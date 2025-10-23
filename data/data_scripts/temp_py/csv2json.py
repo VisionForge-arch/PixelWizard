@@ -10,7 +10,7 @@ import json
 
 def extract_to_json():
     # 读取CSV文件
-    csv_file = "/hpc2ssd/JH_DATA/spooler/htian395/Wenxue/UltraVideo/matched_short.csv"
+    csv_file = "/mnt/vision-gen-nas02-ak/IndividualDirs/wenxueli/Dataset/UltraVideo/matched_short.csv"
     
     try:
         # 读取CSV文件
@@ -51,7 +51,7 @@ def extract_to_json():
         # print(json_output)
         
         # 保存到文件
-        output_file = "/hpc2ssd/JH_DATA/spooler/htian395/Wenxue/UltraVideo/matched_short.json"
+        output_file = "/mnt/vision-gen-nas02-ak/IndividualDirs/wenxueli/Dataset/UltraVideo/matched_short.json"
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(json_output)
         
