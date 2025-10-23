@@ -2,7 +2,7 @@ import pandas as pd
 from collections import Counter
 
 # 文件路径
-short_csv_path = '/hpc2ssd/JH_DATA/spooler/htian395/Wenxue/UltraVideo/short.csv'
+short_csv_path = '/mnt/vision-gen-nas02-ak/IndividualDirs/wenxueli/Dataset/UltraVideo/short.csv'
 
 print("=" * 80)
 print("Short.csv - frame_width 和 frame_height 统计")

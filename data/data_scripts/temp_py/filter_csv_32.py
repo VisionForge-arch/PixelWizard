@@ -121,9 +121,9 @@ def main(args):
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv_file", type=str, default="/hpc2ssd/JH_DATA/spooler/htian395/Wenxue/UltraVideo/short.csv")
-    parser.add_argument("--video_dir", type=str, default="/hpc2ssd/JH_DATA/spooler/htian395/Wenxue/UltraVideo/clips_short_1920")
-    parser.add_argument("--output_path", type=str, default="/hpc2ssd/JH_DATA/spooler/htian395/Wenxue/UltraVideo/matched_short.csv")
+    parser.add_argument("--csv_file", type=str, default="/mnt/vision-gen-nas02-ak/IndividualDirs/wenxueli/Dataset/UltraVideo/short.csv")
+    parser.add_argument("--video_dir", type=str, default="/mnt/vision-gen-nas02-ak/IndividualDirs/wenxueli/Dataset/clips_short_merged")
+    parser.add_argument("--output_path", type=str, default="/mnt/vision-gen-nas02-ak/IndividualDirs/wenxueli/Dataset/UltraVideo/matched_short.csv")
     args = parser.parse_args()
     
     
