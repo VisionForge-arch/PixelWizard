@@ -166,7 +166,7 @@ def main():
     parser.add_argument(
         '--input_dir',
         type=str,
-        default='/hpc2ssd/JH_DATA/spooler/htian395/Wenxue/UltraVideo/clips_short_1920',
+        default='/mnt/vision-gen-nas02-ak/IndividualDirs/wenxueli/Dataset/clips_short_merged',
         help='Input directory containing videos'
     )
     parser.add_argument(
