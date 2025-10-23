@@ -52,6 +52,10 @@ def resample_video(args_tuple):
     """Resample a single video to target fps."""
     input_path, output_path, target_fps, use_gpu, overwrite = args_tuple
     
+    # Debug: Check input file
+    if not os.path.exists(input_path):
+        return False, input_path, f"input file not found: {input_path}"
+    
     # Check if output already exists
     if os.path.exists(output_path) and not overwrite:
         # Verify the file is valid
@@ -211,8 +215,8 @@ def main():
     parser.add_argument(
         '--max_files',
         type=int,
-        default=0,
-        help='Maximum number of files to process (default: 100)'
+        default=100,
+        help='Maximum number of files to process (default: 0 = all files)'
     )
     
     args = parser.parse_args()
@@ -259,6 +263,13 @@ def main():
         video_files = video_files[:args.max_files]
         print(f"Limiting to first {len(video_files)} files")
     
+    # Show some sample files that will be processed
+    print(f"\nSample files to process:")
+    for i, vf in enumerate(video_files[:5]):
+        print(f"  {i+1}. {vf.name}")
+    if len(video_files) > 5:
+        print(f"  ... and {len(video_files) - 5} more files")
+    
     # Prepare tasks
     tasks = []
     for video_path in video_files:
@@ -273,6 +284,13 @@ def main():
             use_gpu,
             args.overwrite
         ))
+    
+    # Show sample output paths
+    print(f"\nSample output paths:")
+    for i, (inp, outp, _, _, _) in enumerate(tasks[:3]):
+        print(f"  {Path(inp).name} -> {outp}")
+    if len(tasks) > 3:
+        print(f"  ... and {len(tasks) - 3} more files")
     
     if args.dry_run:
         print("\n=== DRY RUN ===")
@@ -297,9 +315,10 @@ def main():
     
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"✓ Output directory created/verified: {output_dir}")
     
     # Process videos in parallel
-    print("\nProcessing videos...")
+    print(f"\nProcessing {len(tasks)} videos...")
     successful = 0
     failed = 0
     
@@ -312,13 +331,15 @@ def main():
     
     # Print results
     print("\n=== Results ===")
+    failed_files = []
     for success, input_path, message in results:
         if success:
             successful += 1
             if message != "already exists":
-                print(f"✓ {Path(input_path).name}")
+                print(f"✓ {Path(input_path).name}: {message}")
         else:
             failed += 1
+            failed_files.append((Path(input_path).name, message))
             print(f"✗ {Path(input_path).name}: {message}")
     
     print(f"\nTotal: {len(results)} videos")
