@@ -48,7 +48,7 @@ def filter_existing_clips():
         clip_id = record.get('clip_id', '')
         if clip_id:
             # 检查 .mp4 文件是否存在
-            file_path = os.path.join(video_base_path, f"{clip_id}.mp4")
+            file_path = os.path.join(video_base_path, f"{clip_id}")
             if os.path.exists(file_path):
                 filtered_data.append(record)
     
