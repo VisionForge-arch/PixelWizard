@@ -44,24 +44,12 @@ def filter_existing_clips():
     
     # 过滤存在的文件
     filtered_data = []
-    
-    # 获取目录下所有文件，建立映射
-    video_files = {}
-    if os.path.exists(video_base_path):
-        for filename in os.listdir(video_base_path):
-            # 去掉前两个字符作为key（原始的clip_id）
-            if len(filename) > 2:
-                original_name = filename[2:]  # 去掉前面两个数字
-                video_files[original_name] = filename  # 映射到实际文件名
-    
     for record in data:
         clip_id = record.get('clip_id', '')
         if clip_id:
-            # 检查是否有对应的文件（带前缀的）
-            if clip_id in video_files:
-                actual_filename = video_files[clip_id]
-                # 更新record中的clip_id为实际的文件名（带两个数字前缀的）
-                record['clip_id'] = actual_filename
+            # 检查 .mp4 文件是否存在
+            file_path = os.path.join(video_base_path, f"{clip_id}")
+            if os.path.exists(file_path):
                 filtered_data.append(record)
     
     # 保存过滤后的数据
