@@ -5,7 +5,7 @@ Resamples videos to 24 fps.
 """
 
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '3,4,6,7'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3,4,5,6,7'
 import subprocess
 import argparse
 from pathlib import Path
@@ -184,13 +184,13 @@ def main():
     parser.add_argument(
         '--input_dir',
         type=str,
-        default='/mnt/nas01-ak/IndividualDirs/wenxueli/Dataset/clips_short_merged',
+        default='/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Dataset',
         help='Input directory containing videos'
     )
     parser.add_argument(
         '--output_dir',
         type=str,
-        default='/mnt/nas01-ak/IndividualDirs/wenxueli/Dataset/clips_short_merged_fps24',
+        default='/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Dataset_fps24',
         help='Output directory for resampled videos (default: input_dir + _fps24)'
     )
     parser.add_argument(
@@ -235,8 +235,8 @@ def main():
     parser.add_argument(
         '--gpu_ids',
         type=str,
-        default="3,4,6,7",
-        help='Comma-separated GPU IDs to use (e.g., "0,1,2,3"). Will distribute workload across GPUs.'
+        default="0,1,2,3,4,5,6,7",
+        help='Comma-separated GPU IDs to use (e.g., "0,1,2,3,4,5,6,7"). Will distribute workload across GPUs.'
     )
     
     args = parser.parse_args()
