@@ -21,12 +21,12 @@ class WanTextEncoder(torch.nn.Module):
             device=torch.device('cpu')
         ).eval().requires_grad_(False)
         self.text_encoder.load_state_dict(
-            torch.load("/mnt/vision-gen-ks3/IndividualDirs/dw/peiyuhan/PretrainedModels/videogen_models/Wan2.2-TI2V-5B/models_t5_umt5-xxl-enc-bf16.pth",
+            torch.load("/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B/models_t5_umt5-xxl-enc-bf16.pth",
                        map_location='cpu', weights_only=False)
         )
 
         self.tokenizer = HuggingfaceTokenizer(
-            name="/mnt/vision-gen-ks3/IndividualDirs/dw/peiyuhan/PretrainedModels/videogen_models/Wan2.2-TI2V-5B/google/umt5-xxl/", seq_len=512, clean='whitespace')
+            name="/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B/google/umt5-xxl/", seq_len=512, clean='whitespace')
 
     @property
     def device(self):
@@ -72,7 +72,7 @@ class WanVAEWrapper2_2(torch.nn.Module):
 
         # init model
         self.model = _video_vae(
-            pretrained_path="/mnt/vision-gen-ks3/IndividualDirs/dw/peiyuhan/PretrainedModels/videogen_models/Wan2.2-TI2V-5B/Wan2.2_VAE.pth",
+            pretrained_path="/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B/Wan2.2_VAE.pth",
             z_dim=48,
             temperal_downsample=[False, True, True],
         ).eval().requires_grad_(False)
@@ -131,7 +131,7 @@ class WanDiffusionWrapper(torch.nn.Module):
     ):
         super().__init__()
 
-        self.model = WanModel.from_pretrained(f"/mnt/vision-gen-ks3/IndividualDirs/dw/peiyuhan/PretrainedModels/videogen_models/Wan2.2-TI2V-5B")
+        self.model = WanModel.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
         self.model.eval()
 
         # For non-causal diffusion, all frames share the same timestep
