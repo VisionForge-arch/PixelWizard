@@ -1,4 +1,3 @@
-generator_ckpt: /hpc2hdd/home/htian395/Wenxue/Self-Forcing/checkpoints/self_forcing_dmd.pt
 generator_fsdp_wrap_strategy: size
 real_score_fsdp_wrap_strategy: size
 fake_score_fsdp_wrap_strategy: size

@@ -287,7 +287,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_base_path", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Dataset_fps24")
     parser.add_argument("--dataset_metadata_path", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/UltraVideo/matched_short.json")
-    parser.add_argument("--dataset_repeat", type=int, default=3)
+    parser.add_argument("--dataset_repeat", type=int, default=1)
     parser.add_argument("--data_file_keys", type=str, default=("clip_id",))
     parser.add_argument("--max_pixels", type=int, default=2560*1440)
     parser.add_argument("--height", type=int, default=1440)
