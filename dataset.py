@@ -285,19 +285,19 @@ if __name__ == "__main__":
     from tqdm import tqdm
     from model_wan import SelfForcingWan
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset_base_path", type=str, default="/hpc2ssd/JH_DATA/spooler/htian395/Wenxue/UltraVideo/clips_short_1920_fps24")
-    parser.add_argument("--dataset_metadata_path", type=str, default="/hpc2ssd/JH_DATA/spooler/htian395/Wenxue/UltraVideo/matched_short.json")
+    parser.add_argument("--dataset_base_path", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Dataset_fps24")
+    parser.add_argument("--dataset_metadata_path", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/UltraVideo/matched_short.json")
     parser.add_argument("--dataset_repeat", type=int, default=3)
     parser.add_argument("--data_file_keys", type=str, default=("clip_id",))
     parser.add_argument("--max_pixels", type=int, default=2560*1440)
     parser.add_argument("--height", type=int, default=1440)
     parser.add_argument("--width", type=int, default=2560)
-    parser.add_argument("--num_frames", type=int, default=81)
+    parser.add_argument("--num_frames", type=int, default=49)
     parser.add_argument("--time_division_factor", type=int, default=4)
     parser.add_argument("--time_division_remainder", type=int, default=1)
-    parser.add_argument("--use_gpu", type=bool, default=False)
-    parser.add_argument("--config_path", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/configs/self_forcing_dmd.yaml")
-    parser.add_argument("--logdir", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/logs/self_forcing_dmd")
+    parser.add_argument("--use_gpu", type=bool, default=True)
+    parser.add_argument("--config_path", type=str, default="/root/ultrawan/configs/self_forcing_dmd.yaml")
+    parser.add_argument("--logdir", type=str, default="/root/ultrawan//logs/self_forcing_dmd")
     
     
     args = parser.parse_args()
