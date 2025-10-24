@@ -5,6 +5,7 @@ Resamples videos to 24 fps.
 """
 
 import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '3,4,6,7'
 import subprocess
 import argparse
 from pathlib import Path
@@ -40,6 +41,14 @@ def get_video_info(video_path):
         print(f"Error getting info for {video_path}: {e}")
     return None
 
+def check_ffmpeg_available():
+    """Check if ffmpeg is available."""
+    try:
+        result = subprocess.run(['ffmpeg', '-version'], capture_output=True)
+        return result.returncode == 0
+    except FileNotFoundError:
+        return False
+
 def check_gpu_available():
     """Check if NVIDIA GPU is available for encoding."""
     try:
@@ -50,7 +59,7 @@ def check_gpu_available():
 
 def resample_video(args_tuple):
     """Resample a single video to target fps."""
-    input_path, output_path, target_fps, use_gpu, overwrite = args_tuple
+    input_path, output_path, target_fps, use_gpu, overwrite, gpu_id = args_tuple
     
     # Debug: Check input file
     if not os.path.exists(input_path):
@@ -74,10 +83,14 @@ def resample_video(args_tuple):
     # Try GPU first, then fallback to CPU if GPU fails
     for attempt, try_gpu in enumerate([use_gpu, False] if use_gpu else [False]):
         # Build ffmpeg command
-        cmd = ['ffmpeg', '-y', '-i', input_path, '-hide_banner', '-loglevel', 'error']
+        cmd = ['ffmpeg', '-y']
         
         # Use GPU encoding if available
         if try_gpu:
+            # Specify GPU device for hardware acceleration
+            if gpu_id is not None:
+                cmd.extend(['-hwaccel', 'cuda', '-hwaccel_device', str(gpu_id)])
+            cmd.extend(['-i', input_path, '-hide_banner', '-loglevel', 'error'])
             # Try NVENC (NVIDIA GPU encoding)
             cmd.extend([
                 '-c:v', 'h264_nvenc',  # Use NVIDIA GPU encoder
@@ -87,6 +100,7 @@ def resample_video(args_tuple):
                 '-bufsize', '10M',
             ])
         else:
+            cmd.extend(['-i', input_path, '-hide_banner', '-loglevel', 'error'])
             # CPU encoding with libx264
             cmd.extend([
                 '-c:v', 'libx264',
@@ -188,7 +202,7 @@ def main():
     parser.add_argument(
         '--num_workers',
         type=int,
-        default=None,
+        default=16,
         help='Number of parallel workers (default: auto-detect)'
     )
     parser.add_argument(
@@ -215,18 +229,45 @@ def main():
     parser.add_argument(
         '--max_files',
         type=int,
-        default=100,
-        help='Maximum number of files to process (default: 0 = all files)'
+        default=0,
+        help='Maximum number of files to process (default: 100, set to 0 for all files)'
+    )
+    parser.add_argument(
+        '--gpu_ids',
+        type=str,
+        default="3,4,6,7",
+        help='Comma-separated GPU IDs to use (e.g., "0,1,2,3"). Will distribute workload across GPUs.'
     )
     
     args = parser.parse_args()
     
+    # Check if ffmpeg is available
+    if not check_ffmpeg_available():
+        print("❌ 错误: 未找到 ffmpeg！")
+        print("\n请先安装 ffmpeg:")
+        print("  Ubuntu/Debian: sudo apt install ffmpeg")
+        print("  CentOS/RHEL:   sudo yum install ffmpeg")
+        print("  Fedora:        sudo dnf install ffmpeg")
+        print("  Conda:         conda install -c conda-forge ffmpeg")
+        print("  macOS:         brew install ffmpeg")
+        return
+    else:
+        print("✓ ffmpeg 已找到")
+    
     # Handle GPU settings
     use_gpu = args.use_gpu and not args.no_gpu
+    gpu_ids = []
+    
     if use_gpu:
         gpu_available = check_gpu_available()
         if gpu_available:
-            print("✓ GPU detected, will use hardware acceleration")
+            # Parse GPU IDs
+            if args.gpu_ids:
+                gpu_ids = [int(x.strip()) for x in args.gpu_ids.split(',')]
+                print(f"✓ GPU detected, will use GPU IDs: {gpu_ids}")
+            else:
+                gpu_ids = [0]  # Default to GPU 0
+                print("✓ GPU detected, will use GPU 0 (default)")
         else:
             print("✗ GPU not available, will use CPU encoding")
             use_gpu = False
@@ -272,33 +313,41 @@ def main():
     
     # Prepare tasks
     tasks = []
-    for video_path in video_files:
+    for i, video_path in enumerate(video_files):
         # Preserve directory structure
         rel_path = video_path.relative_to(input_dir)
         output_path = output_dir / rel_path
+        
+        # Distribute tasks across GPUs in round-robin fashion
+        gpu_id = gpu_ids[i % len(gpu_ids)] if gpu_ids else None
         
         tasks.append((
             str(video_path),
             str(output_path),
             args.fps,
             use_gpu,
-            args.overwrite
+            args.overwrite,
+            gpu_id
         ))
     
     # Show sample output paths
     print(f"\nSample output paths:")
-    for i, (inp, outp, _, _, _) in enumerate(tasks[:3]):
-        print(f"  {Path(inp).name} -> {outp}")
+    for i, (inp, outp, _, _, _, gid) in enumerate(tasks[:3]):
+        gpu_str = f" (GPU {gid})" if gid is not None else ""
+        print(f"  {Path(inp).name} -> {outp}{gpu_str}")
     if len(tasks) > 3:
         print(f"  ... and {len(tasks) - 3} more files")
     
     if args.dry_run:
         print("\n=== DRY RUN ===")
-        for input_path, output_path, _, _, _ in tasks[:10]:  # Show first 10
-            print(f"{Path(input_path).name} -> {output_path}")
+        for input_path, output_path, _, _, _, gid in tasks[:10]:  # Show first 10
+            gpu_str = f" (GPU {gid})" if gid is not None else ""
+            print(f"{Path(input_path).name} -> {output_path}{gpu_str}")
         if len(tasks) > 10:
             print(f"... and {len(tasks) - 10} more files")
         print(f"\nTotal: {len(tasks)} files would be processed")
+        if gpu_ids:
+            print(f"Using GPUs: {gpu_ids}")
         return
     
     # Determine number of workers
@@ -307,11 +356,17 @@ def main():
     else:
         # If using GPU, limit workers to avoid GPU memory issues
         if use_gpu:
-            num_workers = min(4, max(1, cpu_count() // 4))
+            # When using multiple GPUs, allow more workers per GPU
+            num_gpus = len(gpu_ids) if gpu_ids else 1
+            workers_per_gpu = min(4, max(1, cpu_count() // 4 // num_gpus))
+            num_workers = workers_per_gpu * num_gpus
         else:
             num_workers = max(1, cpu_count() // 2)
     
-    print(f"Using {num_workers} parallel workers")
+    if use_gpu and gpu_ids:
+        print(f"Using {num_workers} parallel workers across {len(gpu_ids)} GPUs")
+    else:
+        print(f"Using {num_workers} parallel workers")
     
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
