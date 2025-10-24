@@ -10,13 +10,13 @@ from pathlib import Path
 
 def filter_existing_clips():
     # 输入JSON文件路径
-    input_json = "/mnt/vision-gen-nas02-ak/IndividualDirs/wenxueli/Dataset/UltraVideo/matched_short.json"
+    input_json = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/UltraVideo/matched_short.json"
     
     # 视频文件存储路径
-    video_base_path = "/mnt/vision-gen-nas02-ak/IndividualDirs/wenxueli/Dataset/clips_short_merged_fps24"
+    video_base_path = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/UltraVideo/clips_short_merged_fps24"
     
     # 输出JSON文件路径
-    output_json = "/mnt/vision-gen-nas02-ak/IndividualDirs/wenxueli/Dataset/UltraVideo/matched_short_filtered.json"
+    output_json = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/UltraVideo/matched_short_filtered.json"
     
     # 读取JSON文件
     with open(input_json, 'r', encoding='utf-8') as f:
