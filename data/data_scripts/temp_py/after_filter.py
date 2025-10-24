@@ -51,7 +51,7 @@ def filter_existing_clips():
         for filename in os.listdir(video_base_path):
             # 去掉前两个字符作为key（原始的clip_id）
             if len(filename) > 2:
-                original_name = filename[2:]  # 去掉前面两个数字
+                original_name = filename[3:]  # 去掉前面两个数字
                 video_files[original_name] = filename  # 映射到实际文件名
     
     for record in data:
