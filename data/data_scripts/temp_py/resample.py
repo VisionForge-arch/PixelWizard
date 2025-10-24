@@ -184,13 +184,13 @@ def main():
     parser.add_argument(
         '--input_dir',
         type=str,
-        default='/mnt/vision-gen-nas02-ak/IndividualDirs/wenxueli/Dataset/clips_short_merged',
+        default='/mnt/nas01-ak/IndividualDirs/wenxueli/Dataset/clips_short_merged',
         help='Input directory containing videos'
     )
     parser.add_argument(
         '--output_dir',
         type=str,
-        default='/mnt/vision-gen-nas02-ak/IndividualDirs/wenxueli/Dataset/clips_short_merged_fps24',
+        default='/mnt/nas01-ak/IndividualDirs/wenxueli/Dataset/clips_short_merged_fps24',
         help='Output directory for resampled videos (default: input_dir + _fps24)'
     )
     parser.add_argument(
