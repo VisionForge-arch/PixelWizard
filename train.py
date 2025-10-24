@@ -26,7 +26,7 @@ def main():
     parser.add_argument("--time_division_remainder", type=int, default=1)
     parser.add_argument("--use_gpu", type=bool, default=True)
     parser.add_argument("--config_path", type=str, default="/root/ultrawan/configs/self_forcing_dmd.yaml")
-    parser.add_argument("--logdir", type=str, default="/root/ultrawan//logs/self_forcing_dmd")
+    parser.add_argument("--logdir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_10000")
     
     args = parser.parse_args()
     
