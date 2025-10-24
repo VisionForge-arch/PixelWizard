@@ -13,7 +13,7 @@ def filter_existing_clips():
     input_json = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/UltraVideo/matched_short.json"
     
     # 视频文件存储路径
-    video_base_path = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/UltraVideo/clips_short_merged_fps24"
+    video_base_path = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Dataset_fps24"
     
     # 输出JSON文件路径
     output_json = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/UltraVideo/matched_short_filtered.json"
