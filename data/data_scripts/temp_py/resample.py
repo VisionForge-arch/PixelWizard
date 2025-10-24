@@ -108,11 +108,10 @@ def resample_video(args_tuple):
                 '-crf', '23',
             ])
         
-        # Set frame rate and copy audio
+        # Set frame rate and copy audio (no re-encoding for speed)
         cmd.extend([
             '-r', str(target_fps),
-            '-c:a', 'aac',  # Re-encode audio to aac for better compatibility
-            '-b:a', '128k',
+            '-c:a', 'copy',  # Copy audio stream directly (much faster)
             '-movflags', '+faststart',  # Optimize for streaming
             '-f', 'mp4',  # Force mp4 format
             temp_output
@@ -202,8 +201,8 @@ def main():
     parser.add_argument(
         '--num_workers',
         type=int,
-        default=16,
-        help='Number of parallel workers (default: auto-detect)'
+        default=8,
+        help='Number of parallel workers (default: 8, matches GPU count)'
     )
     parser.add_argument(
         '--use_gpu',
@@ -354,12 +353,11 @@ def main():
     if args.num_workers:
         num_workers = args.num_workers
     else:
-        # If using GPU, limit workers to avoid GPU memory issues
+        # If using GPU, use one worker per GPU for best performance
         if use_gpu:
-            # When using multiple GPUs, allow more workers per GPU
             num_gpus = len(gpu_ids) if gpu_ids else 1
-            workers_per_gpu = min(4, max(1, cpu_count() // 4 // num_gpus))
-            num_workers = workers_per_gpu * num_gpus
+            # Use exactly one worker per GPU to avoid GPU context switching
+            num_workers = num_gpus
         else:
             num_workers = max(1, cpu_count() // 2)
     
