@@ -11,11 +11,11 @@ from utils_long.misc import (
 )
 import os
 import time
+import random
 import wandb
 from utils_long.distributed import EMA_FSDP, fsdp_wrap, fsdp_state_dict, launch_distributed_job
 import torch.distributed as dist
-from dataset import cycle
-from dataset_image import UIEBD_Dataset_Wrapper
+from dataset import UnifiedDataset, cycle
 
 class WanModel_Trainer:
     def __init__(self, config):
@@ -42,7 +42,23 @@ class WanModel_Trainer:
 
         set_seed(config.seed + global_rank)
         
-        dataset = UIEBD_Dataset_Wrapper(config.input_root, config.gt_root, 'train')
+        dataset = UnifiedDataset(
+            base_path=config.dataset_base_path,
+            metadata_path=config.dataset_metadata_path,
+            repeat=config.dataset_repeat,
+            data_file_keys=config.data_file_keys,
+            main_data_operator=UnifiedDataset.default_video_operator(
+                base_path=config.dataset_base_path,
+                max_pixels=config.max_pixels,
+                height=config.height,
+                width=config.width,
+                height_division_factor=16,
+                width_division_factor=16,
+                num_frames=config.num_frames,
+                time_division_factor=4,
+                time_division_remainder=1,
+                ),
+            )
         print("len(dataset):", len(dataset))
         
         sampler = torch.utils.data.distributed.DistributedSampler(
@@ -103,6 +119,37 @@ class WanModel_Trainer:
             )
         self.previous_time = None
         
+    '''
+    def convert_pil_list_to_tensor(self, pil_frames):
+        """
+        将PIL图像列表转换为VAE期望的tensor格式
+        Args:
+            pil_frames: List[PIL.Image] - PIL图像列表
+        Returns:
+            torch.Tensor: shape [1, 3, num_frames, height, width]
+        """
+        # 转换PIL图像为tensor
+        transform = transforms.Compose([
+            transforms.ToTensor(),  # 转换为 [0,1] 范围的tensor，形状 [C, H, W]
+        ])
+        
+        # 转换每一帧
+        tensor_frames = []
+        for pil_frame in pil_frames:
+            frame_tensor = transform(pil_frame)  # [3, H, W]
+            tensor_frames.append(frame_tensor)
+        
+        # 堆叠所有帧：[num_frames, 3, H, W]
+        video_tensor = torch.stack(tensor_frames, dim=0)
+        
+        # 重新排列为VAE期望的格式：[1, 3, num_frames, H, W]
+        # 从 [num_frames, 3, H, W] 到 [1, 3, num_frames, H, W]
+        video_tensor = video_tensor.permute(1, 0, 2, 3).unsqueeze(0)
+        
+        return video_tensor
+    '''
+
+
 
     def train_one_step(self, batch):
         self.model.train()
@@ -110,32 +157,27 @@ class WanModel_Trainer:
         if self.step % 20 == 0:
             torch.cuda.empty_cache()
             
-        input_image = batch[0]
-        target_image = batch[1]
-            
         # Step 1: Get the next batch of text prompts
         # DataLoader会将字符串打包成列表，直接使用
+        options = ['detailed_description', 'brief_description', 'summarized_description']
+        text_prompts = batch[random.choice(options)]
+        
         #text_prompts = batch["detailed_description"]
-        text_prompts = [""]
 
         # 转换PIL图像列表为tensor格式
-        frames = target_image.to(device=self.device, dtype=self.dtype)
-        input_frames = input_image.to(device=self.device, dtype=self.dtype)
-        frames = frames.unsqueeze(2)  # [B, C, H, W] -> [B, C, 1, H, W]
-        input_frames = input_frames.unsqueeze(2)  # [B, C, H, W] -> [B, C, 1, H, W]
+        frames = batch["clip_id"].to(device=self.device, dtype=self.dtype)
         
         with torch.no_grad():
-            clean_latent = self.model.vae.encode_to_latent(frames)   # [1, 1, 48, 15, 15]
-            input_latent = self.model.vae.encode_to_latent(input_frames)   # [1, 1, 48, 15, 15]
-            # 确保张量正确分离并转换类型
-            clean_latent = clean_latent.detach().to(dtype=self.dtype)
-            input_latent = input_latent.detach().to(dtype=self.dtype)
+            clean_latent = self.model.vae.encode_to_latent(frames).to(device=self.device, dtype=self.dtype)   
             
             if self.step % 100 == 0:  # 每100步打印一次
-                print(f"input_frames.shape: {input_latent.shape}, clean_latent.shape: {clean_latent.shape}")
+                print(f"frames.shape: {frames.shape}, clean_latent.shape: {clean_latent.shape}")
         
+        # VAE编码完成后立即释放frames显存
+        del frames
+        torch.cuda.empty_cache()
 
-        batch_size = target_image.shape[0]
+        batch_size = len(text_prompts)
         image_or_video_shape = list(self.config.image_or_video_shape)
         image_or_video_shape[0] = batch_size
 
@@ -143,14 +185,24 @@ class WanModel_Trainer:
         with torch.no_grad():
             # 'promot_embeds': [B, 512, 4096]
             conditional_dict = self.model.text_encoder(text_prompts=text_prompts)
+            if not getattr(self, "unconditional_dict", None):
+                unconditional_dict = self.model.text_encoder(
+                    text_prompts=[self.config.negative_prompt] * batch_size)
+                unconditional_dict = {k: v.detach()
+                                      for k, v in unconditional_dict.items()}
+                self.unconditional_dict = unconditional_dict  # cache the unconditional_dict
+            else:
+                unconditional_dict = self.unconditional_dict
                 
         generator_loss, generator_log_dict = self.model.generator_loss(
                 image_or_video_shape=image_or_video_shape,
                 conditional_dict=conditional_dict,
+                unconditional_dict=unconditional_dict,
                 clean_latent=clean_latent,
-                input_latent=input_latent,
             )
-        print(f"generator_loss: {generator_loss}")
+        
+        print("generator_loss:", generator_loss.mean().item())
+        
         generator_loss.backward()
         
         generator_grad_norm = self.model.generator.clip_grad_norm_(self.max_grad_norm_generator)

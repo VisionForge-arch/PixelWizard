@@ -285,8 +285,8 @@ if __name__ == "__main__":
     from tqdm import tqdm
     from model_wan import SelfForcingWan
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset_base_path", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/data/video_resample")
-    parser.add_argument("--dataset_metadata_path", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/data/ultralong_32_extracted.json")
+    parser.add_argument("--dataset_base_path", type=str, default="/hpc2ssd/JH_DATA/spooler/htian395/Wenxue/UltraVideo/clips_short_1920_fps24")
+    parser.add_argument("--dataset_metadata_path", type=str, default="/hpc2ssd/JH_DATA/spooler/htian395/Wenxue/UltraVideo/matched_short.json")
     parser.add_argument("--dataset_repeat", type=int, default=3)
     parser.add_argument("--data_file_keys", type=str, default=("clip_id",))
     parser.add_argument("--max_pixels", type=int, default=2560*1440)
@@ -322,9 +322,9 @@ if __name__ == "__main__":
     dataloader = torch.utils.data.DataLoader(dataset, shuffle=True, collate_fn=lambda x: x[0], num_workers=1)
     
     for data in tqdm(dataloader):
+        print(data.keys())
         print(data['detailed_description'])
         print(data['clip_id'].shape)
-        print(data['clip_id'].min(), data['clip_id'].max())
         break
     # for data in dataset:
     #     print(data['detailed_description'])

@@ -1,7 +1,7 @@
 import argparse
 import torch
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 from omegaconf import OmegaConf
 from tqdm import tqdm
 from torchvision import transforms
@@ -11,20 +11,23 @@ import torch.distributed as dist
 from torch.utils.data import DataLoader, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 
-from pipeline_long import BidirectionalDiffusionInferencePipeline2
-from dataset_image import UIEBD_Dataset_Wrapper
-from utils_long.misc import set_seed
+from pipeline_long import (
+    CausalInferencePipeline,
+)
+from dataset_text import TextDataset_json
+from utils.misc import set_seed
 
 from demo_utils.memory import gpu, get_cuda_free_memory_gb, DynamicSwapInstaller
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--config_path", type=str, default="/hpc2hdd/home/htian395/Wenxue/Underwater/Underwater_Video_UIE/configs/self_forcing_dmd.yaml", help="Path to the config file")
+parser.add_argument("--config_path", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing/configs/self_forcing_dmd0.yaml", help="Path to the config file")
 #parser.add_argument("--checkpoint_path", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing/checkpoints/self_forcing_dmd.pt", help="Path to the checkpoint folder")
-parser.add_argument("--checkpoint_path", type=str, default="/hpc2hdd/home/htian395/Wenxue/Underwater/Underwater_Video_UIE/logs/self_forcing_dmd/checkpoint_model_002000/model.pt", help="Path to the checkpoint folder")
-parser.add_argument("--data_path", type=str, default="/hpc2ssd/JH_DATA/spooler/htian395/C-underwater/0-dataset-split/UIED-no-rename/test/raw-890", help="Path to the dataset")
-parser.add_argument("--gt_path", type=str, default="/hpc2ssd/JH_DATA/spooler/htian395/C-underwater/0-dataset-split/UIED-no-rename/test/reference-890", help="Path to the dataset")
-parser.add_argument("--output_folder", type=str, default="/hpc2hdd/home/htian395/Wenxue/Underwater/Underwater_Video_UIE/outputs/", help="Output folder")
-parser.add_argument("--num_output_frames", type=int, default=1, help="Number of overlap frames between sliding windows")
+parser.add_argument("--checkpoint_path", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/logs/self_forcing_dmd/checkpoint_model_000050/model.pt", help="Path to the checkpoint folder")
+parser.add_argument("--data_path", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/data/ultralong_32_extracted.json", help="Path to the dataset")
+parser.add_argument("--extended_prompt_path", type=str, help="Path to the extended prompt")
+parser.add_argument("--output_folder", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/outputs/", help="Output folder")
+parser.add_argument("--num_output_frames", type=int, default=42, help="Number of overlap frames between sliding windows")
+parser.add_argument("--i2v", action="store_true", help="Whether to perform I2V (or T2V by default)")
 parser.add_argument("--use_ema", action="store_true", default=True, help="Whether to use EMA parameters")
 parser.add_argument("--seed", type=int, default=0, help="Random seed")
 parser.add_argument("--num_samples", type=int, default=1, help="Number of samples to generate per prompt")
@@ -52,12 +55,12 @@ low_memory = get_cuda_free_memory_gb(gpu) < 40
 torch.set_grad_enabled(False)
 
 config = OmegaConf.load(args.config_path)
-default_config = OmegaConf.load("/hpc2hdd/home/htian395/Wenxue/Underwater/Underwater_Video_UIE/configs/default_config.yaml")
+default_config = OmegaConf.load("/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/configs/default_config0.yaml")
 config = OmegaConf.merge(default_config, config)
 
 # Initialize pipeline
 # Few-step inference
-pipeline = BidirectionalDiffusionInferencePipeline2(config, device=device)
+pipeline = CausalInferencePipeline(config, device=device)
 
 
 # if args.checkpoint_path:
@@ -86,10 +89,9 @@ pipeline.vae.to(device=gpu)
 
 
 # Create dataset
-dataset = UIEBD_Dataset_Wrapper(args.data_path, args.gt_path, 'test')
+dataset = TextDataset_json(prompt_path=args.data_path)
 num_prompts = len(dataset)
 print(f"Number of prompts: {num_prompts}")
-
 
 if dist.is_initialized():
     sampler = DistributedSampler(dataset, shuffle=False, drop_last=True)
@@ -119,7 +121,7 @@ def encode(self, videos: torch.Tensor) -> torch.Tensor:
 
 
 for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
-    idx = batch_data[2]
+    idx = batch_data['idx'].item()
 
     # For DataLoader batch_size=1, the batch_data is already a single item, but in a batch container
     # Unpack the batch data for convenience
@@ -131,29 +133,38 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
     all_video = []
     num_generated_frames = 0  # Number of generated (latent) frames
 
+    if args.i2v:
+        # For image-to-video, batch contains image and caption
+        prompt = batch['prompts'][0]  # Get caption from batch
+        prompts = [prompt] * args.num_samples
 
-    prompt = ""  # Get caption from batch
-    prompts = [prompt] * args.num_samples
+        # Process the image
+        image = batch['image'].squeeze(0).unsqueeze(0).unsqueeze(2).to(device=device, dtype=torch.bfloat16)
 
-    # Process the image
-    image = batch[0].squeeze(0).unsqueeze(0).unsqueeze(2).to(device=device, dtype=torch.bfloat16)
+        # Encode the input image as the first latent
+        initial_latent = pipeline.vae.encode_to_latent(image).to(device=device, dtype=torch.bfloat16)
+        initial_latent = initial_latent.repeat(args.num_samples, 1, 1, 1, 1)
 
-    # Encode the input image as the first latent
-    initial_latent = pipeline.vae.encode_to_latent(image).to(device=device, dtype=torch.bfloat16)
-    initial_latent = initial_latent.repeat(args.num_samples, 1, 1, 1, 1)
+        sampled_noise = torch.randn(
+            [args.num_samples, args.num_output_frames - 1, 16, 60, 104], device=device, dtype=torch.bfloat16
+        )
+    else:
+        # For text-to-video, batch is just the text prompt
+        prompt = batch["prompts"]['detailed_description'][0]
+        prompts = [prompt] * args.num_samples
+        initial_latent = None
 
-    sampled_noise = torch.randn(
-        [args.num_samples, args.num_output_frames, 48, 14, 14], device=device, dtype=torch.bfloat16
-    )
-    
-    
+        sampled_noise = torch.randn(
+            [args.num_samples, args.num_output_frames, 16, 60, 104], device=device, dtype=torch.bfloat16
+        )
 
     # Generate 81 frames
     video, latents = pipeline.inference(
-        input_image=initial_latent,
         noise=sampled_noise,
         text_prompts=prompts,
         return_latents=True,
+        initial_latent=initial_latent,
+        low_memory=low_memory,
     )
     current_video = rearrange(video, 'b t c h w -> b t h w c').cpu()
     all_video.append(current_video)
@@ -163,15 +174,15 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
     video = 255.0 * torch.cat(all_video, dim=1)
 
     # Clear VAE cache
-    
     pipeline.vae.model.clear_cache()
 
     # Save the video if the current prompt is not a dummy prompt
-
+    if idx < num_prompts:
+        model = "regular" if not args.use_ema else "ema"
+        for seed_idx in range(args.num_samples):
             # All processes save their videos
-            
-    name = idx[0].split(".")[0]
-    output_path = os.path.join(args.output_folder, f'{name}.mp4')
-
-    #write_video(output_path, video[0], fps=16)
-    write_video(output_path, video[0], fps=16)
+            if args.save_with_index:
+                output_path = os.path.join(args.output_folder, f'{idx}-{seed_idx}_{model}.mp4')
+            else:
+                output_path = os.path.join(args.output_folder, f'{prompt[:100]}-{seed_idx}.mp4')
+            write_video(output_path, video[seed_idx], fps=16)
