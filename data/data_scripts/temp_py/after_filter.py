@@ -31,7 +31,7 @@ def filter_existing_clips():
     for i, record in enumerate(data[:3]):
         clip_id = record.get('clip_id', '')
         print(f"  {i+1}. clip_id: {clip_id}")
-        print(f"     尝试路径: {os.path.join(video_base_path, f'{clip_id}.mp4')}")
+        print(f"     尝试路径: {os.path.join(video_base_path, f'{clip_id}')}")
     
     # 获取视频目录下的实际文件
     if os.path.exists(video_base_path):
