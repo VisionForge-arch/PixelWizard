@@ -111,7 +111,7 @@ class WanTI2V:
         
         # ==============load the model from the checkpoint=============
         if wan_ckpt is not None:
-        
+            print(f"Loading Wan model from {wan_ckpt}")
             state_dict = torch.load(wan_ckpt, map_location="cpu")
             generator_state_dict = state_dict['generator']
             
