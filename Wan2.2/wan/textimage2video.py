@@ -45,6 +45,7 @@ class WanTI2V:
         t5_cpu=False,
         init_on_cpu=True,
         convert_model_dtype=False,
+        wan_ckpt=None,
     ):
         r"""
         Initializes the Wan text-to-video generation model components.
@@ -109,16 +110,18 @@ class WanTI2V:
             convert_model_dtype=convert_model_dtype)
         
         # ==============load the model from the checkpoint=============
-        state_dict = torch.load("/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/logs/self_forcing_dmd/checkpoint_model_001700/model.pt", map_location="cpu")
-        generator_state_dict = state_dict['generator']
+        if wan_ckpt is not None:
         
-        def strip_prefix(d, prefix="model."):
-            if all(k.startswith(prefix) for k in d.keys()):
-                return {k[len(prefix):]: v for k, v in d.items()}
-            return d
-        generator_state_dict = strip_prefix(generator_state_dict)
-        
-        self.model.load_state_dict(generator_state_dict)
+            state_dict = torch.load(wan_ckpt, map_location="cpu")
+            generator_state_dict = state_dict['generator']
+            
+            def strip_prefix(d, prefix="model."):
+                if all(k.startswith(prefix) for k in d.keys()):
+                    return {k[len(prefix):]: v for k, v in d.items()}
+                return d
+            generator_state_dict = strip_prefix(generator_state_dict)
+            
+            self.model.load_state_dict(generator_state_dict)
         # ==============================================================
         
         if use_sp:

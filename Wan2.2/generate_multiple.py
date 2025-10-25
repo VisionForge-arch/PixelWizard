@@ -300,6 +300,11 @@ def _parse_args():
         type=str,
         default="/root/ultrawan/Wan2.2/prompt.txt",
         help="The file to read the prompts from.")
+    parser.add_argument(
+        "--wan_ckpt",
+        type=str,
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_10000/checkpoints/self_forcing_dmd.pt",
+        help="The path to the Wan checkpoint.")
     args = parser.parse_args()
     _validate_args(args)
 
@@ -389,6 +394,7 @@ def generate(args):
         use_sp=(args.ulysses_size > 1),
         t5_cpu=args.t5_cpu,
         convert_model_dtype=args.convert_model_dtype,
+        wan_ckpt=args.wan_ckpt,
     )
     
     logging.info(f"Generating video ...")
