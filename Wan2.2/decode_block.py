@@ -99,7 +99,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--latent_path", type=str, default="/hpc2hdd/home/htian395/Wenxue/Wan2.2/ti2v-5B_1920*1056_1_Close-up_of_an_Asian_man_with_a_hopeful_expression_20251023_122841.pt")
     parser.add_argument("--output", type=str, default="/hpc2hdd/home/htian395/Wenxue/Wan2.2/ti2v-5B_1920*1056_1_Close-up_of_an_Asian_man_with_a_hopeful_expression_20251023_122841.mp4")
-    parser.add_argument("--vae_path", type=str, default="/hpc2ssd/JH_DATA/spooler/htian395/Wenxue/Weight/Wan2.2-TI2V-5B/Wan2.2_VAE.pth")
+    parser.add_argument("--vae_path", type=str, default="/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B/Wan2.2_VAE.pth")
     parser.add_argument("--num_patches", type=int, default=2, help="分成几个patch进行decode，默认2表示分一半一半")
     parser.add_argument("--patch_dim", type=str, default="h", choices=['h', 'w'], help="在哪个维度分割，h=高度，w=宽度")
     parser.add_argument("--device", type=str, default="cuda")

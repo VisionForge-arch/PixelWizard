@@ -115,10 +115,10 @@ def generate_output_filename(prompt, resolution, timestamp):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input_dir", type=str, default="/hpc2hdd/home/htian395/Wenxue/Wan2.2/outputs_long")
-    parser.add_argument("--output_dir", type=str, default="/hpc2hdd/home/htian395/Wenxue/Wan2.2/outputs_long_video")
-    parser.add_argument("--vae_path", type=str, default="/hpc2ssd/JH_DATA/spooler/htian395/Wenxue/Weight/Wan2.2-TI2V-5B/Wan2.2_VAE.pth")
-    parser.add_argument("--num_patches", type=int, default=3, help="分成几个patch进行decode，默认4")
+    parser.add_argument("--input_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/4k_10000iter")
+    parser.add_argument("--output_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/4k_10000iter/decode_video")
+    parser.add_argument("--vae_path", type=str, default="/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B/Wan2.2_VAE.pth")
+    parser.add_argument("--num_patches", type=int, default=2, help="分成几个patch进行decode，默认4")
     parser.add_argument("--patch_dim", type=str, default="w", choices=['h', 'w'], help="在哪个维度分割，h=高度，w=宽度")
     parser.add_argument("--device", type=str, default="cuda")
     args = parser.parse_args()
@@ -144,27 +144,9 @@ if __name__ == "__main__":
         print(f"{'='*60}")
         
         try:
-            # 从文件名提取时间戳
+            # 直接用原文件名，只改扩展名
             filename = os.path.basename(pt_file)
-            timestamp = filename.split('_')[-1].replace('.pt', '')
-            
-            # 先加载文件读取prompt和分辨率信息
-            data = torch.load(pt_file, map_location='cpu')
-            prompt = data.get('prompt', 'unknown')
-            
-            latent_shape = data['latent'][0].shape  # [C, T, H, W]
-            
-            # # 检查最后一个维度（宽度）是否为240
-            # if latent_shape[3] != 240:
-            #     print(f"跳过：latent宽度维度不是240，而是{latent_shape[3]}")
-            #     continue
-            
-            # 计算实际分辨率（VAE会放大8倍）
-            latent_h, latent_w = latent_shape[2], latent_shape[3]
-            resolution = (latent_h * 8, latent_w * 8)
-            
-            # 生成输出文件名
-            output_filename = generate_output_filename(prompt, resolution, timestamp)
+            output_filename = filename.replace('.pt', '.mp4')
             output_path = os.path.join(args.output_dir, output_filename)
             
             # 如果输出文件已存在，跳过
