@@ -178,8 +178,7 @@ class WanModel_Trainer:
         torch.cuda.empty_cache()
 
         batch_size = len(text_prompts)
-        image_or_video_shape = list(self.config.image_or_video_shape)
-        image_or_video_shape[0] = batch_size
+        image_or_video_shape = clean_latent.shape
 
         # Step 2: Extract the conditional infos
         with torch.no_grad():
@@ -201,7 +200,6 @@ class WanModel_Trainer:
                 clean_latent=clean_latent,
             )
         
-        print("generator_loss:", generator_loss.mean().item())
         
         generator_loss.backward()
         
