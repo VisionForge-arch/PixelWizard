@@ -115,8 +115,8 @@ def generate_output_filename(prompt, resolution, timestamp):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/2k_10000iter")
-    parser.add_argument("--output_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/2k_10000iter/decode_video")
+    parser.add_argument("--input_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/2k_10000iter_3s")
+    parser.add_argument("--output_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/2k_10000iter_3s/decode_video")
     parser.add_argument("--vae_path", type=str, default="/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B/Wan2.2_VAE.pth")
     parser.add_argument("--num_patches", type=int, default=2, help="分成几个patch进行decode，默认4")
     parser.add_argument("--patch_dim", type=str, default="w", choices=['h', 'w'], help="在哪个维度分割，h=高度，w=宽度")
