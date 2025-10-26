@@ -21,7 +21,7 @@ def main():
     parser.add_argument("--max_pixels", type=int, default=3840*2144)
     parser.add_argument("--height", type=int, default=2144)
     parser.add_argument("--width", type=int, default=3840)
-    parser.add_argument("--num_frames", type=int, default=5)
+    parser.add_argument("--num_frames", type=int, default=25)
     parser.add_argument("--time_division_factor", type=int, default=4)
     parser.add_argument("--time_division_remainder", type=int, default=1)
     parser.add_argument("--use_gpu", type=bool, default=True)
