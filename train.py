@@ -53,6 +53,7 @@ def main():
     config.use_gpu = args.use_gpu
     config.config_path = args.config_path
     config.logdir = args.logdir
+    config.generator_ckpt = args.generator_ckpt
     
     config.seq_len = int(config.height // 16) * int(config.width // 16) * int((config.num_frames - 1) // config.time_division_factor)
     
