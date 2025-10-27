@@ -123,7 +123,7 @@ def _parse_args():
     parser.add_argument(
         "--frame_num",
         type=int,
-        default=25,
+        default=49,
         help="How many frames of video are generated. The number should be 4n+1"
     )
     parser.add_argument(
@@ -160,7 +160,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/4k_train_10000iter/4k_1s",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/4k_train_10000iter/480p_1s",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
@@ -363,7 +363,7 @@ def generate(args):
     
     # 定义要使用的分辨率
     #resolutions = ['1920*1056', '2560*1440', '3840*2144']
-    resolutions = ['3840*2144']
+    resolutions = ['832*480']
     
     # 创建保存文件夹
     output_dir = args.save_file 
@@ -453,7 +453,7 @@ def generate(args):
             if rank == 0:
                 formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
                 formatted_prompt = current_prompt.replace(" ", "_").replace("/", "_")[:50]
-                file_name = f"{args.task}_{args.size.replace('*','x') if sys.platform=='win32' else args.size}_{args.ulysses_size}_{formatted_prompt}_{formatted_time}.pt"
+                file_name = f"{args.task}_{resolution.replace('*','x') if sys.platform=='win32' else resolution}_{args.ulysses_size}_{formatted_prompt}_{formatted_time}.pt"
                 args.save_file = os.path.join(output_dir, file_name)
                 
                 logging.info(f"Saving latent to {args.save_file}")
@@ -461,7 +461,7 @@ def generate(args):
                     'latent': video,
                     'prompt': args.prompt,
                     'seed': args.base_seed,
-                    'size': args.size,
+                    'size': resolution,
                     'frame_num': args.frame_num,
                 }, args.save_file)
                 #logging.info(f"Latent shape: {video.shape}")
