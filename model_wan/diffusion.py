@@ -49,7 +49,21 @@ class SelfForcingWan(SelfForcingModel):
             
         self.noise_augmentation_max_timestep = getattr(args, "noise_augmentation_max_timestep", 0)
 
+        ##############################################################################################################
+        # (If resuming) Load the model and optimizer, lr_scheduler, ema's statedicts
+        if getattr(args, "generator_ckpt", False):
+            print(f"Loading pretrained generator from {args.generator_ckpt}")
+            state_dict = torch.load(args.generator_ckpt, map_location="cpu")
+            if "generator" in state_dict:
+                state_dict = state_dict["generator"]
+            elif "model" in state_dict:
+                state_dict = state_dict["model"]
+            self.model.generator.load_state_dict(
+                state_dict, strict=True
+            )
             
+        ##############################################################################################################
+
             
     def _initialize_models(self, args, device):
         self.seq_len = args.seq_len
