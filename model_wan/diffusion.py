@@ -58,7 +58,7 @@ class SelfForcingWan(SelfForcingModel):
                 state_dict = state_dict["generator"]
             elif "model" in state_dict:
                 state_dict = state_dict["model"]
-            self.model.generator.load_state_dict(
+            self.generator.load_state_dict(
                 state_dict, strict=True
             )
             
