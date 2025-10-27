@@ -123,7 +123,7 @@ def _parse_args():
     parser.add_argument(
         "--frame_num",
         type=int,
-        default=73,
+        default=25,
         help="How many frames of video are generated. The number should be 4n+1"
     )
     parser.add_argument(
@@ -160,7 +160,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/2k_10000iter_3s",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/4k_train_10000iter/4k_1s",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
@@ -303,7 +303,7 @@ def _parse_args():
     parser.add_argument(
         "--wan_ckpt",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_10000/checkpoint_model_001000/model.pt",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_4k_10000/checkpoint_model_001000/model.pt",
         help="The path to the Wan checkpoint.")
     args = parser.parse_args()
     _validate_args(args)
