@@ -142,8 +142,6 @@ class WanDiffusionWrapper(torch.nn.Module):
         )
         self.scheduler.set_timesteps(1000, training=True)
 
-        #self.seq_len = 32760  # [1, 21, 16, 60, 104]
-        #self.seq_len = 90*160*21  # [1, 21, 16, 180, 320]
         self.seq_len = seq_len
         self.post_init()
 

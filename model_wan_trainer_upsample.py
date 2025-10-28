@@ -16,6 +16,7 @@ import wandb
 from utils_long.distributed import EMA_FSDP, fsdp_wrap, fsdp_state_dict, launch_distributed_job
 import torch.distributed as dist
 from dataset import UnifiedDataset, cycle
+import torch.nn.functional as F
 
 class WanModel_Trainer:
     def __init__(self, config):
@@ -137,15 +138,22 @@ class WanModel_Trainer:
 
         # 转换PIL图像列表为tensor格式
         frames = batch["clip_id"].to(device=self.device, dtype=self.dtype)
+        frames_480p = F.interpolate(
+                frames, 
+                size=(480, 832),      # 或 (480, 640)，取决于你希望的宽高比
+                mode='bilinear', 
+                align_corners=False)
         
         with torch.no_grad():
             clean_latent = self.model.vae.encode_to_latent(frames).to(device=self.device, dtype=self.dtype)   
+            clean_latent_lr = self.model.vae.encode_to_latent(frames_480p).to(device=self.device, dtype=self.dtype)
             
             if self.step % 100 == 0:  # 每100步打印一次
                 print(f"frames.shape: {frames.shape}, clean_latent.shape: {clean_latent.shape}")
-        
+                print(f"frames_480p.shape: {frames_480p.shape}, clean_latent_lr.shape: {clean_latent_lr.shape}")
         # VAE编码完成后立即释放frames显存
         del frames
+        del frames_480p
         torch.cuda.empty_cache()
 
         batch_size = len(text_prompts)
@@ -169,6 +177,7 @@ class WanModel_Trainer:
                 conditional_dict=conditional_dict,
                 unconditional_dict=unconditional_dict,
                 clean_latent=clean_latent,
+                clean_latent_lr=clean_latent_lr
             )
         
         

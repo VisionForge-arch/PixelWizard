@@ -1,9 +1,11 @@
 from typing import Tuple
 import torch
+import torch.nn.functional as F
 
 from model_wan.base import BaseModel, SelfForcingModel
 from utils_long.wan2_wrapper import WanDiffusionWrapper, WanTextEncoder, WanVAEWrapper2_2
 from pipeline_long import SelfForcingTrainingPipeline
+
 
 class SelfForcingWan(SelfForcingModel):
     def __init__(self, args, device):
@@ -112,6 +114,7 @@ class SelfForcingWan(SelfForcingModel):
         conditional_dict: dict,
         unconditional_dict: dict,
         clean_latent: torch.Tensor,
+        clean_latent_lr: torch.Tensor = None,
         initial_latent: torch.Tensor = None
     ) -> Tuple[torch.Tensor, dict]:
         """
@@ -144,11 +147,32 @@ class SelfForcingWan(SelfForcingModel):
         timestep = self.scheduler.timesteps[index].to(dtype=self.dtype, device=self.device)
         timestep = timestep[:, None].expand(batch_size, num_frame)  # [B, F]
         # Flow Matching: x_t = (1-sigma) * x0 + sigma * noise
-        noisy_latents = self.scheduler.add_noise(
-            clean_latent.flatten(0, 1),
-            noise.flatten(0, 1),
-            timestep.flatten(0, 1)
-        ).unflatten(0, (batch_size, num_frame))
+        
+        if clean_latent_lr is not None:
+            
+            
+            clean_latent_lr = F.interpolate(
+                clean_latent_lr,
+                size=clean_latent.shape[-2:],
+                mode='bilinear',
+                align_corners=False
+            )
+            print('===upsample===')
+            print(f"clean_latent_lr.shape: {clean_latent_lr.shape}, clean_latent.shape: {clean_latent.shape}")
+            
+            noisy_latents = self.scheduler.add_noise(
+                clean_latent_lr.flatten(0, 1),
+                noise.flatten(0, 1),
+                timestep.flatten(0, 1)
+            ).unflatten(0, (batch_size, num_frame))
+        else:
+        
+        
+            noisy_latents = self.scheduler.add_noise(
+                clean_latent.flatten(0, 1),
+                noise.flatten(0, 1),
+                timestep.flatten(0, 1)
+            ).unflatten(0, (batch_size, num_frame))
         # Flow Matching target: v = noise - x0 (velocity field)
         training_target = self.scheduler.training_target(
             clean_latent.flatten(0, 1), 
