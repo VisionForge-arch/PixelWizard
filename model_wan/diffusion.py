@@ -51,16 +51,16 @@ class SelfForcingWan(SelfForcingModel):
 
         ##############################################################################################################
         # (If resuming) Load the model and optimizer, lr_scheduler, ema's statedicts
-        if getattr(args, "generator_ckpt", False):
-            print(f"Loading pretrained generator from {args.generator_ckpt}")
-            state_dict = torch.load(args.generator_ckpt, map_location="cpu")
-            if "generator" in state_dict:
-                state_dict = state_dict["generator"]
-            elif "model" in state_dict:
-                state_dict = state_dict["model"]
-            self.generator.load_state_dict(
-                state_dict, strict=True
-            )
+        # if getattr(args, "generator_ckpt", False):
+        #     print(f"Loading pretrained generator from {args.generator_ckpt}")
+        #     state_dict = torch.load(args.generator_ckpt, map_location="cpu")
+        #     if "generator" in state_dict:
+        #         state_dict = state_dict["generator"]
+        #     elif "model" in state_dict:
+        #         state_dict = state_dict["model"]
+        #     self.generator.load_state_dict(
+        #         state_dict, strict=True
+        #     )
             
         ##############################################################################################################
 

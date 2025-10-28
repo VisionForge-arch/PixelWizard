@@ -135,6 +135,7 @@ class WanModel_Trainer:
         
         #text_prompts = batch["detailed_description"]
 
+        # 转换PIL图像列表为tensor格式
         frames = batch["clip_id"].to(device=self.device, dtype=self.dtype)
         
         with torch.no_grad():
