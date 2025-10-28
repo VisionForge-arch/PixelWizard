@@ -172,6 +172,8 @@ class WanModel_Trainer:
             else:
                 unconditional_dict = self.unconditional_dict
                 
+                
+        exit()
         generator_loss, generator_log_dict = self.model.generator_loss(
                 image_or_video_shape=image_or_video_shape,
                 conditional_dict=conditional_dict,
