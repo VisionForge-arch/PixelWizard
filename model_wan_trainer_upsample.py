@@ -139,28 +139,39 @@ class WanModel_Trainer:
         # 转换PIL图像列表为tensor格式
         frames = batch["clip_id"].to(device=self.device, dtype=self.dtype)
         
+        
+        # 处理frames为480p，作为lr guidance。
         B, C, T, H, W = frames.shape
         frames_480p = frames.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W)
         
         frames_480p = F.interpolate(frames_480p,  size=(480, 832), mode='bilinear', align_corners=False)
         frames_480p = frames_480p.reshape(B, T, C, 480, 832).permute(0, 2, 1, 3, 4)
         
+        # vae编码
         with torch.no_grad():
-            clean_latent = self.model.vae.encode_to_latent(frames).to(device=self.device, dtype=self.dtype)   
-            clean_latent_lr = self.model.vae.encode_to_latent(frames_480p).to(device=self.device, dtype=self.dtype)
+            clean_latent = self.model.vae.encode_to_latent(frames).to(device=self.device, dtype=self.dtype)           # [1, 13, 48, 90, 160]
+            clean_latent_lr = self.model.vae.encode_to_latent(frames_480p).to(device=self.device, dtype=self.dtype)   # [1, 13, 48, 30, 52]
             
-            if self.step % 100 == 0:  # 每100步打印一次
-                print(f"frames.shape: {frames.shape}, clean_latent.shape: {clean_latent.shape}")
-                print(f"frames_480p.shape: {frames_480p.shape}, clean_latent_lr.shape: {clean_latent_lr.shape}")
+            B, C, T, H, W   = clean_latent.shape
+            _, _, _, h, w   = clean_latent_lr.shape
+
+            clean_latent_lr = clean_latent_lr.permute(0, 2, 1, 3, 4).reshape(B*T, C, h, w)  # [B*T, C, h, w]
+            clean_latent_lr = F.interpolate(clean_latent_lr, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
+            clean_latent_lr = clean_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)  # 还原回 [B, C, T, H, W]
+                    
+            print(f"frames.shape: {frames.shape}, clean_latent.shape: {clean_latent.shape}")
+            print(f"frames_480p.shape: {frames_480p.shape}, clean_latent_lr.shape: {clean_latent_lr.shape}")
+                
         # VAE编码完成后立即释放frames显存
         del frames
         del frames_480p
         torch.cuda.empty_cache()
+        exit()
 
         batch_size = len(text_prompts)
         image_or_video_shape = clean_latent.shape
 
-        # Step 2: Extract the conditional infos
+        # Extract the conditional infos
         with torch.no_grad():
             # 'promot_embeds': [B, 512, 4096]
             conditional_dict = self.model.text_encoder(text_prompts=text_prompts)
@@ -174,7 +185,6 @@ class WanModel_Trainer:
                 unconditional_dict = self.unconditional_dict
                 
                 
-        exit()
         generator_loss, generator_log_dict = self.model.generator_loss(
                 image_or_video_shape=image_or_video_shape,
                 conditional_dict=conditional_dict,
