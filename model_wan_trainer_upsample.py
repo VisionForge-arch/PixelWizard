@@ -159,14 +159,14 @@ class WanModel_Trainer:
             clean_latent_lr = F.interpolate(clean_latent_lr, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
             clean_latent_lr = clean_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)  # 还原回 [B, C, T, H, W]
                     
-            print(f"frames.shape: {frames.shape}, clean_latent.shape: {clean_latent.shape}")
-            print(f"frames_480p.shape: {frames_480p.shape}, clean_latent_lr.shape: {clean_latent_lr.shape}")
+            # print(f"frames.shape: {frames.shape}, clean_latent.shape: {clean_latent.shape}")
+            # print(f"frames_480p.shape: {frames_480p.shape}, clean_latent_lr.shape: {clean_latent_lr.shape}")
                 
         # VAE编码完成后立即释放frames显存
         del frames
         del frames_480p
         torch.cuda.empty_cache()
-        exit()
+        
 
         batch_size = len(text_prompts)
         image_or_video_shape = clean_latent.shape
@@ -178,8 +178,7 @@ class WanModel_Trainer:
             if not getattr(self, "unconditional_dict", None):
                 unconditional_dict = self.model.text_encoder(
                     text_prompts=[self.config.negative_prompt] * batch_size)
-                unconditional_dict = {k: v.detach()
-                                      for k, v in unconditional_dict.items()}
+                unconditional_dict = {k: v.detach() for k, v in unconditional_dict.items()}
                 self.unconditional_dict = unconditional_dict  # cache the unconditional_dict
             else:
                 unconditional_dict = self.unconditional_dict

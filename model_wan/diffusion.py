@@ -15,7 +15,6 @@ class SelfForcingWan(SelfForcingModel):
         super().__init__(args, device)
         self.num_frame_per_block = getattr(args, "num_frame_per_block", 1)
         self.same_step_across_blocks = getattr(args, "same_step_across_blocks", True)
-        self.num_training_frames = getattr(args, "num_training_frames", 21)
         
         # Random crop settings for loss computation (to save memory)
         self.use_random_crop = getattr(args, "use_random_crop", False)
@@ -149,17 +148,7 @@ class SelfForcingWan(SelfForcingModel):
         # Flow Matching: x_t = (1-sigma) * x0 + sigma * noise
         
         if clean_latent_lr is not None:
-            
-            
-            clean_latent_lr = F.interpolate(
-                clean_latent_lr,
-                size=clean_latent.shape[-2:],
-                mode='bilinear',
-                align_corners=False
-            )
-            print('===upsample===')
-            print(f"clean_latent_lr.shape: {clean_latent_lr.shape}, clean_latent.shape: {clean_latent.shape}")
-            
+                
             noisy_latents = self.scheduler.add_noise(
                 clean_latent_lr.flatten(0, 1),
                 noise.flatten(0, 1),
