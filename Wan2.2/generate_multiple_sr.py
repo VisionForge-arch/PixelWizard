@@ -492,13 +492,13 @@ def generate(args):
                     elif file_path.endswith(".mp4"):
                         # 480p → VAE.encode_to_latent
                         frames_lr = load_video_tensor(file_path, target_hw=(480, 832))  # 你的保存就是 832x480
-                        frames_lr = frames_lr.to(device=wan_ti2v.device, dtype=wan_ti2v.dtype)
+                        frames_lr = frames_lr.to(device=wan_ti2v.device, dtype=torch.float32)
                         cond_latent = wan_ti2v.model.vae.encode_to_latent(frames_lr)  # [1,C,T,h',w']
                     else:
                         logging.warning(f"不支持的文件类型: {file_path}")
 
                     if cond_latent is not None:
-                        cond_latent = cond_latent.to(device=wan_ti2v.device, dtype=wan_ti2v.dtype)
+                        cond_latent = cond_latent.to(device=wan_ti2v.device, dtype=torch.float32)
 
                         # 上采样 cond_latent 到 HR latent 尺寸（与目标像素尺寸对应的 latent 尺寸）
                         latent_H, latent_W = pixels_to_latent_hw(resolution, down=8)  # 下采样倍数按实际 VAE 改
