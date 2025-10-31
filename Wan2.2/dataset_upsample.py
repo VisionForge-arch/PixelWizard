@@ -65,7 +65,10 @@ class ToAbsolutePath(DataProcessingOperator):
         self.base_path = base_path
         
     def __call__(self, data):
-        return os.path.join(self.base_path, data)
+        if args.base_path is not None:
+            return os.path.join(self.base_path, data)
+        else:
+            return data
     
     
 class ImageCropAndResize(DataProcessingOperator):
