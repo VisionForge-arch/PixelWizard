@@ -499,7 +499,7 @@ def generate(args):
                 
             # ========== (A) 准备 cond_latent (480p 条件) ==========
             B, C, T, H, W = video_input.shape
-            video_input = video_input.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W)
+            video_input = [video_input.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W)]
 
             with torch.no_grad():
                 cond_latent = encode_to_latent(wan_ti2v, video_input)  # [1,C,T,h',w']
