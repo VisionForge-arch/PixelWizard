@@ -455,7 +455,7 @@ def generate(args):
     
     for prompt_idx, (prompt, file_path) in enumerate(prompts_and_files, 1):
         print(prompt)
-        print(file_name)
+        print(file_path)
 
         for resolution in resolutions:
             if rank == 0:
