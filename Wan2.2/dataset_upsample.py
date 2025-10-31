@@ -61,11 +61,11 @@ class RouteByType(DataProcessingOperator):
         raise ValueError(f"Unsupported data: {data}")
 
 class ToAbsolutePath(DataProcessingOperator):
-    def __init__(self, base_path=""):
+    def __init__(self, base_path=None):
         self.base_path = base_path
         
     def __call__(self, data):
-        if args.base_path is not None:
+        if self.base_path is not None:
             return os.path.join(self.base_path, data)
         else:
             return data
