@@ -123,7 +123,7 @@ def _parse_args():
     parser.add_argument(
         "--frame_num",
         type=int,
-        default=49,
+        default=121,
         help="How many frames of video are generated. The number should be 4n+1"
     )
     parser.add_argument(
@@ -160,7 +160,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/480p_2s",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/480p_5s",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
