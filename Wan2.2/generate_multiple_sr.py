@@ -458,7 +458,7 @@ def generate(args):
         print(prompt)
         video_input = data["file"]
         print(video_input.shape)
-        video_input = video_input.unsqeeze(0).to(device=device, dtype=torch.float32)
+        video_input = video_input.unsqueeze(0).to(device=device, dtype=torch.float32)
         
         #file_path = 
         # print(file_path)
