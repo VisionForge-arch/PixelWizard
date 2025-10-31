@@ -493,7 +493,7 @@ def generate(args):
                         # 480p → VAE.encode_to_latent
                         frames_lr = load_video_tensor(file_path, target_hw=(480, 832))  # 你的保存就是 832x480
                         frames_lr = frames_lr.to(device=wan_ti2v.device, dtype=torch.float32)
-                        cond_latent = wan_ti2v.model.vae.encode_to_latent(frames_lr)  # [1,C,T,h',w']
+                        cond_latent = wan_ti2v.vae.encode_to_latent(frames_lr)  # [1,C,T,h',w']
                     else:
                         logging.warning(f"不支持的文件类型: {file_path}")
 
