@@ -14,6 +14,7 @@ import random
 import torch
 import torch.distributed as dist
 from PIL import Image
+import json
 
 import wan
 from wan.configs import MAX_AREA_CONFIGS, SIZE_CONFIGS, SUPPORTED_SIZES, WAN_CONFIGS
@@ -298,7 +299,7 @@ def _parse_args():
     parser.add_argument(
         "--prompt_file",
         type=str,
-        default="/root/ultrawan/Wan2.2/prompt.txt",
+        default="/root/ultrawan/Wan2.2/prompt_to_file.json",
         help="The file to read the prompts from.")
     parser.add_argument(
         "--wan_ckpt",
@@ -322,6 +323,44 @@ def _init_logging(rank):
             handlers=[logging.StreamHandler(stream=sys.stdout)])
     else:
         logging.basicConfig(level=logging.ERROR)
+
+# ============ 工具：读 mp4 -> 标准化 -> [1,C,T,H,W] ============
+def load_video_tensor(path, target_hw=None):
+    """
+    读取 mp4 为 [1, C, T, H, W]，像素已标准化到 [-1, 1]。
+    若 target_hw=(H,W) 则逐帧 resize 到该分辨率（像素分辨率，不是 latent）。
+    """
+    import torchvision.io as io
+    from torchvision.transforms.functional import resize
+
+    vid, _, info = io.read_video(path, pts_unit="sec")  # [T, H, W, C], float32 in [0,255]
+    vid = vid.permute(0, 3, 1, 2).contiguous()          # [T, C, H, W]
+    # 归一化到 [-1, 1]（与你的 VAE 预处理保持一致）
+    vid = vid / 255.0 * 2.0 - 1.0
+
+    if target_hw is not None:
+        T = vid.size(0)
+        frames = []
+        for i in range(T):
+            frames.append(resize(vid[i], target_hw, antialias=True))
+        vid = torch.stack(frames, dim=0)                # [T, C, H, W]
+
+    vid = vid.permute(1, 0, 2, 3).unsqueeze(0)          # [1, C, T, H, W]
+    return vid
+
+# ============ 工具：把 [B,C,T,h,w] 上采样到 [B,C,T,H,W] ============
+def upsample_latent_to(latent, target_hw):
+    B, C, T, h, w = latent.shape
+    H, W = target_hw
+    x = latent.permute(0, 2, 1, 3, 4).reshape(B*T, C, h, w)
+    x = F.interpolate(x, size=(H, W), mode='bilinear', align_corners=False)
+    x = x.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4).contiguous()
+    return x
+
+# —— 估计 latent 的空间尺寸（像素 -> latent），用你的 VAE 下采样率。假设 /8，按需改成 /4 或 /16 —— #
+def pixels_to_latent_hw(size_str, down=8):
+    W, H = map(int, size_str.split("*"))  # 注意你的顺序是 "1280*704"
+    return H // down, W // down
 
 
 def generate(args):
@@ -357,14 +396,22 @@ def generate(args):
         
     # 读取prompt文件
     prompt_file = args.prompt_file
-    with open(prompt_file, 'r', encoding='utf-8') as f:
-        prompts = [line.strip() for line in f.readlines() if line.strip()]
+    with open(prompt_file, "r", encoding="utf-8") as f:
+        pairs = json.load(f) 
     
-    logging.info(f"从 {prompt_file} 读取了 {len(prompts)} 条 prompts")
+    prompts_and_files = []
+    for item in pairs:
+        p = item.get("prompt", "").strip()
+        fp = item.get("file", None)
+        if p:
+            prompts_and_files.append((p, fp))
+
+    logging.info(f"从 {prompt_file} 读取了 {len(prompts_and_files)} 条 prompts")
+    
     
     # 定义要使用的分辨率
     #resolutions = ['1920*1056', '2560*1440', '3840*2144']
-    resolutions = ['1280*704']
+    resolutions = ['2560*1440']
     
     # 创建保存文件夹
     output_dir = args.save_file 
@@ -383,6 +430,11 @@ def generate(args):
         base_seed = [args.base_seed] if rank == 0 else [None]
         dist.broadcast_object_list(base_seed, src=0)
         args.base_seed = base_seed[0]
+        
+        
+        
+    # ======== 对齐参数 ==========
+    denoising_strength = 0.5              
 
     logging.info("Creating WanTI2V pipeline.")
     wan_ti2v = wan.WanTI2V(
@@ -399,25 +451,16 @@ def generate(args):
     )
     
     logging.info(f"Generating video ...")
-        # video = wan_ti2v.generate(
-        #     args.prompt,
-        #     img=img,
-        #     size=SIZE_CONFIGS[args.size],
-        #     max_area=MAX_AREA_CONFIGS[args.size],
-        #     frame_num=args.frame_num,
-        #     shift=args.sample_shift,
-        #     sample_solver=args.sample_solver,
-        #     sampling_steps=args.sample_steps,
-        #     guide_scale=args.sample_guide_scale,
-        #     seed=args.base_seed,
-        #     offload_model=args.offload_model)
 
     
-    for prompt_idx, prompt in enumerate(prompts, 1):
+    for prompt_idx, (prompt, file_path) in enumerate(prompts_and_files, 1):
+        print(prompt)
+        print(file_name)
+
         for resolution in resolutions:
             if rank == 0:
                 logging.info(f"\n{'='*80}")
-                logging.info(f"处理 Prompt {prompt_idx}/{len(prompts)}, 分辨率: {resolution}")
+                logging.info(f"处理 Prompt {prompt_idx}/{len(prompts_and_files)}, 分辨率: {resolution}")
                 logging.info(f"Prompt: {prompt}")
                 logging.info(f"{'='*80}\n")
                 
@@ -434,7 +477,34 @@ def generate(args):
                 base_seed = [current_seed] if rank == 0 else [None]
                 dist.broadcast_object_list(base_seed, src=0)
                 current_seed = base_seed[0]
-            
+                
+                
+            # ========== (A) 准备 cond_latent (480p 条件) ==========
+            cond_latent = None
+            if file_path and os.path.exists(file_path):
+                with torch.no_grad():
+                    if file_path.endswith(".pt"):
+                        tmp = torch.load(file_path, map_location="cpu")
+                        if isinstance(tmp, dict) and "latent" in tmp:
+                            cond_latent = tmp["latent"]
+                        else:
+                            cond_latent = tmp
+                    elif file_path.endswith(".mp4"):
+                        # 480p → VAE.encode_to_latent
+                        frames_lr = load_video_tensor(file_path, target_hw=(480, 832))  # 你的保存就是 832x480
+                        frames_lr = frames_lr.to(device=wan_ti2v.device, dtype=wan_ti2v.dtype)
+                        cond_latent = wan_ti2v.model.vae.encode_to_latent(frames_lr)  # [1,C,T,h',w']
+                    else:
+                        logging.warning(f"不支持的文件类型: {file_path}")
+
+                    if cond_latent is not None:
+                        cond_latent = cond_latent.to(device=wan_ti2v.device, dtype=wan_ti2v.dtype)
+
+                        # 上采样 cond_latent 到 HR latent 尺寸（与目标像素尺寸对应的 latent 尺寸）
+                        latent_H, latent_W = pixels_to_latent_hw(resolution, down=8)  # 下采样倍数按实际 VAE 改
+                        cond_latent = upsample_latent_to(cond_latent, (latent_H, latent_W))  # [1,C,T,H,W]
+
+                
             
 
             video = wan_ti2v.generate(
