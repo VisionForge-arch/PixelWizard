@@ -283,7 +283,7 @@ def cycle(dl):
 if __name__ == "__main__":
     import argparse
     from tqdm import tqdm
-    from model_wan import SelfForcingWan
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_base_path", type=str, default=None)
     parser.add_argument("--dataset_metadata_path", type=str, default="/root/ultrawan/Wan2.2/prompt_to_file.json")
