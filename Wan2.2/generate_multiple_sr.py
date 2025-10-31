@@ -429,7 +429,9 @@ def generate(args):
                 ),
             )
     print("len(dataset):", len(dataset))
-    exit()
+
+    
+    dataloader = torch.utils.data.DataLoader(dataset, shuffle=True, collate_fn=lambda x: x[0], num_workers=1)
         
     # ======== 对齐参数 ==========
     denoising_strength = 0.5              
@@ -451,9 +453,15 @@ def generate(args):
     logging.info(f"Generating video ...")
 
     
-    for prompt_idx, (prompt, file_path) in enumerate(prompts_and_files, 1):
+    for prompt_idx, data in enumerate(dataloader):
+        prompt = data["prompt"]
         print(prompt)
-        print(file_path)
+        video_input = data["file"].shape
+        print(video_input.shape)
+        video_input = video_input.unsqeeze(0).to(device=device, dtype=torch.float32)
+        
+        #file_path = 
+        # print(file_path)
 
         for resolution in resolutions:
             if rank == 0:
@@ -479,30 +487,19 @@ def generate(args):
                 
             # ========== (A) 准备 cond_latent (480p 条件) ==========
             cond_latent = None
-            if file_path and os.path.exists(file_path):
-                with torch.no_grad():
-                    if file_path.endswith(".pt"):
-                        tmp = torch.load(file_path, map_location="cpu")
-                        if isinstance(tmp, dict) and "latent" in tmp:
-                            cond_latent = tmp["latent"]
-                        else:
-                            cond_latent = tmp
-                    elif file_path.endswith(".mp4"):
-                        # 480p → VAE.encode_to_latent
-                        frames_lr = load_video_tensor(file_path, target_hw=(480, 832))  # 你的保存就是 832x480
-                        frames_lr = frames_lr.to(device=wan_ti2v.device, dtype=torch.float32)
-                        cond_latent = wan_ti2v.vae.encode_to_latent(frames_lr)  # [1,C,T,h',w']
-                    else:
-                        logging.warning(f"不支持的文件类型: {file_path}")
-
-                    if cond_latent is not None:
-                        cond_latent = cond_latent.to(device=wan_ti2v.device, dtype=torch.float32)
-
-                        # 上采样 cond_latent 到 HR latent 尺寸（与目标像素尺寸对应的 latent 尺寸）
-                        latent_H, latent_W = pixels_to_latent_hw(resolution, down=8)  # 下采样倍数按实际 VAE 改
-                        cond_latent = upsample_latent_to(cond_latent, (latent_H, latent_W))  # [1,C,T,H,W]
-
+            with torch.no_grad():
+                cond_latent = wan_ti2v.vae.encode_to_latent(video_input)  # [1,C,T,h',w']
                 
+                print(cond_latent.shape)
+                exit()
+                if cond_latent is not None:
+                    cond_latent = cond_latent.to(device=wan_ti2v.device, dtype=torch.float32)
+
+                # 上采样 cond_latent 到 HR latent 尺寸（与目标像素尺寸对应的 latent 尺寸）
+                latent_H, latent_W = pixels_to_latent_hw(resolution, down=8)  # 下采样倍数按实际 VAE 改
+                cond_latent = upsample_latent_to(cond_latent, (latent_H, latent_W))  # [1,C,T,H,W]
+
+            
             
  
             video = wan_ti2v.generate(
