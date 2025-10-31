@@ -456,7 +456,7 @@ def generate(args):
     for prompt_idx, data in enumerate(dataloader):
         prompt = data["prompt"]
         print(prompt)
-        video_input = data["file"].shape
+        video_input = data["file"]
         print(video_input.shape)
         video_input = video_input.unsqeeze(0).to(device=device, dtype=torch.float32)
         
@@ -486,7 +486,7 @@ def generate(args):
                 
                 
             # ========== (A) 准备 cond_latent (480p 条件) ==========
-            cond_latent = None
+
             with torch.no_grad():
                 cond_latent = wan_ti2v.vae.encode_to_latent(video_input)  # [1,C,T,h',w']
                 
