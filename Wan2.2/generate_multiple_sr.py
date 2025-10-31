@@ -342,6 +342,23 @@ def pixels_to_latent_hw(size_str, down=8):
     return H // down, W // down
 
 
+def encode_to_latent(model, pixel: torch.Tensor) -> torch.Tensor:
+    # pixel: [batch_size, num_channels, num_frames, height, width]
+    device, dtype = pixel.device, pixel.dtype
+    scale = [model.vae.mean.to(device=device, dtype=dtype),
+                1.0 / model.vae.std.to(device=device, dtype=dtype)]
+
+    output = [
+        model.vae.encode(u.unsqueeze(0), scale).float().squeeze(0)
+        for u in pixel
+    ]
+    output = torch.stack(output, dim=0)
+    # from [batch_size, num_channels, num_frames, height, width]
+    # to [batch_size, num_frames, num_channels, height, width]
+    output = output.permute(0, 2, 1, 3, 4)
+    return output
+
+
 def generate(args):
     rank = int(os.getenv("RANK", 0))
     world_size = int(os.getenv("WORLD_SIZE", 1))
@@ -486,9 +503,11 @@ def generate(args):
                 
                 
             # ========== (A) 准备 cond_latent (480p 条件) ==========
+            B, C, T, H, W = video_input.shape
+            video_input = video_input.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W)
 
             with torch.no_grad():
-                cond_latent = wan_ti2v.vae.encode_to_latent(video_input)  # [1,C,T,h',w']
+                cond_latent = wan_ti2v.vae.encode(video_input)  # [1,C,T,h',w']
                 
                 print(cond_latent.shape)
                 exit()
