@@ -396,7 +396,7 @@ class WanTI2V:
                 temp_ts = (mask2[0][0][:, ::2, ::2] * timestep).flatten()
                 temp_ts = torch.cat([
                     temp_ts,
-                    temp_ts.new_ones(seq_len - temp_ts.size(0)) * timestep
+                    temp_ts.new _ones(seq_len - temp_ts.size(0)) * timestep
                 ])
                 timestep = temp_ts.unsqueeze(0)
 
