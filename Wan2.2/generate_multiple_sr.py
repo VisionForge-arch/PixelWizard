@@ -22,6 +22,8 @@ from wan.distributed.util import init_distributed_group
 from wan.utils.prompt_extend import DashScopePromptExpander, QwenPromptExpander
 from wan.utils.utils import merge_video_audio, save_video, str2bool
 
+from dataset_upsample import UnifiedDataset
+
 
 EXAMPLE_PROMPT = {
     "t2v-A14B": {
@@ -324,29 +326,6 @@ def _init_logging(rank):
     else:
         logging.basicConfig(level=logging.ERROR)
 
-# ============ 工具：读 mp4 -> 标准化 -> [1,C,T,H,W] ============
-def load_video_tensor(path, target_hw=None):
-    """
-    读取 mp4 为 [1, C, T, H, W]，像素已标准化到 [-1, 1]。
-    若 target_hw=(H,W) 则逐帧 resize 到该分辨率（像素分辨率，不是 latent）。
-    """
-    import torchvision.io as io
-    from torchvision.transforms.functional import resize
-
-    vid, _, info = io.read_video(path, pts_unit="sec")  # [T, H, W, C], float32 in [0,255]
-    vid = vid.permute(0, 3, 1, 2).contiguous()          # [T, C, H, W]
-    # 归一化到 [-1, 1]（与你的 VAE 预处理保持一致）
-    vid = vid / 255.0 * 2.0 - 1.0
-
-    if target_hw is not None:
-        T = vid.size(0)
-        frames = []
-        for i in range(T):
-            frames.append(resize(vid[i], target_hw, antialias=True))
-        vid = torch.stack(frames, dim=0)                # [T, C, H, W]
-
-    vid = vid.permute(1, 0, 2, 3).unsqueeze(0)          # [1, C, T, H, W]
-    return vid
 
 # ============ 工具：把 [B,C,T,h,w] 上采样到 [B,C,T,H,W] ============
 def upsample_latent_to(latent, target_hw):
@@ -431,7 +410,26 @@ def generate(args):
         dist.broadcast_object_list(base_seed, src=0)
         args.base_seed = base_seed[0]
         
-        
+    
+    dataset = UnifiedDataset(
+            base_path=None,
+            metadata_path=args.prompt_file,
+            repeat=1,
+            data_file_keys=("file",),
+            main_data_operator=UnifiedDataset.default_video_operator(
+                base_path=None,
+                max_pixels=832*480,
+                height=480,
+                width=832,
+                height_division_factor=16,
+                width_division_factor=16,
+                num_frames=args.frame_num,
+                time_division_factor=4,
+                time_division_remainder=1,
+                ),
+            )
+    print("len(dataset):", len(dataset))
+    exit()
         
     # ======== 对齐参数 ==========
     denoising_strength = 0.5              
@@ -506,7 +504,7 @@ def generate(args):
 
                 
             
-
+ 
             video = wan_ti2v.generate(
                     current_prompt,
                     img=img,
