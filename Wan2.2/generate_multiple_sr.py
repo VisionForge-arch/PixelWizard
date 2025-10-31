@@ -507,7 +507,7 @@ def generate(args):
             video_input = video_input.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W)
 
             with torch.no_grad():
-                cond_latent = wan_ti2v.vae.encode(video_input)  # [1,C,T,h',w']
+                cond_latent = encode_to_latent(wan_ti2v, video_input)  # [1,C,T,h',w']
                 
                 print(cond_latent.shape)
                 exit()
