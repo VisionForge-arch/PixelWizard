@@ -472,9 +472,8 @@ def generate(args):
         video_input = data["file"]
         print(video_input.shape)
         video_input = video_input.unsqueeze(0).to(device=device, dtype=torch.float32)
-        
-        #file_path = 
-        # print(file_path)
+        print(video_input.shape)
+
 
         for resolution in resolutions:
             if rank == 0:
