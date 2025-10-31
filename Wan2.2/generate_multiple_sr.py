@@ -344,12 +344,8 @@ def pixels_to_latent_hw(size_str, down=8):
 
 def encode_to_latent(model, pixel: torch.Tensor) -> torch.Tensor:
     # pixel: [batch_size, num_channels, num_frames, height, width]
-    device, dtype = pixel.device, pixel.dtype
-    scale = [model.vae.mean.to(device=device, dtype=dtype),
-                1.0 / model.vae.std.to(device=device, dtype=dtype)]
-
     output = [
-        model.vae.encode(u.unsqueeze(0), scale).float().squeeze(0)
+        model.vae.encode(u.unsqueeze(0)).float().squeeze(0)
         for u in pixel
     ]
     output = torch.stack(output, dim=0)
