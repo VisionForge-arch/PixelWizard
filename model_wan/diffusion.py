@@ -186,9 +186,7 @@ class SelfForcingWan(SelfForcingModel):
             aug_t=None
         )
         
-        # 随机裁剪以节省显存（如果启用）
-        if self.use_random_crop:
-            flow_pred, training_target = self.random_crop(flow_pred, training_target)
+
         
         # loss = torch.nn.functional.mse_loss(flow_pred.float(), training_target.float())
         loss = torch.nn.functional.mse_loss(

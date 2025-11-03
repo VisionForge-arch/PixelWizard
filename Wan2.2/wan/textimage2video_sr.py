@@ -335,8 +335,9 @@ class WanTI2V_SR:
             context = [t.to(self.device) for t in context]
             context_null = [t.to(self.device) for t in context_null]
 
-        noise = [
-            torch.randn(
+        
+        if cond_latent is not None:
+            pure_noise = torch.randn(
                 target_shape[0],
                 target_shape[1],
                 target_shape[2],
@@ -344,11 +345,29 @@ class WanTI2V_SR:
                 dtype=torch.float32,
                 device=self.device,
                 generator=seed_g)
-        ]
+            sigma_before_shift = 0.5
+            sigma_initial = shift * sigma_before_shift / (1 + (shift - 1) * sigma_before_shift)
+            
+            # Flow Matching 的混合公式: x_t = (1-sigma) * x0 + sigma * noise
+            noise = [(1 - sigma_initial) * cond_latent + sigma_initial * pure_noise]
+            
+            print(f'Using cond_latent with denoising_strength={sigma_initial}')
+            print(f'sigma_before_shift={sigma_before_shift:.4f}, sigma_after_shift={sigma_initial:.4f}')
+        
+        else:
+            noise = [
+                torch.randn(
+                    target_shape[0],
+                    target_shape[1],
+                    target_shape[2],
+                    target_shape[3],
+                    dtype=torch.float32,
+                    device=self.device,
+                    generator=seed_g)
+            ]
         
         print('noise_shape:', noise[0].shape)
         print('cond_latent_shape:', cond_latent.shape)
-        exit()
         
 
         @contextmanager
@@ -369,9 +388,30 @@ class WanTI2V_SR:
                     num_train_timesteps=self.num_train_timesteps,
                     shift=1,
                     use_dynamic_shifting=False)
-                sample_scheduler.set_timesteps(
-                    sampling_steps, device=self.device, shift=shift)
+                
+                if cond_latent is not None:
+                    # 手动计算 sigmas，从 denoising_strength 对应的值开始
+                    # 而不是从 sigma_max=1.0 开始
+                    sigma_max = 1.0
+                    sigma_min = self.num_train_timesteps / (self.num_train_timesteps + 1)  # 默认值
+                    
+                    # 计算起始 sigma（对应 denoising_strength）
+                    sigma_start = sigma_min + (sigma_max - sigma_min) * denoising_strength
+                    
+                    # 生成从 sigma_start 到 sigma_min 的 sigmas
+                    import numpy as np
+                    sigmas = np.linspace(sigma_start, sigma_min, sampling_steps + 1)[:-1]
+                    
+                    # 调用 set_timesteps，传入自定义的 sigmas
+                    sample_scheduler.set_timesteps(
+                        sampling_steps, device=self.device, sigmas=sigmas, shift=shift)
+                else:
+                    # 标准的 t2v，从纯噪声开始
+                    sample_scheduler.set_timesteps(
+                        sampling_steps, device=self.device, shift=shift)
+
                 timesteps = sample_scheduler.timesteps
+                
             elif sample_solver == 'dpm++':
                 sample_scheduler = FlowDPMSolverMultistepScheduler(
                     num_train_timesteps=self.num_train_timesteps,
