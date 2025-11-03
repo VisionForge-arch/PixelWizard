@@ -344,6 +344,9 @@ def pixels_to_latent_hw(size_str, down=8):
 
 def encode_to_latent(model, pixel: torch.Tensor) -> torch.Tensor:
     # pixel: [batch_size, num_channels, num_frames, height, width]
+    
+    print("in the fx, the pixel shape is:")
+    print(pixel.shape)
     output = [
         model.vae.encode(u.unsqueeze(0)).float().squeeze(0)
         for u in pixel
