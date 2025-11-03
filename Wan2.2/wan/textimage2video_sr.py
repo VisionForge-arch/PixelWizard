@@ -316,6 +316,9 @@ class WanTI2V_SR:
         seq_len = math.ceil((target_shape[2] * target_shape[3]) /
                             (self.patch_size[1] * self.patch_size[2]) *
                             target_shape[1] / self.sp_size) * self.sp_size
+        
+        print('target_shape:', target_shape)  # [48, 31, 90, 160]
+        print('seq_len:', seq_len)  # 121
 
         if n_prompt == "":
             n_prompt = self.sample_neg_prompt
@@ -366,8 +369,8 @@ class WanTI2V_SR:
                     generator=seed_g)
             ]
         
-        print('noise_shape:', noise[0].shape)
-        print('cond_latent_shape:', cond_latent.shape)
+        print('noise_shape:', noise[0].shape)    # [1, 48, 31, 90, 160]
+        print('cond_latent_shape:', cond_latent.shape)  # [1, 48, 31, 90, 160]
         
 
         @contextmanager
