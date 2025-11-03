@@ -339,42 +339,23 @@ class WanTI2V_SR:
             context_null = [t.to(self.device) for t in context_null]
 
         
+        # 先处理 cond_latent 的维度（如果有的话）
         if cond_latent is not None:
             if cond_latent.dim() == 5:  # [B, C, T, H, W]
                 cond_latent = cond_latent.squeeze(0)  # 变成 [C, T, H, W]
-            
-            
-            pure_noise = torch.randn(
-                target_shape[0],
-                target_shape[1],
-                target_shape[2],
-                target_shape[3],
-                dtype=torch.float32,
-                device=self.device,
-                generator=seed_g)
-            sigma_before_shift = 0.2
-            sigma_initial = shift * sigma_before_shift / (1 + (shift - 1) * sigma_before_shift)
-            
-            # Flow Matching 的混合公式: x_t = (1-sigma) * x0 + sigma * noise
-            noise = [(1 - sigma_initial) * cond_latent + sigma_initial * pure_noise]
-            
-            print(f'Using cond_latent with denoising_strength={sigma_initial}')
-            print(f'sigma_before_shift={sigma_before_shift:.4f}, sigma_after_shift={sigma_initial:.4f}')
+            print(f'cond_latent_shape: {cond_latent.shape}')
         
-        else:
-            noise = [
-                torch.randn(
-                    target_shape[0],
-                    target_shape[1],
-                    target_shape[2],
-                    target_shape[3],
-                    dtype=torch.float32,
-                    device=self.device,
-                    generator=seed_g)
-            ]
+        # 暂时先生成纯噪声（后面会根据 scheduler 的第一个 sigma 重新初始化）
+        pure_noise = torch.randn(
+            target_shape[0],
+            target_shape[1],
+            target_shape[2],
+            target_shape[3],
+            dtype=torch.float32,
+            device=self.device,
+            generator=seed_g)
         
-        print('noise_shape:', noise[0].shape)    # [1, 48, 31, 90, 160]
-        print('cond_latent_shape:', cond_latent.shape)  # [1, 48, 31, 90, 160]
+        print(f'pure_noise_shape: {pure_noise.shape}')
         
 
         @contextmanager
@@ -438,9 +419,26 @@ class WanTI2V_SR:
             else:
                 raise NotImplementedError("Unsupported solver.")
 
-            # sample videos
-            latents = noise
-            mask1, mask2 = masks_like(noise, zero=False)
+            # 重要：根据 scheduler 的第一个 sigma 初始化 latent
+            if cond_latent is not None:
+                # 获取第一个 timestep 对应的 sigma（经过 shift transform 后的）
+                first_sigma = sample_scheduler.sigmas[0].item()
+                
+                print(f'✓ SR Mode Initialization:')
+                print(f'  First timestep: {timesteps[0].item():.1f}')
+                print(f'  First sigma (after shift): {first_sigma:.4f}')
+                
+                # 使用正确的 sigma 初始化 latent
+                # Flow Matching: x_t = (1-sigma) * x0 + sigma * noise
+                latents = [(1 - first_sigma) * cond_latent + first_sigma * pure_noise]
+                
+                print(f'  Initialized latent: mean={latents[0].mean():.4f}, std={latents[0].std():.4f}')
+            else:
+                # 纯 T2V 模式：使用纯噪声
+                latents = [pure_noise]
+                print(f'✓ T2V Mode: pure noise, mean={latents[0].mean():.4f}, std={latents[0].std():.4f}')
+            
+            mask1, mask2 = masks_like(latents, zero=False)
 
             arg_c = {'context': context, 'seq_len': seq_len}
             arg_null = {'context': context_null, 'seq_len': seq_len}
@@ -449,7 +447,10 @@ class WanTI2V_SR:
                 self.model.to(self.device)
                 torch.cuda.empty_cache()
 
-            for _, t in enumerate(tqdm(timesteps)):
+            print(f'\n🚀 Starting sampling loop with {len(timesteps)} steps')
+            print(f'   CFG scale: {guide_scale}, Shift: {shift}')
+            
+            for i, t in enumerate(tqdm(timesteps)):
                 latent_model_input = latents
                 timestep = [t]
 
@@ -475,6 +476,11 @@ class WanTI2V_SR:
                     return_dict=False,
                     generator=seed_g)[0]
                 latents = [temp_x0.squeeze(0)]
+                
+                # 每 10 步打印一次统计信息
+                if i % 10 == 0 or i == len(timesteps) - 1:
+                    print(f'  Step {i}/{len(timesteps)}, t={t:.1f}, '
+                          f'latent: mean={latents[0].mean():.4f}, std={latents[0].std():.4f}')
             x0 = latents
             if offload_model:
                 self.model.cpu()
