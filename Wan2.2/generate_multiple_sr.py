@@ -501,7 +501,7 @@ def generate(args):
             B, C, T, H, W = video_input.shape
             
 
-            video_input = [video_input]#.permute(0, 2, 1, 3, 4)
+            video_input = video_input#.permute(0, 2, 1, 3, 4)
             
             print(video_input.shape)
 
