@@ -373,7 +373,7 @@ class WanTI2V_SR:
                     generator=seed_g)
             ]
         
-        print('noise_shape:', noise[0].shape)    # [1, 48, 31, 90, 160]
+        print('noise_shape:', noise.shape)    # [1, 48, 31, 90, 160]
         print('cond_latent_shape:', cond_latent.shape)  # [1, 48, 31, 90, 160]
         
 
@@ -399,15 +399,19 @@ class WanTI2V_SR:
                 if cond_latent is not None:
                     # 手动计算 sigmas，从 denoising_strength 对应的值开始
                     # 而不是从 sigma_max=1.0 开始
+                        # FlowMatchScheduler 的默认值
                     sigma_max = 1.0
-                    sigma_min = self.num_train_timesteps / (self.num_train_timesteps + 1)  # 默认值
+                    sigma_min = 0.0  # 修正：应该是 0.0，不是接近 1 的值
+                    denoising_strength = 0.5  # 与训练对齐
                     
                     # 计算起始 sigma（对应 denoising_strength）
-                    sigma_start = sigma_min + (sigma_max - sigma_min) * 0.5
+                    sigma_start = sigma_min + (sigma_max - sigma_min) * denoising_strength
                     
                     # 生成从 sigma_start 到 sigma_min 的 sigmas
                     import numpy as np
                     sigmas = np.linspace(sigma_start, sigma_min, sampling_steps + 1)[:-1]
+                    print(f'SR mode: Custom sigmas range [{sigma_start:.4f}, {sigma_min:.4f}], '
+                            f'{len(sigmas)} steps (before shift transform)')
                     
                     # 调用 set_timesteps，传入自定义的 sigmas
                     sample_scheduler.set_timesteps(
@@ -416,8 +420,10 @@ class WanTI2V_SR:
                     # 标准的 t2v，从纯噪声开始
                     sample_scheduler.set_timesteps(
                         sampling_steps, device=self.device, shift=shift)
+                    
 
                 timesteps = sample_scheduler.timesteps
+                print(f'Timesteps: {len(timesteps)} steps, range [{timesteps[0]:.1f}, {timesteps[-1]:.1f}]')
                 
             elif sample_solver == 'dpm++':
                 sample_scheduler = FlowDPMSolverMultistepScheduler(
