@@ -476,10 +476,10 @@ def generate(args):
     for prompt_idx, data in enumerate(dataloader):
         prompt = data["prompt"]
         print(prompt)
-        video_input = data["file"]
+        video_input = data["file"].to(device=device, dtype=torch.float32)
         print(video_input.shape)
-        video_input = video_input.unsqueeze(0).to(device=device, dtype=torch.float32)
-        print(video_input.shape)
+        #video_input = video_input.unsqueeze(0).to(device=device, dtype=torch.float32)
+        #print(video_input.shape)
 
 
         for resolution in resolutions:
