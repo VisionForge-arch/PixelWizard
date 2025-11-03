@@ -131,7 +131,7 @@ class SelfForcingWan(SelfForcingModel):
             - generator_log_dict: a dictionary containing the intermediate tensors for logging.
         """
         noise = torch.randn_like(clean_latent)
-        print(f"image_or_video_shape: {image_or_video_shape}")
+        #print(f"image_or_video_shape: {image_or_video_shape}")
         batch_size, num_frame = image_or_video_shape[:2]
 
         # Step 2: Randomly sample a timestep and add noise to denoiser inputs (Flow Matching)
