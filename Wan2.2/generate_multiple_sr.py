@@ -13,6 +13,7 @@ import random
 
 import torch
 import torch.distributed as dist
+import torch.nn.functional as F
 from PIL import Image
 import json
 
@@ -327,19 +328,6 @@ def _init_logging(rank):
         logging.basicConfig(level=logging.ERROR)
 
 
-# ============ 工具：把 [B,C,T,h,w] 上采样到 [B,C,T,H,W] ============
-def upsample_latent_to(latent, target_hw):
-    B, C, T, h, w = latent.shape
-    H, W = target_hw
-    x = latent.permute(0, 2, 1, 3, 4).reshape(B*T, C, h, w)
-    x = F.interpolate(x, size=(H, W), mode='bilinear', align_corners=False)
-    x = x.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4).contiguous()
-    return x
-
-# —— 估计 latent 的空间尺寸（像素 -> latent），用你的 VAE 下采样率。假设 /8，按需改成 /4 或 /16 —— #
-def pixels_to_latent_hw(size_str, down=8):
-    W, H = map(int, size_str.split("*"))  # 注意你的顺序是 "1280*704"
-    return H // down, W // down
 
 
 def encode_to_latent(model, pixel: torch.Tensor) -> torch.Tensor:
@@ -454,7 +442,7 @@ def generate(args):
     denoising_strength = 0.5              
 
     logging.info("Creating WanTI2V pipeline.")
-    wan_ti2v = wan.WanTI2V(
+    wan_ti2v = wan.WanTI2V_SR(
         config=cfg,
         checkpoint_dir=args.ckpt_dir,
         device_id=device,
@@ -502,7 +490,6 @@ def generate(args):
                 
                 
             # ========== (A) 准备 cond_latent (480p 条件) ==========
-            #B, C, T, H, W = video_input.shape
             
 
             video_input = video_input#.permute(0, 2, 1, 3, 4)
@@ -511,21 +498,23 @@ def generate(args):
 
             with torch.no_grad():
                 cond_latent = encode_to_latent(wan_ti2v, video_input)  # [1,C,T,h',w']
+                B, T, C, h, w = cond_latent.shape
+                H = 90
+                W = 160
                 
-                print(cond_latent.shape)
-                exit()
-                if cond_latent is not None:
-                    cond_latent = cond_latent.to(device=wan_ti2v.device, dtype=torch.float32)
-
-                # 上采样 cond_latent 到 HR latent 尺寸（与目标像素尺寸对应的 latent 尺寸）
-                latent_H, latent_W = pixels_to_latent_hw(resolution, down=8)  # 下采样倍数按实际 VAE 改
-                cond_latent = upsample_latent_to(cond_latent, (latent_H, latent_W))  # [1,C,T,H,W]
+                print(cond_latent.shape) # [1, 31, 48, 30, 52]
+                cond_latent = cond_latent.to(device=wan_ti2v.device, dtype=torch.float32)
+                
+                cond_latent = cond_latent.permute(0, 2, 1, 3, 4).reshape(B*T, C, h, w)  # [B*T, C, h, w]
+                cond_latent = F.interpolate(cond_latent, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
+                cond_latent = cond_latent.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)  # 还原回 [B, C, T, H, W]
 
             
             
  
             video = wan_ti2v.generate(
                     current_prompt,
+                    cond_latent=cond_latent,
                     img=img,
                     size=SIZE_CONFIGS[resolution],
                     max_area=MAX_AREA_CONFIGS[resolution],

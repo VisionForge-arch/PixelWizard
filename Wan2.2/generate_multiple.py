@@ -385,7 +385,7 @@ def generate(args):
         args.base_seed = base_seed[0]
 
     logging.info("Creating WanTI2V pipeline.")
-    wan_ti2v = wan.WanTI2V(
+    wan_ti2v = wan.WanTI2V_SR(
         config=cfg,
         checkpoint_dir=args.ckpt_dir,
         device_id=device,

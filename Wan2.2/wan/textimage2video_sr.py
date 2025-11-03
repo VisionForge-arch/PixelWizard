@@ -31,7 +31,7 @@ from .utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
 from .utils.utils import best_output_size, masks_like
 
 
-class WanTI2V:
+class WanTI2V_SR:
 
     def __init__(
         self,
@@ -177,6 +177,7 @@ class WanTI2V:
 
     def generate(self,
                  input_prompt,
+                 cond_latent=None,
                  img=None,
                  size=(1280, 704),
                  max_area=704 * 1280,
@@ -194,6 +195,8 @@ class WanTI2V:
         Args:
             input_prompt (`str`):
                 Text prompt for content generation
+            cond_latent (`torch.Tensor`, *optional*, defaults to None):
+                Conditional latent tensor. Shape: [B, T, C, H, W]
             img (PIL.Image.Image):
                 Input image tensor. Shape: [3, H, W]
             size (`tuple[int]`, *optional*, defaults to (1280,704)):
@@ -246,6 +249,7 @@ class WanTI2V:
         
         return self.t2v(
             input_prompt=input_prompt,
+            cond_latent=cond_latent,
             size=size,
             frame_num=frame_num,
             shift=shift,
@@ -258,6 +262,7 @@ class WanTI2V:
 
     def t2v(self,
             input_prompt,
+            cond_latent=None,
             size=(1280, 704),
             frame_num=121,
             shift=5.0,
@@ -273,6 +278,8 @@ class WanTI2V:
         Args:
             input_prompt (`str`):
                 Text prompt for content generation
+            cond_latent (`torch.Tensor`, *optional*, defaults to None):
+                Conditional latent tensor. Shape: [B, T, C, H, W]
             size (`tuple[int]`, *optional*, defaults to (1280,704)):
                 Controls video resolution, (width,height).
             frame_num (`int`, *optional*, defaults to 121):
@@ -340,6 +347,8 @@ class WanTI2V:
         ]
         
         print('noise_shape:', noise[0].shape)
+        print('cond_latent_shape:', cond_latent.shape)
+        exit()
         
 
         @contextmanager
