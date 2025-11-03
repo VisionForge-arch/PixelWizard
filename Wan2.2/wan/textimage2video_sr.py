@@ -352,7 +352,7 @@ class WanTI2V_SR:
                 dtype=torch.float32,
                 device=self.device,
                 generator=seed_g)
-            sigma_before_shift = 0.5
+            sigma_before_shift = 0.2
             sigma_initial = shift * sigma_before_shift / (1 + (shift - 1) * sigma_before_shift)
             
             # Flow Matching 的混合公式: x_t = (1-sigma) * x0 + sigma * noise
