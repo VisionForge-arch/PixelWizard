@@ -145,7 +145,7 @@ class WanModel_Trainer:
         frames_480p = frames.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W)
         
         frames_480p = F.interpolate(frames_480p,  size=(480, 832), mode='bilinear', align_corners=False)
-        frames_480p = frames_480p.reshape(B, T, C, 480, 832).permute(0, 2, 1, 3, 4)
+        frames_480p = frames_480p.reshape(B, T, C, 480, 832).permute(0, 2, 1, 3, 4)   # [b, C, T, h, w]
         
         
         # vae编码
@@ -154,9 +154,11 @@ class WanModel_Trainer:
             clean_latent = self.model.vae.encode_to_latent(frames).to(device=self.device, dtype=self.dtype)           # [1, 13, 48, 90, 160]
             clean_latent_lr = self.model.vae.encode_to_latent(frames_480p).to(device=self.device, dtype=self.dtype)   # [1, 13, 48, 30, 52]
             
+            print(f"frames.shape: {frames.shape}, clean_latent.shape: {clean_latent.shape}")
+            print(f"frames_480p.shape: {frames_480p.shape}, clean_latent_lr.shape: {clean_latent_lr.shape}")
+            exit()
             
-            
-            B, C, T, H, W   = clean_latent.shape
+            B, T, C, H, W   = clean_latent.shape
             _, _, _, h, w   = clean_latent_lr.shape
 
             clean_latent_lr = clean_latent_lr.permute(0, 2, 1, 3, 4).reshape(B*T, C, h, w)  # [B*T, C, h, w]
