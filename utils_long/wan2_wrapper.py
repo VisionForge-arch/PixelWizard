@@ -81,9 +81,6 @@ class WanVAEWrapper2_2(torch.nn.Module):
         # pixel: [batch_size, num_channels, num_frames, height, width]
         device, dtype = pixel.device, pixel.dtype
         
-        # ======= shape in the fx ==========
-        print(pixel.shape)
-        
         scale = [self.mean.to(device=device, dtype=dtype),
                  1.0 / self.std.to(device=device, dtype=dtype)]
 

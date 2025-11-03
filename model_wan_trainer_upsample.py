@@ -147,13 +147,14 @@ class WanModel_Trainer:
         frames_480p = F.interpolate(frames_480p,  size=(480, 832), mode='bilinear', align_corners=False)
         frames_480p = frames_480p.reshape(B, T, C, 480, 832).permute(0, 2, 1, 3, 4)
         
-        print(frames_480p.shape)
         
         # vae编码
         with torch.no_grad():
             
             clean_latent = self.model.vae.encode_to_latent(frames).to(device=self.device, dtype=self.dtype)           # [1, 13, 48, 90, 160]
             clean_latent_lr = self.model.vae.encode_to_latent(frames_480p).to(device=self.device, dtype=self.dtype)   # [1, 13, 48, 30, 52]
+            
+            
             
             B, C, T, H, W   = clean_latent.shape
             _, _, _, h, w   = clean_latent_lr.shape
