@@ -373,7 +373,7 @@ class WanTI2V_SR:
                     generator=seed_g)
             ]
         
-        print('noise_shape:', noise.shape)    # [1, 48, 31, 90, 160]
+        print('noise_shape:', noise[0].shape)    # [1, 48, 31, 90, 160]
         print('cond_latent_shape:', cond_latent.shape)  # [1, 48, 31, 90, 160]
         
 
