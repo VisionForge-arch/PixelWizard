@@ -396,7 +396,7 @@ class WanTI2V_SR:
                     sigma_min = self.num_train_timesteps / (self.num_train_timesteps + 1)  # 默认值
                     
                     # 计算起始 sigma（对应 denoising_strength）
-                    sigma_start = sigma_min + (sigma_max - sigma_min) * denoising_strength
+                    sigma_start = sigma_min + (sigma_max - sigma_min) * 0.5
                     
                     # 生成从 sigma_start 到 sigma_min 的 sigmas
                     import numpy as np
