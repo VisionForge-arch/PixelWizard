@@ -340,6 +340,10 @@ class WanTI2V_SR:
 
         
         if cond_latent is not None:
+            if cond_latent.dim() == 5:  # [B, C, T, H, W]
+                cond_latent = cond_latent.squeeze(0)  # 变成 [C, T, H, W]
+            
+            
             pure_noise = torch.randn(
                 target_shape[0],
                 target_shape[1],
