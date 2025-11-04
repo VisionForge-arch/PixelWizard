@@ -139,8 +139,8 @@ class WanDiffusionWrapper(torch.nn.Module):
         self.uniform_timestep = not is_causal
 
         self.scheduler = FlowMatchScheduler(shift=timestep_shift, sigma_min=0.0, extra_one_step=True)
-        #self.scheduler.set_timesteps(1000, training=True)
-        self.scheduler.set_timesteps(500, denoising_strength=0.167, training=True)
+        self.scheduler.set_timesteps(1000, training=True)
+        #self.scheduler.set_timesteps(500, denoising_strength=0.167, training=True)
         
 
         self.seq_len = seq_len

@@ -6,8 +6,8 @@ from tqdm import tqdm
 from omegaconf import OmegaConf
 
 import wandb
-#from model_wan_trainer import WanModel_Trainer
-from model_wan_trainer_upsample import WanModel_Trainer
+from model_wan_trainer import WanModel_Trainer
+#from model_wan_trainer_upsample import WanModel_Trainer
     
     
 
@@ -27,7 +27,8 @@ def main():
     parser.add_argument("--time_division_remainder", type=int, default=1)
     parser.add_argument("--use_gpu", type=bool, default=True)
     parser.add_argument("--config_path", type=str, default="/root/ultrawan/configs/self_forcing_dmd.yaml")
-    parser.add_argument("--logdir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_latent_upsample_lora")
+    parser.add_argument("--logdir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_yarn")
+    #parser.add_argument("--logdir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_latent_upsample_lora")
     parser.add_argument("--generator_ckpt", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_10000/checkpoint_model_001000/model.pt")
     args = parser.parse_args()
     

@@ -48,7 +48,7 @@ num_frame_per_block: 3
 load_raw_video: false
 model_kwargs:
   timestep_shift: 5.0
-use_lora: Ture
+use_lora: False
 lora_r: 64
 lora_alpha: 64
 lora_dropout: 0.1
