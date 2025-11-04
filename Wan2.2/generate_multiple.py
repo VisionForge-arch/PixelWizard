@@ -160,7 +160,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/720p_5s",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/2k_train_10000iter/2k_10000iter_yarn",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
@@ -303,8 +303,8 @@ def _parse_args():
     parser.add_argument(
         "--wan_ckpt",
         type=str,
-        default=None,
-        #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_1000/checkpoint_model_001300/model.pt",
+        #default=None,
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_1000/checkpoint_model_001000/model.pt",
         help="The path to the Wan checkpoint.")
     args = parser.parse_args()
     _validate_args(args)
@@ -364,7 +364,7 @@ def generate(args):
     
     # 定义要使用的分辨率
     #resolutions = ['1920*1056', '2560*1440', '3840*2144']
-    resolutions = ['1280*704']
+    resolutions = ['2560*1440']
     
     # 创建保存文件夹
     output_dir = args.save_file 
@@ -385,7 +385,7 @@ def generate(args):
         args.base_seed = base_seed[0]
 
     logging.info("Creating WanTI2V pipeline.")
-    wan_ti2v = wan.WanTI2V_SR(
+    wan_ti2v = wan.WanTI2V(
         config=cfg,
         checkpoint_dir=args.ckpt_dir,
         device_id=device,
