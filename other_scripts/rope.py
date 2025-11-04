@@ -34,7 +34,7 @@ def rope_params(max_seq_len, dim, theta=10000,
 
 if __name__ == "__main__":
     # 输出文件夹
-    out_dir = "./rope_viz"
+    out_dir = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/rope_viz"
     os.makedirs(out_dir, exist_ok=True)
 
     max_seq_len = 1024
