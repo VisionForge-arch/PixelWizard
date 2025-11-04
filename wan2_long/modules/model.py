@@ -577,12 +577,24 @@ class WanModel(ModelMixin, ConfigMixin):
         # buffers (don't use register_buffer otherwise dtype will be changed in to())
         assert (dim % num_heads) == 0 and (dim // num_heads) % 2 == 0
         d = dim // num_heads
-        self.freqs = torch.cat([
-            rope_params(1024, d - 4 * (d // 6)),
-            rope_params(1024, 2 * (d // 6)),
-            rope_params(1024, 2 * (d // 6))
-        ],
-                               dim=1)
+        
+        self.rope_scaling = "yarn"
+        if self.rope_scaling == "yarn":
+            self.freqs = torch.cat([
+                rope_params(1024, d - 4 * (d // 6),
+                            scaling="yarn", factor=8.0, yarn_alpha=0.8, yarn_short_factor=1.0),
+                rope_params(1024, 2 * (d // 6),
+                            scaling="yarn", factor=8.0, yarn_alpha=0.8, yarn_short_factor=1.0),
+                rope_params(1024, 2 * (d // 6),
+                            scaling="yarn", factor=8.0, yarn_alpha=0.8, yarn_short_factor=1.0)
+            ], dim=1)
+        else:
+            self.freqs = torch.cat([
+                rope_params(1024, d - 4 * (d // 6)),
+                rope_params(1024, 2 * (d // 6)),
+                rope_params(1024, 2 * (d // 6))
+            ], dim=1)         
+        
 
         # initialize weights
         self.init_weights()
