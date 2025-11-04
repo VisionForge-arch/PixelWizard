@@ -578,7 +578,7 @@ class WanModel(ModelMixin, ConfigMixin):
         assert (dim % num_heads) == 0 and (dim // num_heads) % 2 == 0
         d = dim // num_heads
         
-        self.rope_scaling = "yarn"
+        self.rope_scaling = None
         if self.rope_scaling == "yarn":
             self.freqs = torch.cat([
                 rope_params(1024, d - 4 * (d // 6)),
