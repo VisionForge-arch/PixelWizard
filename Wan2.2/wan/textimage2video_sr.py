@@ -383,7 +383,7 @@ class WanTI2V_SR:
                         # FlowMatchScheduler 的默认值
                     sigma_max = 1.0
                     sigma_min = 0.0  # 修正：应该是 0.0，不是接近 1 的值
-                    denoising_strength = 0.5  # 与训练对齐
+                    denoising_strength = 0.167  # 与训练对齐
                     
                     # 计算起始 sigma（对应 denoising_strength）
                     sigma_start = sigma_min + (sigma_max - sigma_min) * denoising_strength

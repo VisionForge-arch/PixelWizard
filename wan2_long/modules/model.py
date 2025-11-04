@@ -25,22 +25,47 @@ def sinusoidal_embedding_1d(dim, position):
 
 
 #@torch.amp.autocast('cuda', enabled=False)
-def rope_params(max_seq_len, dim, theta=10000):
+def rope_params(max_seq_len, dim, theta=10000,
+                scaling: str = "none",          # "none" | "ntk" | "yarn"
+                factor: float = 8.0,            # 放大上下文的倍率，例如从4K到32K可用8.0
+                yarn_alpha: float = 0.8,        # YARN平滑指数(0.5~1.0常用)
+                yarn_short_factor: float = 1.0, # 近程段保真(=1表示近程不缩放)
+                ):
+    '''
+    生成长度为 max_seq_len、维度为 dim 的复数频率表（极坐标形式）
+    
+    '''
     assert dim % 2 == 0
-    freqs = torch.outer(
-        torch.arange(max_seq_len),
-        1.0 / torch.pow(theta,
-                        torch.arange(0, dim, 2).to(torch.float64).div(dim)))
+    # ===== 原始频率计算 ===== theta^{-2i/d} 
+    idx = torch.arange(0, dim, 2).to(torch.float64)
+    base = 1.0 / torch.pow(theta, idx.div(dim))
+    
+    if scaling == "yarn" and factor != 1.0:
+        # yarn: 高频压缩，低频保持
+        t = torch.linspace(0.0, 1.0, base.numel(), dtype=torch.float64)
+        half = base.numel() // 2
+        yarn_scale = torch.ones_like(base)
+        if half > 0:
+            yarn_scale[:half] = (factor ** (t[:half] ** yarn_alpha))**(-1) * yarn_short_factor
+        yarn_scale[half:] = (factor ** (t[half:] ** yarn_alpha))**(-1)
+        base = base * yarn_scale
+    
+    # ---- 相位矩阵 ----
+    freqs = torch.outer(torch.arange(max_seq_len), base)  # [max_seq_len, dim//2]
     freqs = torch.polar(torch.ones_like(freqs), freqs)
     return freqs
 
 
 #@torch.amp.autocast('cuda', enabled=False)
 def rope_apply(x, grid_sizes, freqs):
+    '''
+    先把最后一维一分为二（偶/奇），视作复数后做乘法（复乘就是二维旋转）
+    
+    '''
     n, c = x.size(2), x.size(3) // 2
 
-    # split freqs
-    freqs = freqs.split([c - 2 * (c // 3), c // 3, c // 3], dim=1)
+    # split freqs 第一段用于 frame，后两段分别用于 height/width
+    freqs = freqs.split([c - 2 * (c // 3), c // 3, c // 3], dim=1)  # 把 freqs 分成三段
 
     # loop over samples
     output = []
@@ -50,6 +75,7 @@ def rope_apply(x, grid_sizes, freqs):
         # precompute multipliers
         x_i = torch.view_as_complex(x[i, :seq_len].to(torch.float64).reshape(
             seq_len, n, -1, 2))
+        # 把三个轴的频率按广播扩展到 [F,H,W,*] 并 concat 到最后一维，形成 [seq_len, 1, (df+dh+dw)]
         freqs_i = torch.cat([
             freqs[0][:f].view(f, 1, 1, -1).expand(f, h, w, -1),
             freqs[1][:h].view(1, h, 1, -1).expand(f, h, w, -1),
