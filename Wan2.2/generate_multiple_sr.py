@@ -308,7 +308,7 @@ def _parse_args():
         "--wan_ckpt",
         type=str,
         #default=None,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_latent_upsample/checkpoint_model_002800/model.pt",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_latent_upsample/checkpoint_model_000600/model.pt",
         help="The path to the Wan checkpoint.")
     args = parser.parse_args()
     _validate_args(args)
@@ -498,7 +498,7 @@ def generate(args):
 
             with torch.no_grad():
                 cond_latent = encode_to_latent(wan_ti2v, video_input)  # [1,C,T,h',w']
-                B, T, C, h, w = cond_latent.shape
+                B, C, T, h, w = cond_latent.shape
                 H = 90
                 W = 160
                 
@@ -507,7 +507,7 @@ def generate(args):
                 
                 cond_latent = cond_latent.permute(0, 2, 1, 3, 4).reshape(B*T, C, h, w)  # [B*T, C, h, w]
                 cond_latent = F.interpolate(cond_latent, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
-                cond_latent = cond_latent.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)  # 还原回 [B, C, T, H, W]
+                cond_latent = cond_latent.reshape(B, T, C, H, W)
 
             
             
