@@ -436,7 +436,7 @@ def generate(args):
     print("len(dataset):", len(dataset))
 
     
-    dataloader = torch.utils.data.DataLoader(dataset, shuffle=True, collate_fn=lambda x: x[0], num_workers=1)
+    dataloader = torch.utils.data.DataLoader(dataset, shuffle=False, collate_fn=lambda x: x[0], num_workers=1)
         
     # ======== 对齐参数 ==========
     denoising_strength = 0.5              
