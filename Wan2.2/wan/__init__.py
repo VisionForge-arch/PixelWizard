@@ -5,4 +5,5 @@ from .speech2video import WanS2V
 from .text2video import WanT2V
 from .textimage2video import WanTI2V
 from .textimage2video_sr import WanTI2V_SR
+from .textimage2video_cross import WanTI2V_Cross
 from .animate import WanAnimate

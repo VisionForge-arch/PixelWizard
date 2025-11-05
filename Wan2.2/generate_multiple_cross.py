@@ -13,13 +13,17 @@ import random
 
 import torch
 import torch.distributed as dist
+import torch.nn.functional as F
 from PIL import Image
+import json
 
 import wan
 from wan.configs import MAX_AREA_CONFIGS, SIZE_CONFIGS, SUPPORTED_SIZES, WAN_CONFIGS
 from wan.distributed.util import init_distributed_group
 from wan.utils.prompt_extend import DashScopePromptExpander, QwenPromptExpander
 from wan.utils.utils import merge_video_audio, save_video, str2bool
+
+from dataset_upsample import UnifiedDataset
 
 
 EXAMPLE_PROMPT = {
@@ -160,7 +164,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/2k_train_900iter_yarn/2k_yarn",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/720p_5s",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
@@ -298,13 +302,13 @@ def _parse_args():
     parser.add_argument(
         "--prompt_file",
         type=str,
-        default="/root/ultrawan/Wan2.2/prompt.txt",
+        default="/root/ultrawan/Wan2.2/prompt_to_file.json",
         help="The file to read the prompts from.")
     parser.add_argument(
         "--wan_ckpt",
         type=str,
         #default=None,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_yarn/checkpoint_model_000900/model.pt",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_latent_upsample/checkpoint_model_000300/model.pt",
         help="The path to the Wan checkpoint.")
     args = parser.parse_args()
     _validate_args(args)
@@ -322,6 +326,25 @@ def _init_logging(rank):
             handlers=[logging.StreamHandler(stream=sys.stdout)])
     else:
         logging.basicConfig(level=logging.ERROR)
+
+
+
+
+def encode_to_latent(model, pixel: torch.Tensor) -> torch.Tensor:
+    # pixel: [batch_size, num_channels, num_frames, height, width]
+    
+    print("in the fx, the pixel shape is:")
+    print(pixel.shape)
+    output = [
+        model.vae.encode([u])[0].float().squeeze(0)
+        for u in pixel
+    ]
+    
+    output = torch.stack(output, dim=0)
+    # from [batch_size, num_channels, num_frames, height, width]
+    # to [batch_size, num_frames, num_channels, height, width]
+    output = output.permute(0, 2, 1, 3, 4)
+    return output
 
 
 def generate(args):
@@ -357,10 +380,18 @@ def generate(args):
         
     # 读取prompt文件
     prompt_file = args.prompt_file
-    with open(prompt_file, 'r', encoding='utf-8') as f:
-        prompts = [line.strip() for line in f.readlines() if line.strip()]
+    with open(prompt_file, "r", encoding="utf-8") as f:
+        pairs = json.load(f) 
     
-    logging.info(f"从 {prompt_file} 读取了 {len(prompts)} 条 prompts")
+    prompts_and_files = []
+    for item in pairs:
+        p = item.get("prompt", "").strip()
+        fp = item.get("file", None)
+        if p:
+            prompts_and_files.append((p, fp))
+
+    logging.info(f"从 {prompt_file} 读取了 {len(prompts_and_files)} 条 prompts")
+    
     
     # 定义要使用的分辨率
     #resolutions = ['1920*1056', '2560*1440', '3840*2144']
@@ -383,9 +414,35 @@ def generate(args):
         base_seed = [args.base_seed] if rank == 0 else [None]
         dist.broadcast_object_list(base_seed, src=0)
         args.base_seed = base_seed[0]
+        
+    
+    dataset = UnifiedDataset(
+            base_path=None,
+            metadata_path=args.prompt_file,
+            repeat=1,
+            data_file_keys=("file",),
+            main_data_operator=UnifiedDataset.default_video_operator(
+                base_path=None,
+                max_pixels=832*480,
+                height=480,
+                width=832,
+                height_division_factor=16,
+                width_division_factor=16,
+                num_frames=args.frame_num,
+                time_division_factor=4,
+                time_division_remainder=1,
+                ),
+            )
+    print("len(dataset):", len(dataset))
+
+    
+    dataloader = torch.utils.data.DataLoader(dataset, shuffle=False, collate_fn=lambda x: x[0], num_workers=1)
+        
+    # ======== 对齐参数 ==========
+    denoising_strength = 0.5              
 
     logging.info("Creating WanTI2V pipeline.")
-    wan_ti2v = wan.WanTI2V(
+    wan_ti2v = wan.WanTI2V_SR(
         config=cfg,
         checkpoint_dir=args.ckpt_dir,
         device_id=device,
@@ -399,25 +456,21 @@ def generate(args):
     )
     
     logging.info(f"Generating video ...")
-        # video = wan_ti2v.generate(
-        #     args.prompt,
-        #     img=img,
-        #     size=SIZE_CONFIGS[args.size],
-        #     max_area=MAX_AREA_CONFIGS[args.size],
-        #     frame_num=args.frame_num,
-        #     shift=args.sample_shift,
-        #     sample_solver=args.sample_solver,
-        #     sampling_steps=args.sample_steps,
-        #     guide_scale=args.sample_guide_scale,
-        #     seed=args.base_seed,
-        #     offload_model=args.offload_model)
 
     
-    for prompt_idx, prompt in enumerate(prompts, 1):
+    for prompt_idx, data in enumerate(dataloader):
+        prompt = data["prompt"]
+        print(prompt)
+        video_input = data["file"]#.to(device=device, dtype=torch.float32)
+        print(video_input.shape)
+        video_input = video_input.unsqueeze(0).to(device=device, dtype=torch.float32)
+        print(video_input.shape)
+
+
         for resolution in resolutions:
             if rank == 0:
                 logging.info(f"\n{'='*80}")
-                logging.info(f"处理 Prompt {prompt_idx}/{len(prompts)}, 分辨率: {resolution}")
+                logging.info(f"处理 Prompt {prompt_idx}/{len(prompts_and_files)}, 分辨率: {resolution}")
                 logging.info(f"Prompt: {prompt}")
                 logging.info(f"{'='*80}\n")
                 
@@ -434,11 +487,34 @@ def generate(args):
                 base_seed = [current_seed] if rank == 0 else [None]
                 dist.broadcast_object_list(base_seed, src=0)
                 current_seed = base_seed[0]
-            
+                
+                
+            # ========== (A) 准备 cond_latent (480p 条件) ==========
             
 
+            video_input = video_input#.permute(0, 2, 1, 3, 4)
+            
+            print(video_input.shape)
+
+            with torch.no_grad():
+                cond_latent = encode_to_latent(wan_ti2v, video_input)  # [1,C,T,h',w']
+                B, C, T, h, w = cond_latent.shape
+                H = 90
+                W = 160
+                
+                print(cond_latent.shape) # [1, 31, 48, 30, 52]
+                cond_latent = cond_latent.to(device=wan_ti2v.device, dtype=torch.float32)
+                
+                cond_latent = cond_latent.permute(0, 2, 1, 3, 4).reshape(B*T, C, h, w)  # [B*T, C, h, w]
+                cond_latent = F.interpolate(cond_latent, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
+                cond_latent = cond_latent.reshape(B, T, C, H, W)
+
+            
+            
+ 
             video = wan_ti2v.generate(
                     current_prompt,
+                    cond_latent=cond_latent,
                     img=img,
                     size=SIZE_CONFIGS[resolution],
                     max_area=MAX_AREA_CONFIGS[resolution],
