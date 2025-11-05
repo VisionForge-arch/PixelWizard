@@ -162,14 +162,6 @@ class SelfForcingWan_Cross(SelfForcingModel):
         ).unflatten(0, (batch_size, num_frame))
 
 
-        # Compute loss
-        # flow_pred, x0_pred = self.generator(
-        #     noisy_image_or_video=noisy_latents,
-        #     conditional_dict=conditional_dict,
-        #     timestep=timestep,
-        #     clean_x=clean_latent_aug if self.teacher_forcing else None,
-        #     aug_t=timestep_clean_aug if self.teacher_forcing else None
-        # )
         flow_pred, x0_pred = self.generator(
             noisy_image_or_video=noisy_latents,
             conditional_dict=conditional_dict,
