@@ -419,7 +419,8 @@ class WanModel(ModelMixin, ConfigMixin):
         if self.rope_scaling == "yarn":
             print("========= Using yarn rope scaling ==========")
             self.freqs = torch.cat([
-                rope_params(1024, d - 4 * (d // 6)),
+                rope_params(1024, d - 4 * (d // 6),
+                            scaling="yarn", factor=2.0, yarn_alpha=0.8, yarn_short_factor=1.0),
                 rope_params(1024, 2 * (d // 6),
                             scaling="yarn", factor=2.0, yarn_alpha=0.8, yarn_short_factor=1.0),
                 rope_params(1024, 2 * (d // 6),
