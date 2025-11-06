@@ -160,7 +160,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/2k_train_900iter_yarn/2k_yarn",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/720p_5s",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
@@ -303,8 +303,8 @@ def _parse_args():
     parser.add_argument(
         "--wan_ckpt",
         type=str,
-        #default=None,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_yarn/checkpoint_model_001000/model.pt",
+        default=None,
+        #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_yarn/checkpoint_model_001000/model.pt",
         help="The path to the Wan checkpoint.")
     args = parser.parse_args()
     _validate_args(args)
@@ -363,8 +363,8 @@ def generate(args):
     logging.info(f"从 {prompt_file} 读取了 {len(prompts)} 条 prompts")
     
     # 定义要使用的分辨率
-    #resolutions = ['1920*1056', '2560*1440', '3840*2144']
-    resolutions = ['2560*1440']
+    #resolutions = ['1920*1056', '2560*1440', '3840*2144'，'1280*704']
+    resolutions = ['1280*704']
     
     # 创建保存文件夹
     output_dir = args.save_file 
