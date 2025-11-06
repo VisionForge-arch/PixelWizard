@@ -67,8 +67,9 @@ class SelfForcingWan(SelfForcingModel):
 
             
     def _initialize_models(self, args, device):
+        self.sr_mode = args.sr_mode
         self.seq_len = args.seq_len
-        self.generator = WanDiffusionWrapper(**getattr(args, "model_kwargs", {}), seq_len=self.seq_len)
+        self.generator = WanDiffusionWrapper(**getattr(args, "model_kwargs", {}), seq_len=self.seq_len, sr=self.sr_mode)
         self.generator.model.requires_grad_(True)
 
         self.text_encoder = WanTextEncoder()

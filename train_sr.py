@@ -6,7 +6,8 @@ from tqdm import tqdm
 from omegaconf import OmegaConf
 
 import wandb
-from model_wan_trainer import WanModel_Trainer
+#from model_wan_trainer import WanModel_Trainer
+from model_wan_trainer_upsample import WanModel_Trainer
     
     
 
@@ -57,6 +58,7 @@ def main():
     config.generator_ckpt = args.generator_ckpt
     
     config.seq_len = int(config.height // 16) * int(config.width // 16) * int((config.num_frames - 1) // config.time_division_factor)
+    config.sr_mode = True
     
     # =========init dataset=========
     

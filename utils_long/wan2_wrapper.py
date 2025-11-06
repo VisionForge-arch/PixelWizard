@@ -128,7 +128,8 @@ class WanDiffusionWrapper(torch.nn.Module):
             is_causal=False,
             local_attn_size=-1,
             sink_size=0,
-            seq_len=35*52*21
+            seq_len=35*52*21,
+            sr=False,
     ):
         super().__init__()
 
@@ -139,8 +140,13 @@ class WanDiffusionWrapper(torch.nn.Module):
         self.uniform_timestep = not is_causal
 
         self.scheduler = FlowMatchScheduler(shift=timestep_shift, sigma_min=0.0, extra_one_step=True)
-        self.scheduler.set_timesteps(1000, training=True)
-        #self.scheduler.set_timesteps(500, denoising_strength=0.167, training=True)
+        
+        if sr is True:
+            print("==========Using latent SR mode scheduler==========")
+            self.scheduler.set_timesteps(200, denoising_strength=0.048, training=True)
+        else:
+            self.scheduler.set_timesteps(1000, training=True)
+        
         
 
         self.seq_len = seq_len

@@ -164,7 +164,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/720p_5s",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/480p_upsample",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
@@ -210,7 +210,7 @@ def _parse_args():
         choices=['unipc', 'dpm++'],
         help="The solver used to sample.")
     parser.add_argument(
-        "--sample_steps", type=int, default=50, help="The sampling steps.")
+        "--sample_steps", type=int, default=25, help="The sampling steps.")
     parser.add_argument(
         "--sample_shift",
         type=float,
@@ -308,7 +308,7 @@ def _parse_args():
         "--wan_ckpt",
         type=str,
         #default=None,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_latent_upsample/checkpoint_model_000300/model.pt",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_latent_upsample/checkpoint_model_000600/model.pt",
         help="The path to the Wan checkpoint.")
     args = parser.parse_args()
     _validate_args(args)
