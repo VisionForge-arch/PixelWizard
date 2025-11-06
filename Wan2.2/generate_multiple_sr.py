@@ -210,7 +210,7 @@ def _parse_args():
         choices=['unipc', 'dpm++'],
         help="The solver used to sample.")
     parser.add_argument(
-        "--sample_steps", type=int, default=25, help="The sampling steps.")
+        "--sample_steps", type=int, default=12, help="The sampling steps.")
     parser.add_argument(
         "--sample_shift",
         type=float,
@@ -308,7 +308,7 @@ def _parse_args():
         "--wan_ckpt",
         type=str,
         #default=None,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_latent_upsample/checkpoint_model_000600/model.pt",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_yarn/checkpoint_model_000100/model.pt",
         help="The path to the Wan checkpoint.")
     args = parser.parse_args()
     _validate_args(args)
