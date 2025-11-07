@@ -239,6 +239,7 @@ class WanDiffusionWrapper(torch.nn.Module):
         timestep: torch.Tensor, 
         crossattn_cache: Optional[List[dict]] = None,
         current_start: Optional[int] = None,
+        lr_context: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         prompt_embeds = conditional_dict["prompt_embeds"]
 
@@ -249,13 +250,21 @@ class WanDiffusionWrapper(torch.nn.Module):
             input_timestep = timestep
 
         # X0 prediction
-
-        flow_pred = self.model(
-            noisy_image_or_video.permute(0, 2, 1, 3, 4),
-            t=input_timestep, 
-            context=prompt_embeds,
-            seq_len=self.seq_len
-        ).permute(0, 2, 1, 3, 4)
+        if lr_context is not None:
+            flow_pred = self.model(
+                noisy_image_or_video.permute(0, 2, 1, 3, 4),
+                t=input_timestep, 
+                context=prompt_embeds,
+                seq_len=self.seq_len,
+                lr_context=lr_context,
+            ).permute(0, 2, 1, 3, 4)
+        else:
+            flow_pred = self.model(
+                noisy_image_or_video.permute(0, 2, 1, 3, 4),
+                t=input_timestep, 
+                context=prompt_embeds,
+                seq_len=self.seq_len,
+            ).permute(0, 2, 1, 3, 4)
 
         # flow_pred: [1, 33, 16, 30, 52]
         pred_x0 = self._convert_flow_pred_to_x0(
