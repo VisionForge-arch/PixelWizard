@@ -931,6 +931,6 @@ class WanModel_Cross(ModelMixin, ConfigMixin):
 
 
 if __name__ == "__main__":
-    model = WanModel_cross.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
+    model = WanModel_Cross.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
     model.eval()
     model.to("cuda")
