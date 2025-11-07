@@ -137,9 +137,7 @@ class WanDiffusionWrapper(torch.nn.Module):
         super().__init__()
         if cross is True:
             self.model = WanModel_Cross.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
-
-            from wan2_long.modules.resampler import VideoResampler
-            self.resampler = VideoResampler().to("cuda")
+            register_lr_adapter(self.model)
         else:   
             self.model = WanModel.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
         self.model.eval()

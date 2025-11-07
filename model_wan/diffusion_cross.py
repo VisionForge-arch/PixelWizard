@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from model_wan.base import BaseModel, SelfForcingModel
 from utils_long.wan2_wrapper import WanDiffusionWrapper, WanTextEncoder, WanVAEWrapper2_2
 from pipeline_long import SelfForcingTrainingPipeline
-
+from wan2_long.modules.resampler import VideoResampler
 
 class SelfForcingWan_Cross(SelfForcingModel):
     def __init__(self, args, device):
@@ -79,6 +79,9 @@ class SelfForcingWan_Cross(SelfForcingModel):
         
         self.scheduler = self.generator.get_scheduler()
         self.scheduler.timesteps = self.scheduler.timesteps.to(device)
+        
+                    
+        self.resampler = VideoResampler().to("cuda")
 
     def random_crop(self, *tensors):
         """
@@ -133,6 +136,12 @@ class SelfForcingWan_Cross(SelfForcingModel):
         noise = torch.randn_like(clean_latent)
         #print(f"image_or_video_shape: {image_or_video_shape}")
         batch_size, num_frame = image_or_video_shape[:2]
+        
+        
+        # ============ LR Context ============
+        clean_latent_lr = clean_latent_lr.permute(0, 2, 1, 3, 4).contiguous()
+        ip_tokens = self.resampler(clean_latent_lr)
+        print("ip_tokens: ", ip_tokens.shape)
 
         # Step 2: Randomly sample a timestep and add noise to denoiser inputs (Flow Matching)
         # 从[0, 1000)中随机采样timestep index

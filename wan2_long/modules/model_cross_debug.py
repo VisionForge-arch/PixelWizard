@@ -592,7 +592,8 @@ def register_lr_adapter(
         )
         block.cross_attn = wrapper
         #exit()
-    
+    lr_layers = nn.ModuleList([block.cross_attn for block in transformer.blocks])
+    return transformer, lr_layers
 
 
 
@@ -1066,23 +1067,23 @@ if __name__ == "__main__":
     
     
     model = WanModel_Cross.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
-    register_lr_adapter(model)
+    model, lr_layers = register_lr_adapter(model)
     
     model.eval()
     model.to("cuda")
     
     
-    noisy_image_or_video = torch.randn(1, 3, 48, 90, 160).to("cuda")
+    noisy_image_or_video = torch.randn(1, 3, 48, 48, 80).to("cuda")
     input_timestep = torch.randint(0, 1000, (1,)).to("cuda")
     prompt_embeds = torch.randn(1, 512, 4096).to("cuda")
-    seq_len = 90*160*3
+    seq_len = 48*80*3
     
     
     flow_pred = model(
                 noisy_image_or_video.permute(0, 2, 1, 3, 4),
                 t=input_timestep, context=prompt_embeds,
                 seq_len=seq_len,
-                lr_context=None,
+                lr_context=ip_tokens,
             ).permute(0, 2, 1, 3, 4)
     
     print("flow_pred: ", flow_pred.shape)
