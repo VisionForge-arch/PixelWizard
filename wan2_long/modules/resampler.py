@@ -65,7 +65,7 @@ class VideoResampler(nn.Module):
     """
     def __init__(
         self,
-        in_channels=3,             # 输入通道 (RGB=3，若传VAE latent则改为 latent C)
+        in_channels=48,             # 输入通道 (RGB=3，若传VAE latent则改为 latent C)
         patch_t=4, patch_h=8, patch_w=8,  # 3D卷积分块
         dim=1024,                  # 内部通道
         depth=4,                   # Perceiver层数
