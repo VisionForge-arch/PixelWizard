@@ -136,8 +136,9 @@ class WanDiffusionWrapper(torch.nn.Module):
     ):
         super().__init__()
         if cross is True:
+            from wan2_long.modules.model_cross import register_lr_adapter
             self.model = WanModel_Cross.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
-            register_lr_adapter(self.model)
+            self.model, _ = register_lr_adapter(self.model)
         else:   
             self.model = WanModel.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
         self.model.eval()

@@ -68,7 +68,7 @@ class SelfForcingWan_Cross(SelfForcingModel):
             
     def _initialize_models(self, args, device):
         self.seq_len = args.seq_len
-        self.generator = WanDiffusionWrapper(**getattr(args, "model_kwargs", {}), seq_len=self.seq_len)
+        self.generator = WanDiffusionWrapper(**getattr(args, "model_kwargs", {}), seq_len=self.seq_len, sr=False)
         self.generator.model.requires_grad_(True)
 
         self.text_encoder = WanTextEncoder()
@@ -81,7 +81,8 @@ class SelfForcingWan_Cross(SelfForcingModel):
         self.scheduler.timesteps = self.scheduler.timesteps.to(device)
         
                     
-        self.resampler = VideoResampler().to("cuda")
+        self.resampler = VideoResampler().to(device)
+        
 
     def random_crop(self, *tensors):
         """
@@ -142,6 +143,8 @@ class SelfForcingWan_Cross(SelfForcingModel):
         clean_latent_lr = clean_latent_lr.permute(0, 2, 1, 3, 4).contiguous()
         ip_tokens = self.resampler(clean_latent_lr)
         print("ip_tokens: ", ip_tokens.shape)
+        
+        
 
         # Step 2: Randomly sample a timestep and add noise to denoiser inputs (Flow Matching)
         # 从[0, 1000)中随机采样timestep index
@@ -175,8 +178,7 @@ class SelfForcingWan_Cross(SelfForcingModel):
             noisy_image_or_video=noisy_latents,
             conditional_dict=conditional_dict,
             timestep=timestep,
-            clean_x=None,
-            aug_t=None
+            lr_context=ip_tokens,
         )
         
 
