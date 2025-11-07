@@ -585,7 +585,7 @@ def register_lr_adapter(
             lr_scale=lr_scale,
         )
         block.cross_attn = wrapper
-        exit()
+        #exit()
     
 
 
