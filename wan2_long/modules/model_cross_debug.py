@@ -260,7 +260,7 @@ class WanAttentionBlock(nn.Module):
                  window_size=(-1, -1),
                  qk_norm=True,
                  cross_attn_norm=False,
-                 eps=1e-6):
+                 eps=1e-6,):
         super().__init__()
         self.dim = dim
         self.ffn_dim = ffn_dim
@@ -296,6 +296,7 @@ class WanAttentionBlock(nn.Module):
         freqs,
         context,
         context_lens,
+        lr_ref_latent=None,
     ):
         r"""
         Args:
@@ -304,6 +305,7 @@ class WanAttentionBlock(nn.Module):
             seq_lens(Tensor): Shape [B], length of each sequence in batch
             grid_sizes(Tensor): Shape [B, 3], the second dimension contains (F, H, W)
             freqs(Tensor): Rope freqs, shape [1024, C / num_heads / 2]
+            lr_ref_latent(Tensor): Shape [B, L, C], reference latent
         """
         #assert e.dtype == torch.float32
         #with torch.amp.autocast('cuda', dtype=torch.float32):
