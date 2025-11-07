@@ -469,6 +469,7 @@ class WanLRAttnProcessor(torch.nn.Module):
         n_registers: int,
         bias: bool = False,
         lr_scale: float = 1.0,
+        init_method: str = 'zero',
     ):
         super().__init__()
         
@@ -483,20 +484,74 @@ class WanLRAttnProcessor(torch.nn.Module):
         self.to_k_lr = nn.Linear(cross_attention_dim, dim, bias=bias)
         self.to_v_lr = nn.Linear(cross_attention_dim, dim, bias=bias)
         
+        # 与 base_attn 保持相同的 q/k 归一化策略
+        self.norm_q = self.base_attn.norm_q
+        self.norm_k = self.base_attn.norm_k
+        
         if n_registers > 0:
             self.register_tokens = nn.Parameter(torch.randn(1, n_registers, dim) * 0.02)
         else:
             self.register_tokens = None
+            
+        if init_method == 'zero':
+            torch.nn.init.zeros_(self.to_k_lr.weight)
+            torch.nn.init.zeros_(self.to_k_lr.bias)
+            torch.nn.init.zeros_(self.to_v_lr.weight)
+            torch.nn.init.zeros_(self.to_v_lr.bias)
+
     
     
     def forward(
         self, 
-        attn, 
-        hidden_states, 
-        encoder_hidden_states=None, 
-        attention_mask=None
+        x,
+        context, 
+        context_lens=None,
+        lr_context=None,
+        lr_context_lens=None,
     ):
-        query = attn.to_q(hidden_states)
+        
+        B, Lq, C = x.shape
+        n = self.num_heads
+        d = self.head_dim
+        
+        q = self.base_attn.q(x)  # [B, Lq, C]
+        q = self.norm_q(q).view(B, Lq, n, d)
+        
+        k = self.norm_k(self.k(context)).view(B, -1, n, d)
+        v = self.v(context).view(B, -1, n, d)
+        
+        # 3) base 注意力输出（未 out）
+        base_out = flash_attention(q, k, v, k_lens=context_lens)  # [B,Lq,n,d]
+        
+        # 拼接 register tokens 到 lr_context 前面
+        if self.register_tokens is not None:
+            reg = self.register_tokens.expand(B, -1, -1)        # [B, n_reg, C_lr]
+            lr_context = torch.cat([reg, lr_context], dim=1)
+            if lr_context_lens is not None:
+                lr_context_lens = lr_context_lens + reg.shape[1]
+                if lr_context_lens is not None:
+                    lr_context_lens = lr_context_lens + reg.shape[1]
+        
+        # 2) LR 分支处理
+        lr_k = self.to_k_lr(lr_context)
+        lr_v = self.to_v_lr(lr_context)
+        
+        if isinstance(self.norm_k, nn.Module):
+            k_lr = self.norm_k(k_lr)
+            
+        k_lr = k_lr.view(B, -1, n, d)
+        k_lr = k_lr.view(B, -1, n, d)
+        
+        # 3) 混合输出
+        lr_out = flash_attention(q, lr_k, lr_v, k_lens=lr_context_lens)
+        
+        out = base_out + lr_out * self.lr_scale
+        
+        out = out.flatten(2)
+        out = self.base_attn.o(out)
+        
+        return out
+        
     
         
 
@@ -506,6 +561,7 @@ def register_lr_adapter(
     cross_attention_dim=None,
     n_registers=0,
     init_method='zero',
+    lr_scale=1.0,
 ):
     attn_procs = {}
     transformer_sd = transformer.state_dict()
@@ -515,18 +571,19 @@ def register_lr_adapter(
         name = f"blocks.{layer_idx}.cross_attn"
         dim = transformer_sd[name + '.k.weight'].shape[1]   # 3072
         
-        attn_procs[name] = WanLRAttnProcessor(cross_attention_dim=dim, dim=dim, n_registers=16, bias=True)
+        base_attn = block.cross_attn
         
-        if init_method == 'zero':
-            torch.nn.init.zeros_(attn_procs[name].to_k_lr.weight)
-            torch.nn.init.zeros_(attn_procs[name].to_k_lr.bias)
-            torch.nn.init.zeros_(attn_procs[name].to_v_lr.weight)
-            torch.nn.init.zeros_(attn_procs[name].to_v_lr.bias)
-
-        print("block.attn2: ", block.cross_attn)
-        block.cross_attn = attn_procs[name]
-        print('==================================================')
-        print("block.attn2: ", block.cross_attn)
+        
+        wrapper = WanLRAttnProcessor(
+            base_attn=base_attn,
+            cross_attention_dim=dim,
+            dim=dim,
+            n_registers=n_registers,
+            bias=True,
+            init_method=init_method,
+            lr_scale=lr_scale,
+        )
+        block.cross_attn = wrapper
         exit()
     
 
