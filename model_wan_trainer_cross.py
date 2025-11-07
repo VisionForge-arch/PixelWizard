@@ -159,9 +159,6 @@ class WanModel_Trainer:
             _, _, _, h, w   = clean_latent_lr.shape
 
             clean_latent_lr = clean_latent_lr.reshape(B*T, C, h, w)  # [B*T, C, h, w]
-            clean_latent_lr = F.interpolate(clean_latent_lr, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
-            clean_latent_lr = clean_latent_lr.reshape(B, T, C, H, W)
-                    
             # print(f"frames.shape: {frames.shape}, clean_latent.shape: {clean_latent.shape}")
             # print(f"frames_480p.shape: {frames_480p.shape}, clean_latent_lr.shape: {clean_latent_lr.shape}")
                 
