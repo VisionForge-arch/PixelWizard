@@ -834,7 +834,9 @@ class WanModel_Cross(ModelMixin, ConfigMixin):
             grid_sizes=grid_sizes,
             freqs=self.freqs,
             context=context,
-            context_lens=context_lens)
+            context_lens=context_lens,
+            lr_ref_latent=lr_ref_latent,
+        )
 
         def create_custom_forward(module):
             def custom_forward(*inputs, **kwargs):
