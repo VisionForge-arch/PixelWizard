@@ -463,12 +463,23 @@ class MLPProj(torch.nn.Module):
 class WanLRAttnProcessor(torch.nn.Module):
     def __init__(
         self,
+        base_attn: WanCrossAttention,
         cross_attention_dim: int,
         dim: int, 
         n_registers: int,
         bias: bool = False,
+        lr_scale: float = 1.0,
     ):
         super().__init__()
+        
+        # 保留原始 cross-attn
+        self.base_attn = base_attn
+        self.dim = dim
+        self.num_heads = base_attn.num_heads
+        self.head_dim = dim // self.num_heads
+        self.lr_scale = lr_scale
+        
+        # LR 分支的 k/v 投影（与原 to_k/to_v 解耦）
         self.to_k_lr = nn.Linear(cross_attention_dim, dim, bias=bias)
         self.to_v_lr = nn.Linear(cross_attention_dim, dim, bias=bias)
         
