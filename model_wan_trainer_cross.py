@@ -159,7 +159,7 @@ class WanModel_Trainer:
             B, T, C, H, W   = clean_latent.shape
             _, _, _, h, w   = clean_latent_lr.shape
 
-            clean_latent_lr = clean_latent_lr.reshape(B*T, C, h, w)  # [B*T, C, h, w]
+            #clean_latent_lr = clean_latent_lr.reshape(B*T, C, h, w)  # [B*T, C, h, w]
             # print(f"frames.shape: {frames.shape}, clean_latent.shape: {clean_latent.shape}")
             # print(f"frames_480p.shape: {frames_480p.shape}, clean_latent_lr.shape: {clean_latent_lr.shape}")
                 
