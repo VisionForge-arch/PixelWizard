@@ -506,6 +506,15 @@ def register_lr_adapter(
         
         attn_procs[name] = WanLRAttnProcessor(cross_attention_dim=dim, dim=dim, n_registers=16, bias=True)
         
+        if init_method == 'zero':
+            torch.nn.init.zeros_(attn_procs[name].to_k_lr.weight)
+            torch.nn.init.zeros_(attn_procs[name].to_k_lr.bias)
+            torch.nn.init.zeros_(attn_procs[name].to_v_lr.weight)
+            torch.nn.init.zeros_(attn_procs[name].to_v_lr.bias)
+
+        
+        block.attn2 = attn_procs[name]
+        
         exit()
     
 
