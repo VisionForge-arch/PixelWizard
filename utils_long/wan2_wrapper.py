@@ -241,6 +241,12 @@ class WanDiffusionWrapper(torch.nn.Module):
         current_start: Optional[int] = None,
         lr_context: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
+        if lr_context is None:
+            import traceback
+            traceback.print_stack()
+            raise RuntimeError("wrapper 收到 None 的 lr_context")
+                
+        
         prompt_embeds = conditional_dict["prompt_embeds"]
 
         # [B, F] -> [B]
