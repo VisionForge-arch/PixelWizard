@@ -1069,12 +1069,12 @@ if __name__ == "__main__":
     model, lr_layers = register_lr_adapter(model)
     
     model.eval()
-    model.to("cuda")
+    model.to("cuda").to(dtype=torch.bfloat16)
     
     
-    noisy_image_or_video = torch.randn(1, 13, 48, 30, 52).to("cuda")
-    input_timestep = torch.randint(0, 1000, (1,)).to("cuda")
-    prompt_embeds = torch.randn(1, 512, 4096).to("cuda")
+    noisy_image_or_video = torch.randn(1, 13, 48, 30, 52).to("cuda").to(dtype=torch.bfloat16)
+    input_timestep = torch.randint(0, 1000, (1,)).to("cuda").to(dtype=torch.bfloat16)
+    prompt_embeds = torch.randn(1, 512, 4096).to("cuda").to(dtype=torch.bfloat16)
     seq_len = 30*52*13
     
     
