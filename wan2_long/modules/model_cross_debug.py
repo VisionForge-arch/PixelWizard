@@ -1056,6 +1056,14 @@ class WanModel_Cross(ModelMixin, ConfigMixin):
 
 
 if __name__ == "__main__":
+    from resampler import VideoResampler
+    
+    lr_x = torch.randn(1, 3, 48, 30, 52).to("cuda") # [B, F, C, H, W]
+    resampler = VideoResampler().to("cuda")
+    ip_tokens = resampler(lr_x)
+    print("ip_tokens: ", ip_tokens.shape)
+    
+    
     model = WanModel_Cross.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
     register_lr_adapter(model)
     
@@ -1067,13 +1075,13 @@ if __name__ == "__main__":
     input_timestep = torch.randint(0, 1000, (1,)).to("cuda")
     prompt_embeds = torch.randn(1, 512, 4096).to("cuda")
     seq_len = 30*52*3
-    lr_x = torch.randn(1, 3, 48, 30, 52).to("cuda") # [B, F, C, H, W]
+    
     
     flow_pred = model(
                 noisy_image_or_video.permute(0, 2, 1, 3, 4),
                 t=input_timestep, context=prompt_embeds,
                 seq_len=seq_len,
-                lr_context=lr_x.permute(0, 2, 1, 3, 4),
+                lr_context=ip_tokens,
             ).permute(0, 2, 1, 3, 4)
     
     print("flow_pred: ", flow_pred.shape)
