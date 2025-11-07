@@ -138,6 +138,8 @@ class VideoResampler(nn.Module):
         """
         assert lr_x.dim() == 5, "lr_x must be [B, F, C, H, W]"
         B, F, C, H, W = lr_x.shape
+        # 交换到 [B, C, F, H, W] 以喂 Conv3d
+        x = lr_x
 
         # 3D patch embed
         x = self.patch_embed(x)  # [B, D, Ft, Ht, Wt]
