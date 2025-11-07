@@ -1059,6 +1059,7 @@ if __name__ == "__main__":
     from resampler import VideoResampler
     
     lr_x = torch.randn(1, 3, 48, 30, 52).to("cuda") # [B, F, C, H, W]
+    lr_x = lr_x.permute(0, 2, 1, 3, 4).contiguous()
     resampler = VideoResampler().to("cuda")
     ip_tokens = resampler(lr_x)
     print("ip_tokens: ", ip_tokens.shape)
