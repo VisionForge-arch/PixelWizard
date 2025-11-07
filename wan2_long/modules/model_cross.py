@@ -853,8 +853,8 @@ class WanModel_Cross(ModelMixin, ConfigMixin):
             lr_context=lr_context,
         )
 
-        def create_custom_forward(module):
-            def custom_forward(*inputs, **kwargs):
+        def create_custom_forward(module, **kwargs):
+            def custom_forward(*inputs):
                 return module(*inputs, **kwargs)
             return custom_forward
 
@@ -873,8 +873,8 @@ class WanModel_Cross(ModelMixin, ConfigMixin):
         for ii, block in enumerate(self.blocks):
             if torch.is_grad_enabled() and self.gradient_checkpointing:
                 x = torch.utils.checkpoint.checkpoint(
-                    create_custom_forward(block),
-                    x, **kwargs,
+                    create_custom_forward(block, **kwargs),
+                    x,
                     use_reentrant=False,
                 )
             else:
