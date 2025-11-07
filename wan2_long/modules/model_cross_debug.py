@@ -296,7 +296,7 @@ class WanAttentionBlock(nn.Module):
         freqs,
         context,
         context_lens,
-        lr_ref_latent=None,
+        lr_context=None,
     ):
         r"""
         Args:
@@ -305,7 +305,7 @@ class WanAttentionBlock(nn.Module):
             seq_lens(Tensor): Shape [B], length of each sequence in batch
             grid_sizes(Tensor): Shape [B, 3], the second dimension contains (F, H, W)
             freqs(Tensor): Rope freqs, shape [1024, C / num_heads / 2]
-            lr_ref_latent(Tensor): Shape [B, L, C], reference latent
+            lr_context(Tensor): Shape [B, L, C], lr context
         """
         #assert e.dtype == torch.float32
         #with torch.amp.autocast('cuda', dtype=torch.float32):
@@ -320,9 +320,9 @@ class WanAttentionBlock(nn.Module):
         x = x + y * e[2].squeeze(2)
 
         # cross-attention & ffn function
-        def cross_attn_ffn(x, context, context_lens, e, lr_ref_latent=None):
+        def cross_attn_ffn(x, context, context_lens, e, lr_context=None):
             if isinstance(self.cross_attn, WanLRAttnProcessor):
-                attn_out = self.cross_attn(self.norm3(x), context, context_lens, lr_ref_latent=lr_ref_latent)
+                attn_out = self.cross_attn(self.norm3(x), context, context_lens, lr_context=lr_context)
             else:
                 attn_out = self.cross_attn(self.norm3(x), context, context_lens)    
             
@@ -333,7 +333,7 @@ class WanAttentionBlock(nn.Module):
             x = x + y * e[5].squeeze(2)
             return x
 
-        x = cross_attn_ffn(x, context, context_lens, e)
+        x = cross_attn_ffn(x, context, context_lens, e, lr_context=lr_context)
         return x
 
 
@@ -766,7 +766,7 @@ class WanModel_Cross(ModelMixin, ConfigMixin):
         gan_ca_blocks=None,
         clip_fea=None,
         y=None,
-        lr_ref_latent=None,
+        lr_context=None,
     ):
         r"""
         Forward pass through the diffusion model
@@ -842,7 +842,7 @@ class WanModel_Cross(ModelMixin, ConfigMixin):
             freqs=self.freqs,
             context=context,
             context_lens=context_lens,
-            lr_ref_latent=lr_ref_latent,
+            lr_context=lr_context,
         )
 
         def create_custom_forward(module):
@@ -1074,7 +1074,7 @@ if __name__ == "__main__":
                 noisy_image_or_video.permute(0, 2, 1, 3, 4),
                 t=input_timestep, context=prompt_embeds,
                 seq_len=seq_len,
-                lr_ref_latent=lr_x.permute(0, 2, 1, 3, 4),
+                lr_context=lr_x.permute(0, 2, 1, 3, 4),
             ).permute(0, 2, 1, 3, 4)
     
     print("flow_pred: ", flow_pred.shape)
