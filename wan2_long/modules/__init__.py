@@ -2,6 +2,7 @@
 from .attention import flash_attention
 from .model import WanModel
 from .model_cross import WanModel_Cross
+from .model_cross_debug import WanModel_Cross_Debug
 from .t5 import T5Decoder, T5Encoder, T5EncoderModel, T5Model
 from .tokenizers import HuggingfaceTokenizer
 from .vae2_1 import Wan2_1_VAE
@@ -13,6 +14,7 @@ __all__ = [
     'Wan2_2_VAE',
     'WanModel',
     'WanModel_Cross',
+    'WanModel_Cross_Debug',
     'T5Model',
     'T5Encoder',
     'T5Decoder',
