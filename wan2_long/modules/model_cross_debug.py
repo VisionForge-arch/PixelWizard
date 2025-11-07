@@ -1082,7 +1082,7 @@ if __name__ == "__main__":
                 noisy_image_or_video.permute(0, 2, 1, 3, 4),
                 t=input_timestep, context=prompt_embeds,
                 seq_len=seq_len,
-                lr_context=ip_tokens,
+                lr_context=None,
             ).permute(0, 2, 1, 3, 4)
     
     print("flow_pred: ", flow_pred.shape)
