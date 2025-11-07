@@ -593,7 +593,8 @@ def register_lr_adapter(
         )
         block.cross_attn = wrapper
         #exit()
-    
+    lr_layers = nn.ModuleList([block.cross_attn for block in transformer.blocks])
+    return transformer, lr_layers
 
 
 
