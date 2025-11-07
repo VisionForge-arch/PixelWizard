@@ -517,8 +517,8 @@ class WanLRAttnProcessor(torch.nn.Module):
         q = self.base_attn.q(x)  # [B, Lq, C]
         q = self.norm_q(q).view(B, Lq, n, d)
         
-        k = self.norm_k(self.k(context)).view(B, -1, n, d)
-        v = self.v(context).view(B, -1, n, d)
+        k = self.norm_k(self.base_attn.k(context)).view(B, -1, n, d)
+        v = self.base_attn.v(context).view(B, -1, n, d)
         
         # 3) base 注意力输出（未 out）
         base_out = flash_attention(q, k, v, k_lens=context_lens)  # [B,Lq,n,d]
@@ -563,7 +563,6 @@ def register_lr_adapter(
     init_method='zero',
     lr_scale=1.0,
 ):
-    attn_procs = {}
     transformer_sd = transformer.state_dict()
     #print("transformer_sd.keys(): ", transformer_sd.keys())
     
