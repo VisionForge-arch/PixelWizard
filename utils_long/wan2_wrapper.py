@@ -6,6 +6,7 @@ from torch import nn
 from utils_long.scheduler import SchedulerInterface, FlowMatchScheduler
 from wan2_long.modules.tokenizers import HuggingfaceTokenizer
 from wan2_long.modules.model import WanModel, RegisterTokens, GanAttentionBlock
+from wan2_long.modules.model_cross import WanModel_Cross
 from wan2_long.modules.vae2_2 import _video_vae
 from wan2_long.modules.t5 import umt5_xxl
 
@@ -130,10 +131,13 @@ class WanDiffusionWrapper(torch.nn.Module):
             sink_size=0,
             seq_len=35*52*21,
             sr=False,
+            cross=False,
     ):
         super().__init__()
-
-        self.model = WanModel.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
+        if cross is True:
+            self.model = WanModel_Cross.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
+        else:   
+            self.model = WanModel.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
         self.model.eval()
 
         # For non-causal diffusion, all frames share the same timestep

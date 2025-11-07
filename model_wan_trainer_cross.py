@@ -76,7 +76,7 @@ class WanModel_Trainer:
         self.dataloader = cycle(dataloader)
 
         # Step 2: Initialize the model and optimizer
-        self.model = SelfForcingWan(config, device=self.device)
+        self.model = SelfForcingWan_Cross(config, device=self.device)
         
         self.model.generator = fsdp_wrap(
             self.model.generator,
@@ -177,7 +177,7 @@ class WanModel_Trainer:
         # Extract the conditional infos
         with torch.no_grad():
             # 'promot_embeds': [B, 512, 4096]
-            conditional_dict = self.model.text_encoder(text_prompts=text_prompts)
+            conditional_dict = self.model.text_encoder(text_prompts=text_prompts) # [B, 512, 4096]
             if not getattr(self, "unconditional_dict", None):
                 unconditional_dict = self.model.text_encoder(
                     text_prompts=[self.config.negative_prompt] * batch_size)

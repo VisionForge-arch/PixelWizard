@@ -313,7 +313,7 @@ class WanAttentionBlock(nn.Module):
         # self-attention
         y = self.self_attn(
             self.norm1(x) * (1 + e[1].squeeze(2)) + e[0].squeeze(2),
-            seq_lens, grid_sizes, freqs)
+            seq_lens, grid_sizes, freqs)      # 
         #with torch.amp.autocast('cuda', dtype=torch.float32):
         x = x + y * e[2].squeeze(2)
 
@@ -457,6 +457,23 @@ class MLPProj(torch.nn.Module):
     def forward(self, image_embeds):
         clip_extra_context_tokens = self.proj(image_embeds)
         return clip_extra_context_tokens
+
+
+def register_lr_adapter(
+    transformer, 
+    cross_attention_dim=None,
+    n_registers=0,
+    init_method='zero',
+):
+    attn_procs = {}
+    transformer_sd = transformer.state_dict()
+    exit()
+    for layer_idx, block in enumerate(transformer.blocks):
+        name = f"blocks.{layer_idx}.cross_attn."
+    
+
+
+
 
 class RegisterTokens(nn.Module):
     def __init__(self, num_registers: int, dim: int):
@@ -688,7 +705,8 @@ class WanModel_Cross(ModelMixin, ConfigMixin):
                     [u, u.new_zeros(self.text_len - u.size(0), u.size(1))])
                 for u in context
             ]))
-
+        
+        
         if clip_fea is not None:
             context_clip = self.img_emb(clip_fea)  # bs x 257 x dim
             context = torch.concat([context_clip, context], dim=1)
@@ -910,3 +928,10 @@ class WanModel_Cross(ModelMixin, ConfigMixin):
 
         # init output layer
         nn.init.zeros_(self.head.head.weight)
+
+
+if __name__ == "__main__":
+    model = WanModel_Cross(model_type='ti2v')
+    model.load_state_dict(torch.load("/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B/model.pt"))
+    model.eval()
+    model.to("cuda")
