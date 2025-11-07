@@ -4,6 +4,7 @@ from PIL import Image
 import torchvision.transforms as transforms
 
 from model_wan import SelfForcingWan_Cross
+
 import torch
 from utils_long.misc import (
     set_seed,
