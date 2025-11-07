@@ -472,7 +472,7 @@ def register_lr_adapter(
     for layer_idx, block in enumerate(transformer.blocks):
         name = f"blocks.{layer_idx}.cross_attn"
         dim = transformer_sd[name + '.k.weight'].shape[1]
-        dim0 = transformer_sd[name + '.k.weight'].shape[1]
+        dim0 = transformer_sd[name + '.k.weight'].shape
         print("dim: ", dim0)
         exit()
     
