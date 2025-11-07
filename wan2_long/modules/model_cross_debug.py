@@ -544,10 +544,10 @@ class WanLRAttnProcessor(torch.nn.Module):
         lr_v = self.to_v_lr(lr_context)
         
         if isinstance(self.norm_k, nn.Module):
-            k_lr = self.norm_k(k_lr)
+            lr_k = self.norm_k(lr_k)
             
-        k_lr = k_lr.view(B, -1, n, d)
-        k_lr = k_lr.view(B, -1, n, d)
+        lr_k = lr_k.view(B, -1, n, d)
+        lr_v = lr_v.view(B, -1, n, d)
         
         # 3) 混合输出
         lr_out = flash_attention(q, lr_k, lr_v, k_lens=lr_context_lens)
