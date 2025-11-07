@@ -1065,7 +1065,6 @@ if __name__ == "__main__":
     ip_tokens = resampler(lr_x)
     print("ip_tokens: ", ip_tokens.shape)
     
-    
     model = WanModel_Cross.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
     model, lr_layers = register_lr_adapter(model)
     
@@ -1073,7 +1072,7 @@ if __name__ == "__main__":
     model.to("cuda")
     
     
-    noisy_image_or_video = torch.randn(1, 3, 48, 48, 80).to("cuda")
+    noisy_image_or_video = torch.randn(1, 3, 48, 30, 52).to("cuda")
     input_timestep = torch.randint(0, 1000, (1,)).to("cuda")
     prompt_embeds = torch.randn(1, 512, 4096).to("cuda")
     seq_len = 48*80*3
