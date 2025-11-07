@@ -843,19 +843,19 @@ class WanModel_Cross(ModelMixin, ConfigMixin):
             context = torch.concat([context_clip, context], dim=1)
 
         # arguments
-        kwargs = dict(
+        common_kwargs = dict(
             e=e0,
             seq_lens=seq_lens,
             grid_sizes=grid_sizes,
             freqs=self.freqs,
             context=context,
             context_lens=context_lens,
-            lr_context=lr_context,
         )
 
-        def create_custom_forward(module, **kwargs):
+        def create_custom_forward(module, **module_kwargs):
             def custom_forward(*inputs):
-                return module(*inputs, **kwargs)
+                inp_x, inp_lr_context = inputs
+                return module(inp_x, lr_context=inp_lr_context, **module_kwargs)
             return custom_forward
 
         # TODO: Tune the number of blocks for feature extraction
@@ -873,12 +873,13 @@ class WanModel_Cross(ModelMixin, ConfigMixin):
         for ii, block in enumerate(self.blocks):
             if torch.is_grad_enabled() and self.gradient_checkpointing:
                 x = torch.utils.checkpoint.checkpoint(
-                    create_custom_forward(block, **kwargs),
+                    create_custom_forward(block, **common_kwargs),
                     x,
+                    lr_context,
                     use_reentrant=False,
                 )
             else:
-                x = block(x, **kwargs)
+                x = block(x, lr_context=lr_context, **common_kwargs)
                 
                 #print(f"the shape in {ii}, x.shape: {x.shape}")
                 
