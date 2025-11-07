@@ -573,6 +573,7 @@ def register_lr_adapter(
         
         base_attn = block.cross_attn
         
+        print("base_attn: ", base_attn)
         
         wrapper = WanLRAttnProcessor(
             base_attn=base_attn,
