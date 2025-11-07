@@ -468,9 +468,12 @@ def register_lr_adapter(
     attn_procs = {}
     transformer_sd = transformer.state_dict()
     print("transformer_sd.keys(): ", transformer_sd.keys())
-    exit()
+    
     for layer_idx, block in enumerate(transformer.blocks):
-        name = f"blocks.{layer_idx}.cross_attn."
+        name = f"blocks.{layer_idx}.cross_attn"
+        dim = transformer_sd[name + '.k.weight'].shape[1]
+        print("dim: ", dim)
+        exit()
     
 
 
