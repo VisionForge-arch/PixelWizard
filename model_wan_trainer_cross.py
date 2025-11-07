@@ -94,7 +94,7 @@ class WanModel_Trainer:
             wrap_strategy=config.text_encoder_fsdp_wrap_strategy
         )
         self.model.vae = self.model.vae.to(device=self.device, dtype=torch.bfloat16 if config.mixed_precision else torch.float32)
-
+        self.model.resampler = self.model.resampler.to(device=self.device, dtype=torch.bfloat16 if config.mixed_precision else torch.float32)
 
 
 
