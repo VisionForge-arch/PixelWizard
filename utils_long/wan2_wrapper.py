@@ -265,7 +265,8 @@ class WanDiffusionWrapper(torch.nn.Module):
         else:
             flow_pred = self.model(
                 noisy_image_or_video.permute(0, 2, 1, 3, 4),
-                t=input_timestep, context=prompt_embeds,
+                t=input_timestep, 
+                context=prompt_embeds,
                 seq_len=self.seq_len
             ).permute(0, 2, 1, 3, 4)
 

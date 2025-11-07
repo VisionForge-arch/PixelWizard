@@ -573,7 +573,7 @@ def register_lr_adapter(
         
         base_attn = block.cross_attn
         
-        print("base_attn: ", base_attn)
+        #print("base_attn: ", base_attn)
         
         wrapper = WanLRAttnProcessor(
             base_attn=base_attn,
@@ -760,6 +760,7 @@ class WanModel_Cross(ModelMixin, ConfigMixin):
         gan_ca_blocks=None,
         clip_fea=None,
         y=None,
+        lr_ref_latent=None,
     ):
         r"""
         Forward pass through the diffusion model
@@ -1058,15 +1059,14 @@ if __name__ == "__main__":
     input_timestep = torch.randint(0, 1000, (1,)).to("cuda")
     prompt_embeds = torch.randn(1, 512, 4096).to("cuda")
     seq_len = 35*52*3
-    clean_x = torch.randn(1, 3, 48, 30, 52).to("cuda")
+    lr_x = torch.randn(1, 3, 48, 30, 52).to("cuda")
     aug_t = torch.randn(1, 1).to("cuda")
     
     flow_pred = model(
                 noisy_image_or_video.permute(0, 2, 1, 3, 4),
                 t=input_timestep, context=prompt_embeds,
                 seq_len=seq_len,
-                clean_x=clean_x.permute(0, 2, 1, 3, 4),
-                aug_t=None,
+                lr_ref_latent=lr_x.permute(0, 2, 1, 3, 4),
             ).permute(0, 2, 1, 3, 4)
     
     print("flow_pred: ", flow_pred.shape)
