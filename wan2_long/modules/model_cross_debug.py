@@ -459,6 +459,37 @@ class MLPProj(torch.nn.Module):
         return clip_extra_context_tokens
 
 
+
+class WanLRAttnProcessor(torch.nn.Module):
+    def __init__(
+        self,
+        cross_attention_dim: int,
+        dim: int, 
+        n_registers: int,
+        bias: bool = False,
+    ):
+        super().__init__()
+        self.to_k_lr = nn.Linear(cross_attention_dim, dim, bias=bias)
+        self.to_v_lr = nn.Linear(cross_attention_dim, dim, bias=bias)
+        
+        if n_registers > 0:
+            self.register_tokens = nn.Parameter(torch.randn(1, n_registers, dim) * 0.02)
+        else:
+            self.register_tokens = None
+    
+    
+    def forward(
+        self, 
+        attn, 
+        hidden_states, 
+        encoder_hidden_states=None, 
+        attention_mask=None
+    ):
+        query = attn.to_q(hidden_states)
+    
+        
+
+
 def register_lr_adapter(
     transformer, 
     cross_attention_dim=None,
@@ -471,9 +502,10 @@ def register_lr_adapter(
     
     for layer_idx, block in enumerate(transformer.blocks):
         name = f"blocks.{layer_idx}.cross_attn"
-        dim = transformer_sd[name + '.k.weight'].shape[1]
-        dim0 = transformer_sd[name + '.k.weight'].shape
-        print("dim: ", dim0)
+        dim = transformer_sd[name + '.k.weight'].shape[1]   # 3072
+        
+        attn_procs[name] = WanLRAttnProcessor(cross_attention_dim=dim, dim=dim, n_registers=16, bias=True)
+        
         exit()
     
 
