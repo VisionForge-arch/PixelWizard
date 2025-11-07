@@ -512,10 +512,10 @@ def register_lr_adapter(
             torch.nn.init.zeros_(attn_procs[name].to_v_lr.weight)
             torch.nn.init.zeros_(attn_procs[name].to_v_lr.bias)
 
-        print("block.attn2: ", block.attn2)
-        block.attn2 = attn_procs[name]
+        print("block.attn2: ", block.cross_attn)
+        block.cross_attn = attn_procs[name]
         print('==================================================')
-        print("block.attn2: ", block.attn2)
+        print("block.attn2: ", block.cross_attn)
         exit()
     
 
