@@ -11,6 +11,7 @@ from .attention import flash_attention
 __all__ = ['WanModel_Cross']
 
 
+
 def sinusoidal_embedding_1d(dim, position):
     # preprocess
     assert dim % 2 == 0
@@ -260,7 +261,7 @@ class WanAttentionBlock(nn.Module):
                  window_size=(-1, -1),
                  qk_norm=True,
                  cross_attn_norm=False,
-                 eps=1e-6):
+                 eps=1e-6,):
         super().__init__()
         self.dim = dim
         self.ffn_dim = ffn_dim
@@ -296,6 +297,7 @@ class WanAttentionBlock(nn.Module):
         freqs,
         context,
         context_lens,
+        lr_context=None,
     ):
         r"""
         Args:
@@ -304,6 +306,7 @@ class WanAttentionBlock(nn.Module):
             seq_lens(Tensor): Shape [B], length of each sequence in batch
             grid_sizes(Tensor): Shape [B, 3], the second dimension contains (F, H, W)
             freqs(Tensor): Rope freqs, shape [1024, C / num_heads / 2]
+            lr_context(Tensor): Shape [B, L, C], lr context
         """
         #assert e.dtype == torch.float32
         #with torch.amp.autocast('cuda', dtype=torch.float32):
@@ -318,15 +321,20 @@ class WanAttentionBlock(nn.Module):
         x = x + y * e[2].squeeze(2)
 
         # cross-attention & ffn function
-        def cross_attn_ffn(x, context, context_lens, e):
-            x = x + self.cross_attn(self.norm3(x), context, context_lens)
+        def cross_attn_ffn(x, context, context_lens, e, lr_context=None):
+            if isinstance(self.cross_attn, WanLRAttnProcessor):
+                attn_out = self.cross_attn(self.norm3(x), context, context_lens, lr_context=lr_context)
+            else:
+                attn_out = self.cross_attn(self.norm3(x), context, context_lens)    
+            
+            x = x + attn_out
             y = self.ffn(
                 self.norm2(x) * (1 + e[4].squeeze(2)) + e[3].squeeze(2))
             #with torch.amp.autocast('cuda', dtype=torch.float32):
             x = x + y * e[5].squeeze(2)
             return x
 
-        x = cross_attn_ffn(x, context, context_lens, e)
+        x = cross_attn_ffn(x, context, context_lens, e, lr_context=lr_context)
         return x
 
 
@@ -459,17 +467,132 @@ class MLPProj(torch.nn.Module):
         return clip_extra_context_tokens
 
 
+
+class WanLRAttnProcessor(torch.nn.Module):
+    def __init__(
+        self,
+        base_attn: WanCrossAttention,
+        cross_attention_dim: int,
+        dim: int, 
+        n_registers: int,
+        bias: bool = False,
+        lr_scale: float = 1.0,
+        init_method: str = 'zero',
+    ):
+        super().__init__()
+        
+        # 保留原始 cross-attn
+        self.base_attn = base_attn
+        self.dim = dim
+        self.num_heads = base_attn.num_heads
+        self.head_dim = dim // self.num_heads
+        self.lr_scale = lr_scale
+        
+        # LR 分支的 k/v 投影（与原 to_k/to_v 解耦）
+        self.to_k_lr = nn.Linear(cross_attention_dim, dim, bias=bias)
+        self.to_v_lr = nn.Linear(cross_attention_dim, dim, bias=bias)
+        
+        # 与 base_attn 保持相同的 q/k 归一化策略
+        self.norm_q = self.base_attn.norm_q
+        self.norm_k = self.base_attn.norm_k
+        
+        if n_registers > 0:
+            self.register_tokens = nn.Parameter(torch.randn(1, n_registers, dim) * 0.02)
+        else:
+            self.register_tokens = None
+            
+        if init_method == 'zero':
+            torch.nn.init.zeros_(self.to_k_lr.weight)
+            torch.nn.init.zeros_(self.to_k_lr.bias)
+            torch.nn.init.zeros_(self.to_v_lr.weight)
+            torch.nn.init.zeros_(self.to_v_lr.bias)
+
+    
+    
+    def forward(
+        self, 
+        x,
+        context, 
+        context_lens=None,
+        lr_context=None,
+        lr_context_lens=None,
+    ):
+        
+        B, Lq, C = x.shape
+        n = self.num_heads
+        d = self.head_dim
+        
+        q = self.base_attn.q(x)  # [B, Lq, C]
+        q = self.norm_q(q).view(B, Lq, n, d)
+        
+        k = self.norm_k(self.base_attn.k(context)).view(B, -1, n, d)
+        v = self.base_attn.v(context).view(B, -1, n, d)
+        
+        # 3) base 注意力输出（未 out）
+        base_out = flash_attention(q, k, v, k_lens=context_lens)  # [B,Lq,n,d]
+        
+        # 拼接 register tokens 到 lr_context 前面
+        if self.register_tokens is not None:
+            reg = self.register_tokens.expand(B, -1, -1)        # [B, n_reg, C_lr]
+            lr_context = torch.cat([reg, lr_context], dim=1)
+            if lr_context_lens is not None:
+                lr_context_lens = lr_context_lens + reg.shape[1]
+                if lr_context_lens is not None:
+                    lr_context_lens = lr_context_lens + reg.shape[1]
+        
+        # 2) LR 分支处理
+        lr_k = self.to_k_lr(lr_context)
+        lr_v = self.to_v_lr(lr_context)
+        
+        if isinstance(self.norm_k, nn.Module):
+            lr_k = self.norm_k(lr_k)
+            
+        lr_k = lr_k.view(B, -1, n, d)
+        lr_v = lr_v.view(B, -1, n, d)
+        
+        # 3) 混合输出
+        lr_out = flash_attention(q, lr_k, lr_v, k_lens=lr_context_lens)
+        
+        out = base_out + lr_out * self.lr_scale
+        
+        out = out.flatten(2)
+        out = self.base_attn.o(out)
+        
+        return out
+        
+    
+        
+
+
 def register_lr_adapter(
     transformer, 
     cross_attention_dim=None,
     n_registers=0,
     init_method='zero',
+    lr_scale=1.0,
 ):
-    attn_procs = {}
     transformer_sd = transformer.state_dict()
-    exit()
+    #print("transformer_sd.keys(): ", transformer_sd.keys())
+    
     for layer_idx, block in enumerate(transformer.blocks):
-        name = f"blocks.{layer_idx}.cross_attn."
+        name = f"blocks.{layer_idx}.cross_attn"
+        dim = transformer_sd[name + '.k.weight'].shape[1]   # 3072
+        
+        base_attn = block.cross_attn
+        
+        #print("base_attn: ", base_attn)
+        
+        wrapper = WanLRAttnProcessor(
+            base_attn=base_attn,
+            cross_attention_dim=dim,
+            dim=dim,
+            n_registers=n_registers,
+            bias=True,
+            init_method=init_method,
+            lr_scale=lr_scale,
+        )
+        block.cross_attn = wrapper
+        #exit()
     
 
 
@@ -644,6 +767,7 @@ class WanModel_Cross(ModelMixin, ConfigMixin):
         gan_ca_blocks=None,
         clip_fea=None,
         y=None,
+        lr_context=None,
     ):
         r"""
         Forward pass through the diffusion model
@@ -718,7 +842,9 @@ class WanModel_Cross(ModelMixin, ConfigMixin):
             grid_sizes=grid_sizes,
             freqs=self.freqs,
             context=context,
-            context_lens=context_lens)
+            context_lens=context_lens,
+            lr_context=lr_context,
+        )
 
         def create_custom_forward(module):
             def custom_forward(*inputs, **kwargs):

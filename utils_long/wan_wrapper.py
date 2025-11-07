@@ -222,9 +222,6 @@ class WanDiffusionWrapper(torch.nn.Module):
         current_start: Optional[int] = None,
         classify_mode: Optional[bool] = False,
         concat_time_embeddings: Optional[bool] = False,
-        clean_x: Optional[torch.Tensor] = None,
-        aug_t: Optional[torch.Tensor] = None,
-        cache_start: Optional[int] = None
     ) -> torch.Tensor:
         prompt_embeds = conditional_dict["prompt_embeds"]
 
@@ -236,35 +233,11 @@ class WanDiffusionWrapper(torch.nn.Module):
 
         logits = None
         # X0 prediction
-
-        if clean_x is not None:
-            # teacher forcing
-            flow_pred = self.model(
-                noisy_image_or_video.permute(0, 2, 1, 3, 4),
-                t=input_timestep, context=prompt_embeds,
-                seq_len=self.seq_len,
-                clean_x=clean_x.permute(0, 2, 1, 3, 4),
-                aug_t=aug_t,
-            ).permute(0, 2, 1, 3, 4)
-        else:
-            if classify_mode:
-                flow_pred, logits = self.model(
-                    noisy_image_or_video.permute(0, 2, 1, 3, 4),
-                    t=input_timestep, context=prompt_embeds,
-                    seq_len=self.seq_len,
-                    classify_mode=True,
-                    register_tokens=self._register_tokens,
-                    cls_pred_branch=self._cls_pred_branch,
-                    gan_ca_blocks=self._gan_ca_blocks,
-                    concat_time_embeddings=concat_time_embeddings
-                )
-                flow_pred = flow_pred.permute(0, 2, 1, 3, 4)
-            else:
-                flow_pred = self.model(
-                    noisy_image_or_video.permute(0, 2, 1, 3, 4),
-                    t=input_timestep, context=prompt_embeds,
-                    seq_len=self.seq_len
-                ).permute(0, 2, 1, 3, 4)
+        flow_pred = self.model(
+            noisy_image_or_video.permute(0, 2, 1, 3, 4),
+            t=input_timestep, context=prompt_embeds,
+            seq_len=self.seq_len
+        ).permute(0, 2, 1, 3, 4)
 
         # flow_pred: [1, 33, 16, 30, 52]
         pred_x0 = self._convert_flow_pred_to_x0(

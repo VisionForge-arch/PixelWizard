@@ -197,7 +197,6 @@ class SelfForcingModel(BaseModel):
             noisy_image_or_video=noisy_input,
             conditional_dict=conditional_dict,
             timestep=timestep,
-            clean_x=clean_latent if self.teacher_forcing else None,
         ) # [B, F, C, H, W]
 
 
