@@ -320,8 +320,13 @@ class WanAttentionBlock(nn.Module):
         x = x + y * e[2].squeeze(2)
 
         # cross-attention & ffn function
-        def cross_attn_ffn(x, context, context_lens, e):
-            x = x + self.cross_attn(self.norm3(x), context, context_lens)
+        def cross_attn_ffn(x, context, context_lens, e, lr_ref_latent=None):
+            if isinstance(self.cross_attn, WanLRAttnProcessor):
+                attn_out = self.cross_attn(self.norm3(x), context, context_lens, lr_ref_latent=lr_ref_latent)
+            else:
+                attn_out = self.cross_attn(self.norm3(x), context, context_lens)    
+            
+            x = x + attn_out
             y = self.ffn(
                 self.norm2(x) * (1 + e[4].squeeze(2)) + e[3].squeeze(2))
             #with torch.amp.autocast('cuda', dtype=torch.float32):
