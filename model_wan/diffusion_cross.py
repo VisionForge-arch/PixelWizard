@@ -68,7 +68,7 @@ class SelfForcingWan_Cross(SelfForcingModel):
             
     def _initialize_models(self, args, device):
         self.seq_len = args.seq_len
-        self.generator = WanDiffusionWrapper(**getattr(args, "model_kwargs", {}), seq_len=self.seq_len, sr=False)
+        self.generator = WanDiffusionWrapper(**getattr(args, "model_kwargs", {}), seq_len=self.seq_len, sr=False, cross=True)
         self.generator.model.requires_grad_(True)
 
         self.text_encoder = WanTextEncoder()
@@ -143,7 +143,6 @@ class SelfForcingWan_Cross(SelfForcingModel):
         clean_latent_lr = clean_latent_lr.permute(0, 2, 1, 3, 4).contiguous()
         ip_tokens = self.resampler(clean_latent_lr)
         print("ip_tokens: ", ip_tokens.shape)
-        
         
 
         # Step 2: Randomly sample a timestep and add noise to denoiser inputs (Flow Matching)
