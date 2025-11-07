@@ -531,6 +531,12 @@ class WanLRAttnProcessor(torch.nn.Module):
         # 3) base 注意力输出（未 out）
         base_out = flash_attention(q, k, v, k_lens=context_lens)  # [B,Lq,n,d]
         
+        if lr_context is None:
+            raise ValueError(
+                "WanLRAttnProcessor expects `lr_context` but received None. "
+                "Ensure the caller supplies low-resolution context tokens."
+            )
+
         # 拼接 register tokens 到 lr_context 前面
         if self.register_tokens is not None:
             reg = self.register_tokens.expand(B, -1, -1)        # [B, n_reg, C_lr]

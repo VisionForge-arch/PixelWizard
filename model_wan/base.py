@@ -8,7 +8,7 @@ from pipeline_long import SelfForcingTrainingPipeline
 from utils_long.loss import get_denoising_loss
 from utils_long.wan_wrapper import WanDiffusionWrapper, WanTextEncoder, WanVAEWrapper
 from peft import LoraConfig, get_peft_model
-
+from wan2_long.modules.resampler import VideoResampler
 
 class BaseModel(nn.Module):
     def __init__(self, args, device):
@@ -59,6 +59,10 @@ class BaseModel(nn.Module):
 
         self.scheduler = self.generator.get_scheduler()
         self.scheduler.timesteps = self.scheduler.timesteps.to(device)
+        
+        # ========== Init in base.py =========
+        print("========== Init in base.py ========= ")
+        self.resampler = VideoResampler().to(device)
 
     def _get_timestep(
             self,

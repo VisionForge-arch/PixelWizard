@@ -80,7 +80,8 @@ class SelfForcingWan_Cross(SelfForcingModel):
         self.scheduler = self.generator.get_scheduler()
         self.scheduler.timesteps = self.scheduler.timesteps.to(device)
         
-                    
+        # ========== Init in diffusion_cross.py =========     
+        print("========== Init in diffusion_cross.py ========= ")       
         self.resampler = VideoResampler().to(device)
         
 
