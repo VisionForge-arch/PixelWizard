@@ -57,7 +57,7 @@ def main():
     config.generator_ckpt = args.generator_ckpt
     
     config.seq_len = int(config.height // 16) * int(config.width // 16) * int((config.num_frames - 1) // config.time_division_factor)
-    
+    config.sr_mode = False
     # =========init dataset=========
     
     
