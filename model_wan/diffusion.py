@@ -183,8 +183,6 @@ class SelfForcingWan(SelfForcingModel):
             noisy_image_or_video=noisy_latents,
             conditional_dict=conditional_dict,
             timestep=timestep,
-            clean_x=None,
-            aug_t=None
         )
         
 
