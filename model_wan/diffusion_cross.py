@@ -15,6 +15,12 @@ class SelfForcingWan_Cross(nn.Module):
         """
         super().__init__()
         self._initialize_models(args, device)
+        self.device = device
+        self.args = args
+        self.dtype = torch.bfloat16 if args.mixed_precision else torch.float32
+        
+        
+        
         self.num_frame_per_block = getattr(args, "num_frame_per_block", 1)
         self.same_step_across_blocks = getattr(args, "same_step_across_blocks", True)
         
