@@ -5,7 +5,6 @@ from torch import nn
 
 from model_wan.base import BaseModel, SelfForcingModel
 from utils_long.wan2_wrapper import WanDiffusionWrapper, WanTextEncoder, WanVAEWrapper2_2
-from pipeline_long import SelfForcingTrainingPipeline
 from wan2_long.modules.resampler import VideoResampler
 
 class SelfForcingWan_Cross(nn.Module):
@@ -39,7 +38,6 @@ class SelfForcingWan_Cross(nn.Module):
         if args.gradient_checkpointing:
             self.generator.enable_gradient_checkpointing()
             
-        self.inference_pipeline: SelfForcingTrainingPipeline = None
 
         # Step 2: Initialize all hyperparameters
         self.num_train_timestep = args.num_train_timestep

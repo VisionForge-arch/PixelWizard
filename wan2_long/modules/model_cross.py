@@ -322,10 +322,14 @@ class WanAttentionBlock(nn.Module):
 
         # cross-attention & ffn function
         def cross_attn_ffn(x, context, context_lens, e, lr_context=None):
-            if isinstance(self.cross_attn, WanLRAttnProcessor):
+            attn_mod = self.cross_attn
+            if hasattr(attn_mod, "module"):
+                attn_mod = attn_mod.module
+            if isinstance(attn_mod, WanLRAttnProcessor):
                 attn_out = self.cross_attn(self.norm3(x), context, context_lens, lr_context=lr_context)
             else:
-                attn_out = self.cross_attn(self.norm3(x), context, context_lens)    
+                attn_out = self.cross_attn(self.norm3(x), context, context_lens)
+
             
             x = x + attn_out
             y = self.ffn(
