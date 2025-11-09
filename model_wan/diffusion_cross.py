@@ -1,13 +1,14 @@
 from typing import Tuple
 import torch
 import torch.nn.functional as F
+from torch import nn
 
 from model_wan.base import BaseModel, SelfForcingModel
 from utils_long.wan2_wrapper import WanDiffusionWrapper, WanTextEncoder, WanVAEWrapper2_2
 from pipeline_long import SelfForcingTrainingPipeline
 from wan2_long.modules.resampler import VideoResampler
 
-class SelfForcingWan_Cross(SelfForcingModel):
+class SelfForcingWan_Cross(nn.Module):
     def __init__(self, args, device):
         """
         Initialize the Diffusion loss module.
