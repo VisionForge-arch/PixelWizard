@@ -195,8 +195,8 @@ class WanModel_Trainer:
                 image_or_video_shape=image_or_video_shape,
                 conditional_dict=conditional_dict,
                 unconditional_dict=unconditional_dict,
-                clean_latent=clean_latent,
-                clean_latent_lr=clean_latent_lr
+                clean_latent=clean_latent,      # [B, T, C, H, W]
+                clean_latent_lr=clean_latent_lr  # [B, C, T, h, w]
             )
         
         
