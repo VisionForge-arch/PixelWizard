@@ -302,7 +302,7 @@ def _parse_args():
     parser.add_argument(
         "--prompt_file",
         type=str,
-        default="/root/ultrawan/Wan2.2/prompt_to_file.json",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file.json",
         help="The file to read the prompts from.")
     parser.add_argument(
         "--wan_ckpt",
