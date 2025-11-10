@@ -133,6 +133,7 @@ class WanTI2V_Cross:
                 self.model.load_state_dict(generator_state_dict)
             else:
                 print(f"Loading Wan model from {wan_ckpt} for SP mode")
+                state_dict = None  # 先占位
                 if not dist.is_initialized() or dist.get_rank() == 0:
                     state_dict = torch.load(wan_ckpt, map_location="cpu")
                     print(f"[rank0] loaded Wan model from {wan_ckpt}")
