@@ -68,6 +68,7 @@ def sp_dit_forward(
     context,
     seq_len,
     y=None,
+    lr_context=None
 ):
     """
     x:              A list of videos each with shape [C, T, H, W].
@@ -128,7 +129,8 @@ def sp_dit_forward(
         grid_sizes=grid_sizes,
         freqs=self.freqs,
         context=context,
-        context_lens=context_lens)
+        context_lens=context_lens,
+        lr_context=lr_context,)
 
     for block in self.blocks:
         x = block(x, **kwargs)
