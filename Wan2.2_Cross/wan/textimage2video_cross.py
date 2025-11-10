@@ -139,9 +139,9 @@ class WanTI2V_Cross:
                     
                 if dist.is_initialized():
                     dist.barrier()  # 确保其它 rank 等待
-                    obj_list = [ckpt_state]
+                    obj_list = [state_dict]
                     dist.broadcast_object_list(obj_list, src=0)
-                    ckpt_state = obj_list[0]  # 其它 rank 拿到同一个 state_dict
+                    state_dict = obj_list[0]  # 其它 rank 拿到同一个 state_dict
 
                 generator_state_dict = state_dict['generator']
                 
