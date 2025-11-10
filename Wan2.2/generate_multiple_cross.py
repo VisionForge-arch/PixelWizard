@@ -442,7 +442,7 @@ def generate(args):
     denoising_strength = 0.5              
 
     logging.info("Creating WanTI2V pipeline.")
-    wan_ti2v = wan.WanTI2V_SR(
+    wan_ti2v = wan.WanTI2V_Cross(
         config=cfg,
         checkpoint_dir=args.ckpt_dir,
         device_id=device,

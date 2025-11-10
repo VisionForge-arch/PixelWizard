@@ -103,9 +103,15 @@ class WanModel_Trainer:
 
         
         # ===== optimizer =====
+        trainable_params = [
+            p for p in self.model.generator.parameters() if p.requires_grad
+        ]
+        trainable_params += [
+            p for p in self.model.resampler.parameters() if p.requires_grad
+        ]
+        
         self.generator_optimizer = torch.optim.AdamW(
-            [param for param in self.model.generator.parameters()
-             if param.requires_grad],
+            trainable_params,
             lr=config.lr,
             betas=(config.beta1, config.beta2),
             weight_decay=config.weight_decay
@@ -264,10 +270,12 @@ class WanModel_Trainer:
     def save(self):
         print("Start gathering distributed model states...")
         generator_state_dict = fsdp_state_dict(self.model.generator)
+        resampler_state_dict = self.model.resampler.state_dict()
 
 
         state_dict = {
             "generator": generator_state_dict,
+            "resampler": resampler_state_dict,
         }
         if self.is_main_process:
             os.makedirs(os.path.join(self.output_path,

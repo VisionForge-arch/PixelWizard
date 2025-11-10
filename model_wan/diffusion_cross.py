@@ -89,6 +89,7 @@ class SelfForcingWan_Cross(nn.Module):
         # ========== Init in diffusion_cross.py =========     
         print("========== Init in diffusion_cross.py ========= ")       
         self.resampler = VideoResampler().to(device)
+        self.resampler.requires_grad_(True)
         
 
     def random_crop(self, *tensors):
