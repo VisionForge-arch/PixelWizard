@@ -308,7 +308,7 @@ def _parse_args():
         "--wan_ckpt",
         type=str,
         #default=None,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_yarn/checkpoint_model_000700/model.pt",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_yarn/checkpoint_model_000600/model.pt",
         help="The path to the Wan checkpoint.")
     args = parser.parse_args()
     _validate_args(args)
@@ -505,9 +505,9 @@ def generate(args):
                 #print(cond_latent.shape) # [1, 31, 48, 30, 52]
                 cond_latent = cond_latent.to(device=wan_ti2v.device, dtype=torch.float32)
                 
-                cond_latent = cond_latent.permute(0, 2, 1, 3, 4).reshape(B*C, T, h, w)  # [B*C, T, h, w]
+                cond_latent = cond_latent.reshape(B*T, C, h, w)  # [B*T, C, h, w]
                 cond_latent = F.interpolate(cond_latent, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
-                cond_latent = cond_latent.reshape(B, C, T, H, W)
+                cond_latent = cond_latent.reshape(B, T, C, H, W)
 
             
             

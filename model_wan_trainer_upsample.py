@@ -151,8 +151,8 @@ class WanModel_Trainer:
         # vae编码
         with torch.no_grad():
             
-            clean_latent = self.model.vae.encode_to_latent(frames).to(device=self.device, dtype=self.dtype)           # [1, 13, 48, 90, 160]
-            clean_latent_lr = self.model.vae.encode_to_latent(frames_480p).to(device=self.device, dtype=self.dtype)   # [1, 13, 48, 30, 52]
+            clean_latent = self.model.vae.encode_to_latent(frames).to(device=self.device, dtype=self.dtype)           # [B, T, C, 90, 160]
+            clean_latent_lr = self.model.vae.encode_to_latent(frames_480p).to(device=self.device, dtype=self.dtype)   # [B, T, C, 30, 52]
             
             
             B, T, C, H, W   = clean_latent.shape
