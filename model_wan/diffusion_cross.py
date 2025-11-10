@@ -138,6 +138,7 @@ class SelfForcingWan_Cross(nn.Module):
             - conditional_dict: a dictionary containing the conditional information (e.g. text embeddings, image embeddings).
             - unconditional_dict: a dictionary containing the unconditional information (e.g. null/negative text embeddings, null/negative image embeddings).
             - clean_latent: a tensor containing the clean latents [B, F, C, H, W]. Need to be passed when no backward simulation is used.
+            - clean_latent_lr: a tensor containing the clean latents [B, F, C, h, w]. Need to be passed when no backward simulation is used.
         Output:
             - loss: a scalar tensor representing the generator loss.
             - generator_log_dict: a dictionary containing the intermediate tensors for logging.
@@ -148,7 +149,7 @@ class SelfForcingWan_Cross(nn.Module):
         
         
         # ============ LR Context ============
-        clean_latent_lr = clean_latent_lr.permute(0, 2, 1, 3, 4).contiguous()
+        clean_latent_lr = clean_latent_lr.permute(0, 2, 1, 3, 4).contiguous()   # [B, C, T, h, w]
         ip_tokens = self.resampler(clean_latent_lr)
         print("ip_tokens: ", ip_tokens.shape)
         

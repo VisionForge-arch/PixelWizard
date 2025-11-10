@@ -347,8 +347,11 @@ class WanTI2V_Cross:
                             (self.patch_size[1] * self.patch_size[2]) *
                             target_shape[1] / self.sp_size) * self.sp_size
         
-        print('target_shape:', target_shape)  # [48, 31, 90, 160]
+        print('target_shape:', target_shape)  # [C, T, 90, 160]
         print('seq_len:', seq_len)  # 121
+        
+        
+        
 
         if n_prompt == "":
             n_prompt = self.sample_neg_prompt
@@ -368,24 +371,24 @@ class WanTI2V_Cross:
             context = [t.to(self.device) for t in context]
             context_null = [t.to(self.device) for t in context_null]
 
+        # ============ LR Context ============
+        clean_latent_lr = clean_latent_lr.permute(0, 2, 1, 3, 4).contiguous()   # [B, C, T, h, w]
+        ip_tokens = self.resampler(clean_latent_lr)
+        print("ip_tokens: ", ip_tokens.shape)
         
-        # 先处理 cond_latent 的维度（如果有的话）
-        if cond_latent is not None:
-            if cond_latent.dim() == 5:  # [B, C, T, H, W]
-                cond_latent = cond_latent.squeeze(0)  # 变成 [C, T, H, W]
-            print(f'cond_latent_shape: {cond_latent.shape}')
         
-        # 暂时先生成纯噪声（后面会根据 scheduler 的第一个 sigma 重新初始化）
-        pure_noise = torch.randn(
-            target_shape[0],
-            target_shape[1],
-            target_shape[2],
-            target_shape[3],
-            dtype=torch.float32,
-            device=self.device,
-            generator=seed_g)
+        noise = [
+            torch.randn(
+                target_shape[0],
+                target_shape[1],
+                target_shape[2],
+                target_shape[3],
+                dtype=torch.float32,
+                device=self.device,
+                generator=seed_g)
+        ]
         
-        print(f'pure_noise_shape: {pure_noise.shape}')
+        print('noise_shape:', noise[0].shape)
         
 
         @contextmanager
@@ -428,22 +431,17 @@ class WanTI2V_Cross:
                 raise NotImplementedError("Unsupported solver.")
 
             # 纯 T2V 模式：使用纯噪声
-            latents = [pure_noise]
-            print(f'✓ T2V Mode: pure noise, mean={latents[0].mean():.4f}, std={latents[0].std():.4f}')
-            
+            latents = noise
             mask1, mask2 = masks_like(latents, zero=False)
 
-            arg_c = {'context': context, 'seq_len': seq_len}
-            arg_null = {'context': context_null, 'seq_len': seq_len}
+            arg_c = {'context': context, 'seq_len': seq_len, 'lr_context':ip_tokens}
+            arg_null = {'context': context_null, 'seq_len': seq_len, 'lr_context':ip_tokens}
 
             if offload_model or self.init_on_cpu:
                 self.model.to(self.device)
                 torch.cuda.empty_cache()
-
-            print(f'\n🚀 Starting sampling loop with {len(timesteps)} steps')
-            print(f'   CFG scale: {guide_scale}, Shift: {shift}')
-            
-            for i, t in enumerate(tqdm(timesteps)):
+                
+            for _, t in enumerate(tqdm(timesteps)):
                 latent_model_input = latents
                 timestep = [t]
 
@@ -470,10 +468,6 @@ class WanTI2V_Cross:
                     generator=seed_g)[0]
                 latents = [temp_x0.squeeze(0)]
                 
-                # 每 10 步打印一次统计信息
-                if i % 10 == 0 or i == len(timesteps) - 1:
-                    print(f'  Step {i}/{len(timesteps)}, t={t:.1f}, '
-                          f'latent: mean={latents[0].mean():.4f}, std={latents[0].std():.4f}')
             x0 = latents
             if offload_model:
                 self.model.cpu()
@@ -482,7 +476,7 @@ class WanTI2V_Cross:
             # if self.rank == 0:
             #     videos = self.vae.decode(x0)
 
-        del pure_noise, latents
+        del noise, latents
         del sample_scheduler
         if offload_model:
             gc.collect()

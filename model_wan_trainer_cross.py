@@ -158,8 +158,8 @@ class WanModel_Trainer:
         # vae编码
         with torch.no_grad():
             
-            clean_latent = self.model.vae.encode_to_latent(frames).to(device=self.device, dtype=self.dtype)           # [1, 13, 48, 90, 160]
-            clean_latent_lr = self.model.vae.encode_to_latent(frames_480p).to(device=self.device, dtype=self.dtype)   # [1, 13, 48, 30, 52]
+            clean_latent = self.model.vae.encode_to_latent(frames).to(device=self.device, dtype=self.dtype)           # [1, T, C, 90, 160]
+            clean_latent_lr = self.model.vae.encode_to_latent(frames_480p).to(device=self.device, dtype=self.dtype)   # [1, T, C, 30, 52]
             
             
             B, T, C, H, W   = clean_latent.shape
@@ -176,7 +176,7 @@ class WanModel_Trainer:
         
 
         batch_size = len(text_prompts)
-        image_or_video_shape = clean_latent.shape
+        image_or_video_shape = clean_latent.shape  # [B, T, C, H, W]
 
         # Extract the conditional infos
         with torch.no_grad():

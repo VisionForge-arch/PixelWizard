@@ -242,6 +242,7 @@ class WanAttentionBlock(nn.Module):
         freqs,
         context,
         context_lens,
+        lr_context=None,
     ):
         r"""
         Args:
@@ -265,14 +266,22 @@ class WanAttentionBlock(nn.Module):
 
         # cross-attention & ffn function
         def cross_attn_ffn(x, context, context_lens, e):
-            x = x + self.cross_attn(self.norm3(x), context, context_lens)
+            attn_mod = self.cross_attn
+            if hasattr(attn_mod, "module"):
+                attn_mod = attn_mod.module
+            
+            attn_out = self.cross_attn(self.norm3(x), context, context_lens, lr_context=lr_context)
+            
+            x = x + attn_out
+                       
             y = self.ffn(
                 self.norm2(x).float() * (1 + e[4].squeeze(2)) + e[3].squeeze(2))
+            
             with torch.amp.autocast('cuda', dtype=torch.float32):
                 x = x + y * e[5].squeeze(2)
             return x
 
-        x = cross_attn_ffn(x, context, context_lens, e)
+        x = cross_attn_ffn(x, context, context_lens, e, lr_context=lr_context)
         return x
 
 
