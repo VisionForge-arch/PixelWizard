@@ -372,8 +372,8 @@ class WanTI2V_Cross:
             context_null = [t.to(self.device) for t in context_null]
 
         # ============ LR Context ============
-        clean_latent = clean_latent.permute(0, 2, 1, 3, 4).contiguous()   # [B, C, T, h, w]
-        ip_tokens = self.resampler(clean_latent)
+        cond_latent = cond_latent.permute(0, 2, 1, 3, 4).contiguous()   # [B, C, T, h, w]
+        ip_tokens = self.resampler(cond_latent)
         print("ip_tokens: ", ip_tokens.shape)
         
         
