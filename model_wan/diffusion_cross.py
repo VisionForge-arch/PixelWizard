@@ -151,7 +151,7 @@ class SelfForcingWan_Cross(nn.Module):
         # ============ LR Context ============
         clean_latent_lr = clean_latent_lr.permute(0, 2, 1, 3, 4).contiguous()   # [B, C, T, h, w]
         ip_tokens = self.resampler(clean_latent_lr)
-        print("ip_tokens: ", ip_tokens.shape)
+        #print("ip_tokens: ", ip_tokens.shape)
         
 
         # Step 2: Randomly sample a timestep and add noise to denoiser inputs (Flow Matching)
