@@ -23,7 +23,7 @@ from .modules.model import WanModel
 from .modules.t5 import T5EncoderModel
 from .modules.vae2_2 import Wan2_2_VAE
 from .modules.resampler import VideoResampler
-from wan2_long.modules.model_cross import register_lr_adapter
+from .modules.model import register_lr_adapter
 from .utils.fm_solvers import (
     FlowDPMSolverMultistepScheduler,
     get_sampling_sigmas,
