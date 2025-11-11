@@ -589,8 +589,8 @@ class WanModel(ModelMixin, ConfigMixin):
         t,
         context,
         seq_len,
+        lr_context,
         y=None,
-        lr_context=None,
     ):
         r"""
         Forward pass through the diffusion model
