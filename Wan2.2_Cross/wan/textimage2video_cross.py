@@ -128,9 +128,11 @@ class WanTI2V_Cross:
                     if all(k.startswith(prefix) for k in d.keys()):
                         return {k[len(prefix):]: v for k, v in d.items()}
                     return d
-                generator_state_dict = strip_prefix(generator_state_dict)
+                generator_state_dict = strip_prefix(generator_state_dict, prefix="model.")
+                
                 
                 self.model.load_state_dict(generator_state_dict)
+                self.resampler.load_state_dict(state_dict['resampler'])
             else:
                 print(f"Loading Wan model from {wan_ckpt} for SP mode")
                 state_dict = None  # 先占位
@@ -152,6 +154,7 @@ class WanTI2V_Cross:
                     return d
                 generator_state_dict = strip_prefix(generator_state_dict)
                 self.model.load_state_dict(generator_state_dict)
+                self.resampler.load_state_dict(state_dict['resampler'])
         # ==============================================================
         
         if use_sp:
