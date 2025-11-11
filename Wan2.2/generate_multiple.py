@@ -364,7 +364,7 @@ def generate(args):
     
     # 定义要使用的分辨率
     #resolutions = ['1920*1056', '2560*1440', '3840*2144'，'1280*704']
-    resolutions = ['1280*704']
+    resolutions = ['2560*1440']
     
     # 创建保存文件夹
     output_dir = args.save_file 
