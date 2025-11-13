@@ -120,7 +120,7 @@ class WanTI2V:
                     return {k[len(prefix):]: v for k, v in d.items()}
                 return d
             generator_state_dict = strip_prefix(generator_state_dict)
-            generator_state_dict = {k.replace("base_attn.", ""): v for k, v in generator_state_dict.items()}
+            #generator_state_dict = {k.replace("base_attn.", ""): v for k, v in generator_state_dict.items()}
             
             self.model.load_state_dict(generator_state_dict, strict=False)
         # ==============================================================
