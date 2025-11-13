@@ -70,7 +70,7 @@ class VideoResampler(nn.Module):
         dim=1024,                  # 内部通道
         depth=4,                   # Perceiver层数
         heads=16, dim_head=64,     # 注意力头设定
-        num_queries=16,            # 输出查询token数 (IP常用 8/16/32)
+        num_queries=32,            # 输出查询token数 (IP常用 8/16/32)
         output_dim=3072,            # 输出到 IP-Adapter 的维度
         ff_mult=4,
         use_pos_emb=True,
