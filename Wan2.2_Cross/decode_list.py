@@ -86,6 +86,10 @@ def save_video(frames, save_path, fps=24):
     import numpy as np
     import imageio
     from tqdm import tqdm
+    
+    video = video.permute(1, 2, 3, 0)  # (T, H, W, 3)
+    video = ((video + 1) / 2 * 255).clamp(0, 255).byte().cpu().numpy()
+    
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     desc = f"Saving {os.path.basename(save_path)}"
     with imageio.get_writer(save_path, fps=fps, quality=8) as w:
