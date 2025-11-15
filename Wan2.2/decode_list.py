@@ -9,6 +9,7 @@ import gc
 import os
 import glob
 from wan.modules.vae2_2 import Wan2_2_VAE, unpatchify
+import re
 
 
 def decode_latent_gpu_chunked(latent_path, output_path, vae, 
@@ -79,7 +80,7 @@ def decode_latent_gpu_chunked(latent_path, output_path, vae,
     save_video(final_video, output_path)
     print(f"视频已保存到: {output_path}")
     
-    return prompt, final_video.shape
+    #return prompt, final_video.shape
 
 def save_video(video, save_path, fps=24):
     """保存视频tensor为mp4文件"""
@@ -108,25 +109,11 @@ def save_video(video, save_path, fps=24):
 #     imageio.mimwrite(output_path, video, fps=24, quality=8)
 
 def generate_output_filename(prompt, resolution, timestamp):
-    """根据prompt和分辨率生成输出文件名
-    
-    Args:
-        prompt: 提示词
-        resolution: (height, width) 分辨率元组
-        timestamp: 时间戳
-    
-    Returns:
-        文件名字符串
-    """
-    # 清理prompt，移除特殊字符
-    clean_prompt = prompt.replace(' ', '_').replace('/', '_').replace('\\', '_')
-    # 限制prompt长度
+    clean_prompt = re.sub(r'[^0-9A-Za-z_\-]+', '_', prompt.strip())
     if len(clean_prompt) > 50:
         clean_prompt = clean_prompt[:50]
-    
-    height, width = resolution
-    filename = f"ti2v-5B_{width}x{height}_{clean_prompt}_{timestamp}.mp4"
-    return filename
+    h, w = resolution
+    return f"ti2v-5B_{w}x{h}_{clean_prompt}_{timestamp}.mp4"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
