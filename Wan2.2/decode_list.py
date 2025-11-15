@@ -81,16 +81,31 @@ def decode_latent_gpu_chunked(latent_path, output_path, vae,
     
     return prompt, final_video.shape
 
-def save_video(video, output_path):
+def save_video(video, save_path, fps=24):
     """保存视频tensor为mp4文件"""
     import numpy as np
     import imageio
+    from tqdm import tqdm
     
-    # video shape: (3, T, H, W), 范围 [-1, 1]
     video = video.permute(1, 2, 3, 0)  # (T, H, W, 3)
     video = ((video + 1) / 2 * 255).clamp(0, 255).byte().cpu().numpy()
     
-    imageio.mimwrite(output_path, video, fps=24, quality=8)
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    desc = f"Saving {os.path.basename(save_path)}"
+    with imageio.get_writer(save_path, fps=fps, quality=8) as w:
+        for f in tqdm(video, desc=desc):
+            w.append_data(np.array(f))
+
+# def save_video(video, output_path):
+#     """保存视频tensor为mp4文件"""
+#     import numpy as np
+#     import imageio
+    
+#     # video shape: (3, T, H, W), 范围 [-1, 1]
+#     video = video.permute(1, 2, 3, 0)  # (T, H, W, 3)
+#     video = ((video + 1) / 2 * 255).clamp(0, 255).byte().cpu().numpy()
+    
+#     imageio.mimwrite(output_path, video, fps=24, quality=8)
 
 def generate_output_filename(prompt, resolution, timestamp):
     """根据prompt和分辨率生成输出文件名
@@ -115,8 +130,8 @@ def generate_output_filename(prompt, resolution, timestamp):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/2k_cross/2k_train_700_wo_adapter")
-    parser.add_argument("--output_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/2k_cross/2k_train_700_wo_adapter/decode_video")
+    parser.add_argument("--input_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/480p_5s")
+    parser.add_argument("--output_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/480p_5s/decode_video_r")
     parser.add_argument("--vae_path", type=str, default="/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B/Wan2.2_VAE.pth")
     parser.add_argument("--num_patches", type=int, default=2, help="分成几个patch进行decode，默认4")
     parser.add_argument("--patch_dim", type=str, default="w", choices=['h', 'w'], help="在哪个维度分割，h=高度，w=宽度")
