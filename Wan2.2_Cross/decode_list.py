@@ -81,7 +81,7 @@ def decode_latent_gpu_chunked(latent_path, output_path, vae,
     
     return prompt, final_video.shape
 
-def save_video(frames, save_path, fps=24):
+def save_video(video, save_path, fps=24):
     """保存视频tensor为mp4文件"""
     import numpy as np
     import imageio
@@ -93,7 +93,7 @@ def save_video(frames, save_path, fps=24):
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     desc = f"Saving {os.path.basename(save_path)}"
     with imageio.get_writer(save_path, fps=fps, quality=8) as w:
-        for f in tqdm(frames, desc=desc):
+        for f in tqdm(video, desc=desc):
             w.append_data(np.array(f))
 
 # def save_video(video, output_path):
