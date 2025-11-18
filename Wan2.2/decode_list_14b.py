@@ -26,9 +26,19 @@ def decode_latent_gpu_chunked(latent_path, output_path, vae,
     data = torch.load(latent_path, map_location='cpu')
     latent = data['latent']
     prompt = data.get('prompt', 'unknown')
+    
+    
+    
+        # 兼容已经解码的视频或单个latent张量
+    if isinstance(latent, torch.Tensor):
+        if latent.dim() == 4 and latent.shape[0] == 3:
+            print(f"检测到已解码视频，直接保存。Prompt: {prompt}, Shape: {latent.shape}")
+            save_video(latent, output_path)
+            return
+        
     print(f"Prompt: {prompt}")
     print(f"Latent shape: {latent[0].shape}")
-    
+        
     # 分patch decode
     print(f"分成 {num_patches} 个patch进行decode...")
     decoded_patches = []
