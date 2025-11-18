@@ -460,7 +460,7 @@ def generate(args):
                 logging.info(f"Saving latent to {args.save_file}")
                 torch.save({
                     'latent': video,
-                    'prompt': args.prompt,
+                    'prompt':current_prompt,
                     'seed': args.base_seed,
                     'size': resolution,
                     'frame_num': args.frame_num,

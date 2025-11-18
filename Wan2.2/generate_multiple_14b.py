@@ -116,7 +116,7 @@ def _parse_args():
     parser.add_argument(
         "--size",
         type=str,
-        default="1920*1056",
+        default="2560*1440",
         choices=list(SIZE_CONFIGS.keys()),
         help="The area (width*height) of the generated video. For the I2V task, the aspect ratio of the output video will follow that of the input image."
     )
@@ -298,7 +298,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/14b_infer/1080p",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/14b_infer/1440p",
         help="The file to save the generated video to.")
     args = parser.parse_args()
     _validate_args(args)
@@ -431,14 +431,14 @@ def generate(args):
             if rank == 0:
 
                 formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-                formatted_prompt = args.prompt.replace(" ", "_").replace("/", "_")[:50]
+                formatted_prompt = current_prompt.replace(" ", "_").replace("/", "_")[:50]
                 file_name = f"{args.task}_{args.size.replace('*','x') if sys.platform=='win32' else args.size}_{args.ulysses_size}_{formatted_prompt}_{formatted_time}.pt"
                 args.save_file = os.path.join(output_dir, file_name)
                 
                 logging.info(f"Saving latent to {args.save_file}")
                 torch.save({
                     'latent': video,
-                    'prompt': args.prompt,
+                    'prompt':current_prompt,
                     'seed': args.base_seed,
                     'size': args.size,
                     'frame_num': args.frame_num,
