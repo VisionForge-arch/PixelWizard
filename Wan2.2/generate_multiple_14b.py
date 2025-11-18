@@ -158,11 +158,6 @@ def _parse_args():
         default=False,
         help="Whether to use FSDP for DiT.")
     parser.add_argument(
-        "--save_file",
-        type=str,
-        default=None,
-        help="The file to save the generated video to.")
-    parser.add_argument(
         "--prompt",
         type=str,
         default="Close-up of an Asian man with a hopeful expression. He's wearing a knit navy sweater and leaning forward slightly. His eyes are wide and focused, giving a sense of urgency or excitement. Soft glowing light illuminates his face, highlighting his features and the texture of his skin. The mood is hopeful, as if he's in the middle of an exciting conversation or reacting to something surprising.",
