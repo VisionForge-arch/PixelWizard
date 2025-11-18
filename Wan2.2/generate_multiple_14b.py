@@ -386,7 +386,7 @@ def generate(args):
         convert_model_dtype=args.convert_model_dtype,
     )
     
-    resolutions = ['1920*1056']
+    resolutions = ['2560*1440']
     # 创建保存文件夹
     output_dir = args.save_file 
     os.makedirs(output_dir, exist_ok=True)
