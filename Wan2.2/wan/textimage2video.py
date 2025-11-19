@@ -509,8 +509,10 @@ class WanTI2V:
         seed = seed if seed >= 0 else random.randint(0, sys.maxsize)
         seed_g = torch.Generator(device=self.device)
         seed_g.manual_seed(seed)
+        
         noise = torch.randn(
-            self.vae.model.z_dim, (F - 1) // self.vae_stride[0] + 1,
+            self.vae.model.z_dim, 
+            (F - 1) // self.vae_stride[0] + 1,
             oh // self.vae_stride[1],
             ow // self.vae_stride[2],
             dtype=torch.float32,
@@ -574,15 +576,8 @@ class WanTI2V:
             mask1, mask2 = masks_like([noise], zero=True)
             latent = (1. - mask2[0]) * z[0] + mask2[0] * latent
 
-            arg_c = {
-                'context': [context[0]],
-                'seq_len': seq_len,
-            }
-
-            arg_null = {
-                'context': context_null,
-                'seq_len': seq_len,
-            }
+            arg_c = {'context': [context[0]], 'seq_len': seq_len,}
+            arg_null = {'context': context_null, 'seq_len': seq_len}
 
             if offload_model or self.init_on_cpu:
                 self.model.to(self.device)

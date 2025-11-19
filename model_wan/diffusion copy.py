@@ -139,15 +139,6 @@ class SelfForcingWan(nn.Module):
         noise = torch.randn_like(clean_latent)
         #print(f"image_or_video_shape: {image_or_video_shape}")
         batch_size, num_frame = image_or_video_shape[:2]
-        cond_latent = None
-        cond_frames = 0
-        if initial_latent is not None:
-            cond_latent = initial_latent
-            if cond_latent.dim() == 4:
-                cond_latent = cond_latent.unsqueeze(1)
-            cond_latent = cond_latent.to(device=self.device, dtype=self.dtype)
-            cond_frames = cond_latent.shape[1]
-            noise[:, :cond_frames] = 0
 
         # Step 2: Randomly sample a timestep and add noise to denoiser inputs (Flow Matching)
         # 从[0, 1000)中随机采样timestep index
@@ -160,8 +151,6 @@ class SelfForcingWan(nn.Module):
         )
         timestep = self.scheduler.timesteps[index].to(dtype=self.dtype, device=self.device)
         timestep = timestep[:, None].expand(batch_size, num_frame)  # [B, F]
-        if cond_frames > 0:
-            timestep[:, :cond_frames] = 0
         # Flow Matching: x_t = (1-sigma) * x0 + sigma * noise
         
         if clean_latent_lr is not None:
@@ -184,9 +173,7 @@ class SelfForcingWan(nn.Module):
             clean_latent.flatten(0, 1), 
             noise.flatten(0, 1), 
             timestep.flatten(0, 1)
-            ).unflatten(0, (batch_size, num_frame))
-        if cond_frames > 0 and cond_latent.shape[2:] == noisy_latents.shape[2:]:
-            noisy_latents[:, :cond_frames] = cond_latent
+        ).unflatten(0, (batch_size, num_frame))
 
 
         # Compute loss
@@ -209,11 +196,8 @@ class SelfForcingWan(nn.Module):
         loss = torch.nn.functional.mse_loss(
             flow_pred.float(), training_target.float(), reduction='none'
         ).mean(dim=(2, 3, 4))
-        weights = self.scheduler.training_weight(timestep).unflatten(0, (batch_size, num_frame))
-        if cond_frames > 0:
-            weights[:, :cond_frames] = 0
-        denom = torch.clamp(weights.sum(), min=1e-8)
-        loss = torch.sum(loss * weights) / denom
+        loss = loss * self.scheduler.training_weight(timestep).unflatten(0, (batch_size, num_frame))
+        loss = loss.mean()
 
         log_dict = {
             "x0": clean_latent.detach(),
