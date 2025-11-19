@@ -9,7 +9,7 @@ from einops import repeat
 
 from attention import flash_attention
 
-__all__ = ['WanModel']
+__all__ = ['WanModel_I2V']
 
 
 def sinusoidal_embedding_1d(dim, position):
@@ -772,18 +772,13 @@ if __name__ == "__main__":
     # patch_size=(1,2,2) 时，序列长度需要覆盖所有 token
     seq_len = (f // 1) * (h // 2) * (w // 2)
 
-    # ==========================加载模型==========================
-    try:
-        model = WanModel_I2V.from_pretrained(
-            "/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B",
-            torch_dtype=dtype,
-            low_cpu_mem_usage=False,  # 避免 meta tensor -> .to() 报错
-            local_files_only=True,
-        ).to(device)
-    except (OSError, TypeError, FileNotFoundError) as load_err:
-        print(f"[INFO] 加载预训练权重失败 ({load_err}), 改为随机初始化权重仅做形状测试。")
-        model = WanModel_I2V().to(device, dtype=dtype)
+
+    model = WanModel_I2V.from_pretrained(
+        f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B"
+    )
+
     model.eval()
+    model.to("cuda").to(dtype=torch.bfloat16)
 
     # ==========================前向推理==========================
     with torch.no_grad():
