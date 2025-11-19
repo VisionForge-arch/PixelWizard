@@ -21,6 +21,8 @@ from wan.distributed.util import init_distributed_group
 from wan.utils.prompt_extend import DashScopePromptExpander, QwenPromptExpander
 from wan.utils.utils import merge_video_audio, save_video, str2bool
 
+import json
+
 
 EXAMPLE_PROMPT = {
     "t2v-A14B": {
@@ -298,7 +300,7 @@ def _parse_args():
     parser.add_argument(
         "--prompt_file",
         type=str,
-        default="/root/ultrawan/Wan2.2/prompt.txt",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/I2V/i2v_test_samples.json",
         help="The file to read the prompts from.")
     parser.add_argument(
         "--wan_ckpt",
@@ -357,14 +359,14 @@ def generate(args):
         
     # 读取prompt文件
     prompt_file = args.prompt_file
-    with open(prompt_file, 'r', encoding='utf-8') as f:
-        prompts = [line.strip() for line in f.readlines() if line.strip()]
+    with open(prompt_file, "r", encoding="utf-8") as f:
+        pairs = json.load(f) 
     
-    logging.info(f"从 {prompt_file} 读取了 {len(prompts)} 条 prompts")
+    logging.info(f"从 {prompt_file} 读取了 {len(pairs)} 条 prompts")
     
     # 定义要使用的分辨率
     #resolutions = ['1920*1056', '2560*1440', '3840*2144'，'1280*704']
-    resolutions = ['832*480']
+    resolutions = ['1280*704']
     
     # 创建保存文件夹
     output_dir = args.save_file 
@@ -413,20 +415,25 @@ def generate(args):
         #     offload_model=args.offload_model)
 
     
-    for prompt_idx, prompt in enumerate(prompts, 1):
+    for idx, item in enumerate(pairs):
         for resolution in resolutions:
+            prompt = item["caption"]
+            frame_path = item["frame_path"]
+            
+            
             if rank == 0:
                 logging.info(f"\n{'='*80}")
-                logging.info(f"处理 Prompt {prompt_idx}/{len(prompts)}, 分辨率: {resolution}")
+                logging.info(f"处理 Prompt {idx}/{len(pairs)}, 分辨率: {resolution}")
                 logging.info(f"Prompt: {prompt}")
                 logging.info(f"{'='*80}\n")
                 
             current_prompt = prompt
-            img = None
+            img = Image.open(frame_path).convert("RGB")
+            logging.info(f"Input image: {args.image}")
             
             # 设置随机种子
             if args.base_seed >= 0:
-                current_seed = args.base_seed + prompt_idx * 100 + resolutions.index(resolution)
+                current_seed = args.base_seed + idx * 100 + resolutions.index(resolution)
             else:
                 current_seed = random.randint(0, sys.maxsize)
             

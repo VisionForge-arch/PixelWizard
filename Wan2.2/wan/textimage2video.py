@@ -624,8 +624,8 @@ class WanTI2V:
                 torch.cuda.synchronize()
                 torch.cuda.empty_cache()
 
-            if self.rank == 0:
-                videos = self.vae.decode(x0)
+            #if self.rank == 0:
+                #videos = self.vae.decode(x0)
 
         del noise, latent, x0
         del sample_scheduler
@@ -635,4 +635,5 @@ class WanTI2V:
         if dist.is_initialized():
             dist.barrier()
 
-        return videos[0] if self.rank == 0 else None
+        #return videos[0] if self.rank == 0 else None
+        return x0
