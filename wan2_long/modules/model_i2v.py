@@ -361,88 +361,6 @@ class WanAttentionBlock(nn.Module):
         return x
 
 
-class GanAttentionBlock(nn.Module):
-
-    def __init__(self,
-                 dim=3072,
-                 ffn_dim=8192,
-                 num_heads=12,
-                 window_size=(-1, -1),
-                 qk_norm=True,
-                 cross_attn_norm=True,
-                 eps=1e-6):
-        super().__init__()
-        self.dim = dim
-        self.ffn_dim = ffn_dim
-        self.num_heads = num_heads
-        self.window_size = window_size
-        self.qk_norm = qk_norm
-        self.cross_attn_norm = cross_attn_norm
-        self.eps = eps
-
-        # layers
-        # self.norm1 = WanLayerNorm(dim, eps)
-        # self.self_attn = WanSelfAttention(dim, num_heads, window_size, qk_norm,
-        #   eps)
-        self.norm3 = WanLayerNorm(
-            dim, eps,
-            elementwise_affine=True) if cross_attn_norm else nn.Identity()
-
-        self.norm2 = WanLayerNorm(dim, eps)
-        self.ffn = nn.Sequential(
-            nn.Linear(dim, ffn_dim), nn.GELU(approximate='tanh'),
-            nn.Linear(ffn_dim, dim))
-
-        self.cross_attn = WanGanCrossAttention(dim, num_heads,
-                                               (-1, -1),
-                                               qk_norm,
-                                               eps)
-
-        # modulation
-        # self.modulation = nn.Parameter(torch.randn(1, 6, dim) / dim**0.5)
-
-    def forward(
-        self,
-        x,
-        context,
-        # seq_lens,
-        # grid_sizes,
-        # freqs,
-        # context,
-        # context_lens,
-    ):
-        r"""
-        Args:
-            x(Tensor): Shape [B, L, C]
-            e(Tensor): Shape [B, 6, C]
-            seq_lens(Tensor): Shape [B], length of each sequence in batch
-            grid_sizes(Tensor): Shape [B, 3], the second dimension contains (F, H, W)
-            freqs(Tensor): Rope freqs, shape [1024, C / num_heads / 2]
-        """
-        # assert e.dtype == torch.float32
-        # with amp.autocast(dtype=torch.float32):
-        # e = (self.modulation + e).chunk(6, dim=1)
-        # assert e[0].dtype == torch.float32
-
-        # # self-attention
-        # y = self.self_attn(
-        #     self.norm1(x) * (1 + e[1]) + e[0], seq_lens, grid_sizes,
-        #     freqs)
-        # # with amp.autocast(dtype=torch.float32):
-        # x = x + y * e[2]
-
-        # cross-attention & ffn function
-        def cross_attn_ffn(x, context):
-            token = context + self.cross_attn(self.norm3(x), context)
-            y = self.ffn(self.norm2(token)) + token  # * (1 + e[4]) + e[3])
-            # with amp.autocast(dtype=torch.float32):
-            # x = x + y * e[5]
-            return y
-
-        x = cross_attn_ffn(x, context)
-        return x
-
-
 class Head(nn.Module):
 
     def __init__(self, dim, out_dim, patch_size, eps=1e-6):
@@ -659,8 +577,6 @@ class WanModel_I2V(ModelMixin, ConfigMixin):
         classify_mode=False,
         concat_time_embeddings=False,
         register_tokens=None,
-        cls_pred_branch=None,
-        gan_ca_blocks=None,
         clip_fea=None,
         y=None,
     ):
@@ -750,16 +666,7 @@ class WanModel_I2V(ModelMixin, ConfigMixin):
 
         # TODO: Tune the number of blocks for feature extraction
         final_x = None
-        if classify_mode:
-            assert register_tokens is not None
-            assert gan_ca_blocks is not None
-            assert cls_pred_branch is not None
 
-            final_x = []
-            registers = repeat(register_tokens(), "n d -> b n d", b=x.shape[0])
-            # x = torch.cat([registers, x], dim=1)
-
-        gan_idx = 0
         for ii, block in enumerate(self.blocks):
             if torch.is_grad_enabled() and self.gradient_checkpointing:
                 x = torch.utils.checkpoint.checkpoint(
@@ -771,21 +678,7 @@ class WanModel_I2V(ModelMixin, ConfigMixin):
                 x = block(x, **kwargs)
                 
                 #print(f"the shape in {ii}, x.shape: {x.shape}")
-                
-
-            if classify_mode and ii in [13, 21, 29]:
-                gan_token = registers[:, gan_idx: gan_idx + 1]
-                final_x.append(gan_ca_blocks[gan_idx](x, gan_token))
-                gan_idx += 1
-
-        if classify_mode:
-            final_x = torch.cat(final_x, dim=1)
-            if concat_time_embeddings:
-                final_x = cls_pred_branch(torch.cat([final_x, 10 * e[:, None, :]], dim=1).view(final_x.shape[0], -1))
-            else:
-                final_x = cls_pred_branch(final_x.view(final_x.shape[0], -1))
-
-        
+            
         
         x = self.head(x, e)
 
@@ -880,11 +773,7 @@ if __name__ == "__main__":
     seq_len = (f // 1) * (h // 2) * (w // 2)
 
     # ==========================加载模型==========================
-    model = WanModel_I2V.from_pretrained(
-        "/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B",
-        torch_dtype=dtype,
-        low_cpu_mem_usage=True,
-    ).to(device)
+    model = WanModel_I2V.from_pretrained("/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B").to(device)
     model.eval()
 
     # ==========================前向推理==========================
