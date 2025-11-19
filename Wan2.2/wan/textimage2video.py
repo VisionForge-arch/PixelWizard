@@ -627,7 +627,7 @@ class WanTI2V:
             #if self.rank == 0:
                 #videos = self.vae.decode(x0)
 
-        del noise, latent, x0
+        del noise, latent
         del sample_scheduler
         if offload_model:
             gc.collect()
