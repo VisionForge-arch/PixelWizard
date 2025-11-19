@@ -6,7 +6,7 @@ from tqdm import tqdm
 from omegaconf import OmegaConf
 
 import wandb
-from model_wan_trainer import WanModel_Trainer
+from model_wan_trainer_i2v import WanModel_Trainer
     
     
 
@@ -18,10 +18,10 @@ def main():
     parser.add_argument("--dataset_metadata_path", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/UltraVideo/matched_short.json")
     parser.add_argument("--dataset_repeat", type=int, default=1)
     parser.add_argument("--data_file_keys", type=str, default=("clip_id",))
-    parser.add_argument("--max_pixels", type=int, default=1280*704)
-    parser.add_argument("--height", type=int, default=1280)
-    parser.add_argument("--width", type=int, default=704)
-    parser.add_argument("--num_frames", type=int, default=121)
+    parser.add_argument("--max_pixels", type=int, default=2560*1440)
+    parser.add_argument("--height", type=int, default=2560)
+    parser.add_argument("--width", type=int, default=1440)
+    parser.add_argument("--num_frames", type=int, default=49)
     parser.add_argument("--time_division_factor", type=int, default=4)
     parser.add_argument("--time_division_remainder", type=int, default=1)
     parser.add_argument("--use_gpu", type=bool, default=True)
