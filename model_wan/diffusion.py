@@ -11,7 +11,7 @@ class SelfForcingWan(nn.Module):
         """
         Initialize the Diffusion loss module.
         """
-        super().__init__(args, device)
+        super().__init__()
         self._initialize_models(args, device)
         self.device = device
         self.args = args
