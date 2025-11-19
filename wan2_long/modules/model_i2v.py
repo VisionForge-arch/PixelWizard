@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.models.modeling_utils import ModelMixin
+from einops import repeat
 
 from .attention import flash_attention
 
@@ -181,44 +182,83 @@ class WanSelfAttention(nn.Module):
         return x
 
 
-class WanCrossAttention(WanSelfAttention):
+class WanT2VCrossAttention(WanSelfAttention):
 
-    def forward(self, x, context, context_lens, crossattn_cache=None):
+    def forward(self, x, context, context_lens, clip_token_len=0, crossattn_cache=None):
         r"""
         Args:
             x(Tensor): Shape [B, L1, C]
             context(Tensor): Shape [B, L2, C]
             context_lens(Tensor): Shape [B]
-            crossattn_cache (List[dict], *optional*): Contains the cached key and value tensors for context embedding.
-        
+            clip_token_len (`int`): Number of image tokens at the start of context (unused for T2V).
+            crossattn_cache (List[dict], *optional*): Cached key/value for speed.
         """
         b, n, d = x.size(0), self.num_heads, self.head_dim
 
-        # compute query, key, value
         q = self.norm_q(self.q(x)).view(b, -1, n, d)
-        
+
         if crossattn_cache is not None:
-            if not crossattn_cache["is_init"]: # 未初始化就计算一次
+            if not crossattn_cache["is_init"]:
                 crossattn_cache["is_init"] = True
                 k = self.norm_k(self.k(context)).view(b, -1, n, d)
                 v = self.v(context).view(b, -1, n, d)
                 crossattn_cache["k"] = k
                 crossattn_cache["v"] = v
-            else: # 已经初始化就使用缓存
+            else:
                 k = crossattn_cache["k"]
                 v = crossattn_cache["v"]
         else:
             k = self.norm_k(self.k(context)).view(b, -1, n, d)
             v = self.v(context).view(b, -1, n, d)
 
-        # compute attention
         x = flash_attention(q, k, v, k_lens=context_lens)
-
-        # output
         x = x.flatten(2)
         x = self.o(x)
         return x
 
+
+class WanI2VCrossAttention(WanSelfAttention):
+
+    def __init__(self, dim, num_heads, window_size=(-1, -1), qk_norm=True, eps=1e-6):
+        super().__init__(dim, num_heads, window_size, qk_norm, eps)
+        self.k_img = nn.Linear(dim, dim)
+        self.v_img = nn.Linear(dim, dim)
+        self.norm_k_img = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
+
+    def forward(self, x, context, context_lens, clip_token_len=0, crossattn_cache=None):
+        r"""
+        Args:
+            x(Tensor): Shape [B, L1, C]
+            context(Tensor): Concatenated [clip_tokens, text_tokens]
+            context_lens(Tensor): Shape [B]
+            clip_token_len (`int`): Number of CLIP tokens at the front of context.
+        """
+        b, n, d = x.size(0), self.num_heads, self.head_dim
+        clip_token_len = max(int(clip_token_len), 0)
+        context_img = context[:, :clip_token_len] if clip_token_len > 0 else None
+        context_txt = context[:, clip_token_len:]
+
+        q = self.norm_q(self.q(x)).view(b, -1, n, d)
+        k = self.norm_k(self.k(context_txt)).view(b, -1, n, d)
+        v = self.v(context_txt).view(b, -1, n, d)
+
+        txt_out = flash_attention(q, k, v, k_lens=context_lens)
+
+        if context_img is not None and context_img.numel() > 0:
+            k_img = self.norm_k_img(self.k_img(context_img)).view(b, -1, n, d)
+            v_img = self.v_img(context_img).view(b, -1, n, d)
+            img_out = flash_attention(q, k_img, v_img, k_lens=None)
+            txt_out = txt_out + img_out
+
+        txt_out = txt_out.flatten(2)
+        txt_out = self.o(txt_out)
+        return txt_out
+
+
+WAN_CROSSATTENTION_CLASSES = {
+    't2v': WanT2VCrossAttention,
+    'i2v': WanI2VCrossAttention,
+}
 
 
 class WanGanCrossAttention(WanSelfAttention):
@@ -228,28 +268,17 @@ class WanGanCrossAttention(WanSelfAttention):
         Args:
             x(Tensor): Shape [B, L1, C]
             context(Tensor): Shape [B, L2, C]
-            context_lens(Tensor): Shape [B]
-            crossattn_cache (List[dict], *optional*): Contains the cached key and value tensors for context embedding.
         """
         b, n, d = x.size(0), self.num_heads, self.head_dim
 
-        # compute query, key, value
         qq = self.norm_q(self.q(context)).view(b, 1, -1, d)
-
         kk = self.norm_k(self.k(x)).view(b, -1, n, d)
         vv = self.v(x).view(b, -1, n, d)
 
-        # compute attention
-        x = flash_attention(qq, kk, vv)
-
-        # output
-        x = x.flatten(2)
-        x = self.o(x)
-        return x
-
-WAN_CROSSATTENTION_CLASSES = {
-    'cross_attn': WanCrossAttention,
-}
+        out = flash_attention(qq, kk, vv)
+        out = out.flatten(2)
+        out = self.o(out)
+        return out
 
 class WanAttentionBlock(nn.Module):
 
@@ -260,7 +289,8 @@ class WanAttentionBlock(nn.Module):
                  window_size=(-1, -1),
                  qk_norm=True,
                  cross_attn_norm=False,
-                 eps=1e-6):
+                 eps=1e-6,
+                 cross_attn_type: str = 't2v'):
         super().__init__()
         self.dim = dim
         self.ffn_dim = ffn_dim
@@ -277,8 +307,8 @@ class WanAttentionBlock(nn.Module):
         self.norm3 = WanLayerNorm(
             dim, eps,
             elementwise_affine=True) if cross_attn_norm else nn.Identity()
-        self.cross_attn = WanCrossAttention(dim, num_heads, (-1, -1), qk_norm,
-                                            eps)
+        self.cross_attn = WAN_CROSSATTENTION_CLASSES[cross_attn_type](
+            dim, num_heads, (-1, -1), qk_norm, eps)
         self.norm2 = WanLayerNorm(dim, eps)
         self.ffn = nn.Sequential(
             nn.Linear(dim, ffn_dim), nn.GELU(approximate='tanh'),
@@ -296,6 +326,7 @@ class WanAttentionBlock(nn.Module):
         freqs,
         context,
         context_lens,
+        clip_token_len=0,
     ):
         r"""
         Args:
@@ -318,15 +349,15 @@ class WanAttentionBlock(nn.Module):
         x = x + y * e[2].squeeze(2)
 
         # cross-attention & ffn function
-        def cross_attn_ffn(x, context, context_lens, e):
-            x = x + self.cross_attn(self.norm3(x), context, context_lens)
+        def cross_attn_ffn(x, context, context_lens, e, clip_token_len):
+            x = x + self.cross_attn(self.norm3(x), context, context_lens, clip_token_len)
             y = self.ffn(
                 self.norm2(x) * (1 + e[4].squeeze(2)) + e[3].squeeze(2))
             #with torch.amp.autocast('cuda', dtype=torch.float32):
             x = x + y * e[5].squeeze(2)
             return x
 
-        x = cross_attn_ffn(x, context, context_lens, e)
+        x = cross_attn_ffn(x, context, context_lens, e, clip_token_len)
         return x
 
 
@@ -470,7 +501,7 @@ class RegisterTokens(nn.Module):
     def reset_parameters(self):
         nn.init.normal_(self.register_tokens, std=0.02)
 
-class WanModel(ModelMixin, ConfigMixin):
+class WanModel_I2V(ModelMixin, ConfigMixin):
     r"""
     Wan diffusion backbone supporting both text-to-video and image-to-video.
     """
@@ -483,7 +514,7 @@ class WanModel(ModelMixin, ConfigMixin):
 
     @register_to_config
     def __init__(self,
-                 model_type='t2v',
+                 model_type='ti2v',
                  patch_size=(1, 2, 2),
                  text_len=512,
                  in_dim=16,
@@ -566,9 +597,11 @@ class WanModel(ModelMixin, ConfigMixin):
         self.time_projection = nn.Sequential(nn.SiLU(), nn.Linear(dim, dim * 6))
 
         # blocks
+        cross_attn_type = 'i2v' if model_type in ['i2v', 'ti2v'] else 't2v'
         self.blocks = nn.ModuleList([
             WanAttentionBlock(dim, ffn_dim, num_heads, window_size, qk_norm,
-                              cross_attn_norm, eps) for _ in range(num_layers)
+                              cross_attn_norm, eps, cross_attn_type=cross_attn_type)
+            for _ in range(num_layers)
         ])
 
         # head
@@ -578,7 +611,7 @@ class WanModel(ModelMixin, ConfigMixin):
         assert (dim % num_heads) == 0 and (dim // num_heads) % 2 == 0
         d = dim // num_heads
         
-        self.rope_scaling = "yarn"
+        self.rope_scaling = None
         if self.rope_scaling == "yarn":
             self.freqs = torch.cat([
                 rope_params(1024, d - 4 * (d // 6)),
@@ -594,6 +627,9 @@ class WanModel(ModelMixin, ConfigMixin):
                 rope_params(1024, 2 * (d // 6))
             ], dim=1)         
         
+
+        if model_type in ['i2v', 'ti2v']:
+            self.img_emb = MLPProj(1280, dim)
 
         # initialize weights
         self.init_weights()
@@ -649,7 +685,7 @@ class WanModel(ModelMixin, ConfigMixin):
             List[Tensor]:
                 List of denoised video tensors with original input shapes [C_out, F, H / 8, W / 8]
         """
-        if self.model_type == 'i2v':
+        if self.model_type in ['i2v', 'ti2v']:
             assert clip_fea is not None and y is not None
         # params
         device = self.patch_embedding.weight.device
@@ -689,8 +725,12 @@ class WanModel(ModelMixin, ConfigMixin):
                 for u in context
             ]))
 
+        clip_token_len = 0
         if clip_fea is not None:
+            if not hasattr(self, "img_emb"):
+                raise ValueError("clip_fea provided but model is not configured for image conditioning.")
             context_clip = self.img_emb(clip_fea)  # bs x 257 x dim
+            clip_token_len = context_clip.size(1)
             context = torch.concat([context_clip, context], dim=1)
 
         # arguments
@@ -700,7 +740,8 @@ class WanModel(ModelMixin, ConfigMixin):
             grid_sizes=grid_sizes,
             freqs=self.freqs,
             context=context,
-            context_lens=context_lens)
+            context_lens=context_lens,
+            clip_token_len=clip_token_len)
 
         def create_custom_forward(module):
             def custom_forward(*inputs, **kwargs):
@@ -806,3 +847,57 @@ class WanModel(ModelMixin, ConfigMixin):
 
         # init output layer
         nn.init.zeros_(self.head.head.weight)
+
+
+
+
+if __name__ == "__main__":
+    """
+    简单的随机输入测试，方便在本地快速跑通 i2v 路径。
+    直接执行本文件即可验证 forward 是否能跑通并打印输出尺寸。
+    """
+    device = torch.device("cuda")
+    dtype = torch.bfloat16
+
+    # ==========================构造随机输入==========================
+    b, f, c, h, w = 1, 13, 48, 30, 52
+    # 训练时 WanModel 收到的 latent 形状是 [C, F, H, W]，所以这里先把 [B, F, C, H, W] 转成 [B, C, F, H, W]
+    noisy_latent = torch.randn(b, f, c, h, w, device=device, dtype=dtype).permute(
+        0, 2, 1, 3, 4).contiguous()
+    cond_latent = torch.randn_like(noisy_latent)  # 模拟第一帧/参考帧 latent，作为 y
+
+    # 文本特征（B, text_len, text_dim）
+    prompt_embeds = torch.randn(b, 512, 4096, device=device, dtype=dtype)
+    context_list = [prompt_embeds[i] for i in range(b)]
+
+    # CLIP 图像特征（B, 257, 1280），只用于 i2v 路径
+    clip_fea = torch.randn(b, 257, 1280, device=device, dtype=dtype)
+
+    # 时间步输入，保持与训练一致即可（这里随机）
+    timesteps = torch.randint(0, 1000, (b,), device=device)
+
+    # patch_size=(1,2,2) 时，序列长度需要覆盖所有 token
+    seq_len = (f // 1) * (h // 2) * (w // 2)
+
+    # ==========================加载模型==========================
+    model = WanModel_I2V.from_pretrained(
+        "/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B",
+        torch_dtype=dtype,
+        low_cpu_mem_usage=True,
+    ).to(device)
+    model.eval()
+
+    # ==========================前向推理==========================
+    with torch.no_grad():
+        flow_pred = model(
+            [noisy_latent[0]],
+            t=timesteps,
+            context=context_list,
+            seq_len=seq_len,
+            clip_fea=clip_fea,
+            y=[cond_latent[0]],
+        )
+
+    # 转回 [B, F, C, H, W] 方便肉眼检查
+    flow_pred = flow_pred.permute(0, 2, 1, 3, 4).contiguous()
+    print("flow_pred shape:", flow_pred.shape)
