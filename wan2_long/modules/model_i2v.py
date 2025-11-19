@@ -773,7 +773,7 @@ if __name__ == "__main__":
     seq_len = (f // 1) * (h // 2) * (w // 2)
 
     # ==========================加载模型==========================
-    model = WanModel_I2V.from_pretrained("/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B").to(device)
+    model = WanModel_I2V.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B").to(device)
     model.eval()
 
     # ==========================前向推理==========================
