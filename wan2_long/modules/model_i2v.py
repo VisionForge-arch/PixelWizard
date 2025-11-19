@@ -773,11 +773,16 @@ if __name__ == "__main__":
     seq_len = (f // 1) * (h // 2) * (w // 2)
 
     # ==========================加载模型==========================
-    model = WanModel_I2V.from_pretrained(
-        "/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B",
-        torch_dtype=dtype,
-        low_cpu_mem_usage=False,  # 避免 meta tensor -> .to() 报错
-    ).to(device)
+    try:
+        model = WanModel_I2V.from_pretrained(
+            "/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B",
+            torch_dtype=dtype,
+            low_cpu_mem_usage=False,  # 避免 meta tensor -> .to() 报错
+            local_files_only=True,
+        ).to(device)
+    except (OSError, TypeError, FileNotFoundError) as load_err:
+        print(f"[INFO] 加载预训练权重失败 ({load_err}), 改为随机初始化权重仅做形状测试。")
+        model = WanModel_I2V().to(device, dtype=dtype)
     model.eval()
 
     # ==========================前向推理==========================
