@@ -1,18 +1,23 @@
 from typing import Tuple
 import torch
 import torch.nn.functional as F
-
-from model_wan.base import BaseModel, SelfForcingModel
+from torch import nn
 from utils_long.wan2_wrapper import WanDiffusionWrapper, WanTextEncoder, WanVAEWrapper2_2
 from pipeline_long import SelfForcingTrainingPipeline
 
 
-class SelfForcingWan(SelfForcingModel):
+class SelfForcingWan(nn.Module):
     def __init__(self, args, device):
         """
         Initialize the Diffusion loss module.
         """
         super().__init__(args, device)
+        self._initialize_models(args, device)
+        self.device = device
+        self.args = args
+        self.dtype = torch.bfloat16 if args.mixed_precision else torch.float32
+        
+        
         self.num_frame_per_block = getattr(args, "num_frame_per_block", 1)
         self.same_step_across_blocks = getattr(args, "same_step_across_blocks", True)
         
