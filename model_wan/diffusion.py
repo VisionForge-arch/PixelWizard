@@ -274,12 +274,12 @@ class SelfForcingWan(nn.Module):
         )
         
         hr_channels = clean_latent_hr.shape[2]
-        flow_pred_hr = flow_pred[:, :, :, :hr_channels]
+        #flow_pred_hr = flow_pred[:, :, :, :hr_channels]
 
         
         # loss = torch.nn.functional.mse_loss(flow_pred.float(), training_target.float())
         loss = torch.nn.functional.mse_loss(
-            flow_pred_hr.float(), training_target.float(), reduction='none'
+            flow_pred.float(), training_target.float(), reduction='none'
         ).mean(dim=(2, 3, 4))
         weights = self.scheduler.training_weight(timestep).unflatten(0, (batch_size, num_frame))
         if cond_frames > 0:
