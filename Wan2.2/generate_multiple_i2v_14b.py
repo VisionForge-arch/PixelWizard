@@ -112,7 +112,7 @@ def _parse_args():
     parser.add_argument(
         "--task",
         type=str,
-        default="ti2v-5B",
+        default="i2v-A14B",
         choices=list(WAN_CONFIGS.keys()),
         help="The task to run.")
     parser.add_argument(
@@ -131,7 +131,7 @@ def _parse_args():
     parser.add_argument(
         "--ckpt_dir",
         type=str,
-        default="/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B",
+        default="/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-I2V-A14B",
         help="The path to the checkpoint directory.")
     parser.add_argument(
         "--offload_model",
@@ -162,7 +162,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/i2v/480p",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/i2v/480p_14b",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
@@ -305,7 +305,7 @@ def _parse_args():
     parser.add_argument(
         "--wan_ckpt",
         type=str,
-        #default=None,
+        default=None,
         #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_i2v/checkpoint_model_000500/model.pt",
         help="The path to the Wan checkpoint.")
     args = parser.parse_args()
@@ -387,7 +387,7 @@ def generate(args):
         args.base_seed = base_seed[0]
 
     logging.info("Creating WanTI2V pipeline.")
-    wan_ti2v = wan.WanTI2V(
+    wan_i2v = wan.WanI2V(
         config=cfg,
         checkpoint_dir=args.ckpt_dir,
         device_id=device,
@@ -397,24 +397,10 @@ def generate(args):
         use_sp=(args.ulysses_size > 1),
         t5_cpu=args.t5_cpu,
         convert_model_dtype=args.convert_model_dtype,
-        wan_ckpt=args.wan_ckpt,
     )
     
     logging.info(f"Generating video ...")
-        # video = wan_ti2v.generate(
-        #     args.prompt,
-        #     img=img,
-        #     size=SIZE_CONFIGS[args.size],
-        #     max_area=MAX_AREA_CONFIGS[args.size],
-        #     frame_num=args.frame_num,
-        #     shift=args.sample_shift,
-        #     sample_solver=args.sample_solver,
-        #     sampling_steps=args.sample_steps,
-        #     guide_scale=args.sample_guide_scale,
-        #     seed=args.base_seed,
-        #     offload_model=args.offload_model)
 
-    
     for idx, item in enumerate(pairs):
         for resolution in resolutions:
             prompt = item["caption"]
@@ -444,10 +430,9 @@ def generate(args):
             
             
 
-            video = wan_ti2v.generate(
+            video = wan_i2v.generate(
                     current_prompt,
                     img=img,
-                    size=SIZE_CONFIGS[resolution],
                     max_area=MAX_AREA_CONFIGS[resolution],
                     frame_num=args.frame_num,
                     shift=args.sample_shift,
