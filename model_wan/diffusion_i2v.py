@@ -11,7 +11,7 @@ class SelfForcingWan(nn.Module):
         """
         Initialize the Diffusion loss module.
         """
-        super().__init__(args, device)
+        super().__init__()
         self._initialize_models(args, device)
         self.device = device
         self.args = args
@@ -21,10 +21,6 @@ class SelfForcingWan(nn.Module):
         self.num_frame_per_block = getattr(args, "num_frame_per_block", 1)
         self.same_step_across_blocks = getattr(args, "same_step_across_blocks", True)
         
-        # Random crop settings for loss computation (to save memory)
-        self.use_random_crop = getattr(args, "use_random_crop", False)
-        self.crop_height = getattr(args, "crop_height", 30)
-        self.crop_width = getattr(args, "crop_width", 52)
         
         if self.num_frame_per_block > 1:
             self.generator.model.num_frame_per_block = self.num_frame_per_block
@@ -86,32 +82,6 @@ class SelfForcingWan(nn.Module):
         self.scheduler = self.generator.get_scheduler()
         self.scheduler.timesteps = self.scheduler.timesteps.to(device)
 
-    def random_crop(self, *tensors):
-        """
-        随机裁剪多个tensor到指定大小，所有tensor使用相同的crop位置
-        Input: tensors with shape [B, F, C, H, W]
-        Output: cropped tensors with shape [B, F, C, crop_h, crop_w]
-        """
-        if not self.use_random_crop:
-            return tensors
-        
-        # 获取原始尺寸
-        _, _, _, h, w = tensors[0].shape
-        
-        # 确保crop尺寸不超过原始尺寸
-        crop_h = min(self.crop_height, h)
-        crop_w = min(self.crop_width, w)
-        
-        # 随机选择crop的起始位置
-        top = torch.randint(0, h - crop_h + 1, (1,)).item() if h > crop_h else 0
-        left = torch.randint(0, w - crop_w + 1, (1,)).item() if w > crop_w else 0
-        
-        # 对所有tensor应用相同的crop
-        cropped = []
-        for tensor in tensors:
-            cropped.append(tensor[:, :, :, top:top+crop_h, left:left+crop_w])
-        
-        return tuple(cropped) if len(cropped) > 1 else cropped[0]
 
     def generator_loss(
         self,
@@ -139,6 +109,15 @@ class SelfForcingWan(nn.Module):
         noise = torch.randn_like(clean_latent)
         #print(f"image_or_video_shape: {image_or_video_shape}")
         batch_size, num_frame = image_or_video_shape[:2]
+        cond_latent = None
+        cond_frames = 0
+        if initial_latent is not None:
+            cond_latent = initial_latent
+            if cond_latent.dim() == 4:
+                cond_latent = cond_latent.unsqueeze(1)
+            cond_latent = cond_latent.to(device=self.device, dtype=self.dtype)
+            cond_frames = cond_latent.shape[1]
+            noise[:, :cond_frames] = 0
 
         # Step 2: Randomly sample a timestep and add noise to denoiser inputs (Flow Matching)
         # 从[0, 1000)中随机采样timestep index
@@ -151,6 +130,8 @@ class SelfForcingWan(nn.Module):
         )
         timestep = self.scheduler.timesteps[index].to(dtype=self.dtype, device=self.device)
         timestep = timestep[:, None].expand(batch_size, num_frame)  # [B, F]
+        if cond_frames > 0:
+            timestep[:, :cond_frames] = 0
         # Flow Matching: x_t = (1-sigma) * x0 + sigma * noise
         
         if clean_latent_lr is not None:
@@ -173,7 +154,9 @@ class SelfForcingWan(nn.Module):
             clean_latent.flatten(0, 1), 
             noise.flatten(0, 1), 
             timestep.flatten(0, 1)
-        ).unflatten(0, (batch_size, num_frame))
+            ).unflatten(0, (batch_size, num_frame))
+        if cond_frames > 0 and cond_latent.shape[2:] == noisy_latents.shape[2:]:
+            noisy_latents[:, :cond_frames] = cond_latent
 
 
         # Compute loss
@@ -196,8 +179,11 @@ class SelfForcingWan(nn.Module):
         loss = torch.nn.functional.mse_loss(
             flow_pred.float(), training_target.float(), reduction='none'
         ).mean(dim=(2, 3, 4))
-        loss = loss * self.scheduler.training_weight(timestep).unflatten(0, (batch_size, num_frame))
-        loss = loss.mean()
+        weights = self.scheduler.training_weight(timestep).unflatten(0, (batch_size, num_frame))
+        if cond_frames > 0:
+            weights[:, :cond_frames] = 0
+        denom = torch.clamp(weights.sum(), min=1e-8)
+        loss = torch.sum(loss * weights) / denom
 
         log_dict = {
             "x0": clean_latent.detach(),

@@ -135,10 +135,10 @@ class WanModel_Trainer:
         
         #text_prompts = batch["detailed_description"]
 
-        frames = batch["clip_id"].to(device=self.device, dtype=self.dtype)
+        frames = batch["clip_id"].to(device=self.device, dtype=self.dtype)  # [b, c, t, h, w]
         
         with torch.no_grad():
-            clean_latent = self.model.vae.encode_to_latent(frames).to(device=self.device, dtype=self.dtype)   
+            clean_latent = self.model.vae.encode_to_latent(frames).to(device=self.device, dtype=self.dtype)    # [b, t, c, h, w]
             
             if self.step % 100 == 0:  # 每100步打印一次
                 print(f"frames.shape: {frames.shape}, clean_latent.shape: {clean_latent.shape}")
