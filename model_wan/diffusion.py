@@ -135,20 +135,14 @@ class SelfForcingWan(nn.Module):
         # Flow Matching: x_t = (1-sigma) * x0 + sigma * noise
         
         if clean_latent_lr is not None:
-                
-            noisy_latents = self.scheduler.add_noise(
-                clean_latent_lr.flatten(0, 1),
-                noise.flatten(0, 1),
-                timestep.flatten(0, 1)
-            ).unflatten(0, (batch_size, num_frame))
-        else:
+            clean_latent_fused = torch.cat([clean_latent, clean_latent_lr], dim=2)
         
         
-            noisy_latents = self.scheduler.add_noise(
-                clean_latent.flatten(0, 1),
-                noise.flatten(0, 1),
-                timestep.flatten(0, 1)
-            ).unflatten(0, (batch_size, num_frame))
+        noisy_latents = self.scheduler.add_noise(
+            clean_latent.flatten(0, 1),
+            noise.flatten(0, 1),
+            timestep.flatten(0, 1)
+        ).unflatten(0, (batch_size, num_frame))
         # Flow Matching target: v = noise - x0 (velocity field)
         training_target = self.scheduler.training_target(
             clean_latent.flatten(0, 1), 
@@ -179,6 +173,113 @@ class SelfForcingWan(nn.Module):
         # loss = torch.nn.functional.mse_loss(flow_pred.float(), training_target.float())
         loss = torch.nn.functional.mse_loss(
             flow_pred.float(), training_target.float(), reduction='none'
+        ).mean(dim=(2, 3, 4))
+        weights = self.scheduler.training_weight(timestep).unflatten(0, (batch_size, num_frame))
+        if cond_frames > 0:
+            weights[:, :cond_frames] = 0
+        denom = torch.clamp(weights.sum(), min=1e-8)
+        loss = torch.sum(loss * weights) / denom
+
+        log_dict = {
+            "x0": clean_latent.detach(),
+            "x0_pred": x0_pred.detach()
+        }
+        return loss, log_dict
+    
+    def generator_loss_upsample(
+        self,
+        image_or_video_shape,
+        conditional_dict: dict,
+        unconditional_dict: dict,
+        clean_latent: torch.Tensor,
+        clean_latent_lr: torch.Tensor = None,
+        initial_latent: torch.Tensor = None
+    ) -> Tuple[torch.Tensor, dict]:
+        """
+        Generate image/videos from noise and compute the DMD loss.
+        The noisy input to the generator is backward simulated.
+        This removes the need of any datasets during distillation.
+        See Sec 4.5 of the DMD2 paper (https://arxiv.org/abs/2405.14867) for details.
+        Input:
+            - image_or_video_shape: a list containing the shape of the image or video [B, F, C, H, W].
+            - conditional_dict: a dictionary containing the conditional information (e.g. text embeddings, image embeddings).
+            - unconditional_dict: a dictionary containing the unconditional information (e.g. null/negative text embeddings, null/negative image embeddings).
+            - clean_latent: a tensor containing the clean latents [B, F, C, H, W]. Need to be passed when no backward simulation is used.
+        Output:
+            - loss: a scalar tensor representing the generator loss.
+            - generator_log_dict: a dictionary containing the intermediate tensors for logging.
+        """
+        
+        #print(f"image_or_video_shape: {image_or_video_shape}")
+        batch_size, num_frame = image_or_video_shape[:2]
+        
+        # --------- 1. 处理 conditional frames (initial_latent) ----------
+        cond_latent = None
+        cond_frames = 0
+        if initial_latent is not None:
+            cond_latent = initial_latent
+            if cond_latent.dim() == 4:
+                cond_latent = cond_latent.unsqueeze(1)
+            cond_latent = cond_latent.to(device=self.device, dtype=self.dtype)
+            cond_frames = cond_latent.shape[1]
+            noise[:, :cond_frames] = 0
+
+        # --------- 2. timestep 采样 ----------
+        index = torch.randint(
+            0,
+            len(self.scheduler.timesteps),
+            (batch_size,),
+            device=self.device,
+            dtype=torch.long
+        )
+        timestep = self.scheduler.timesteps[index].to(dtype=self.dtype, device=self.device)
+        timestep = timestep[:, None].expand(batch_size, num_frame)  # [B, F]
+        # if cond_frames > 0:
+        #     timestep[:, :cond_frames] = 0
+        # Flow Matching: x_t = (1-sigma) * x0 + sigma * noise
+        
+        
+        # --------- 3. 准备 HR / LR latent ----------
+        
+        clean_latent_hr = clean_latent
+        
+        noise_hr = torch.randn_like(clean_latent_hr)
+        
+              
+        noisy_hr = self.scheduler.add_noise(
+            clean_latent_hr.flatten(0, 1),
+            noise_hr.flatten(0, 1),
+            timestep.flatten(0, 1)
+        ).unflatten(0, (batch_size, num_frame))
+        # Flow Matching target: v = noise - x0 (velocity field)
+        training_target = self.scheduler.training_target(
+            clean_latent_hr.flatten(0, 1), 
+            noise_hr.flatten(0, 1), 
+            timestep.flatten(0, 1)
+            ).unflatten(0, (batch_size, num_frame))
+        
+        if cond_frames > 0 and cond_latent.shape[2:] == noisy_hr.shape[2:]:
+            noisy_hr[:, :cond_frames] = cond_latent
+
+        # --------- 5. 构造 generator 输入：噪声 HR + 干净 LR 拼接 ----------
+        # 通道维在 dim=2: [B, F, C_hr + C_lr, H, W]
+        noisy_latents_fused = torch.cat([noisy_hr, clean_latent_lr], dim=2)
+        
+        
+        # --------- 6. 过 generator ----------
+        flow_pred, x0_pred = self.generator(
+            noisy_image_or_video=noisy_latents_fused,
+            conditional_dict=conditional_dict,
+            timestep=timestep,
+        )
+        
+        hr_channels = clean_latent_hr.shape[2]
+        flow_pred_hr = flow_pred[:, :, :, :hr_channels]
+
+        
+        # loss = torch.nn.functional.mse_loss(flow_pred.float(), training_target.float())
+        loss = torch.nn.functional.mse_loss(
+            flow_pred_hr.float(), training_target.float(), reduction='none'
         ).mean(dim=(2, 3, 4))
         weights = self.scheduler.training_weight(timestep).unflatten(0, (batch_size, num_frame))
         if cond_frames > 0:

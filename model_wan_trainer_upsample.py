@@ -187,7 +187,7 @@ class WanModel_Trainer:
                 unconditional_dict = self.unconditional_dict
                 
                 
-        generator_loss, generator_log_dict = self.model.generator_loss(
+        generator_loss, generator_log_dict = self.model.generator_loss_upsample(
                 image_or_video_shape=image_or_video_shape,
                 conditional_dict=conditional_dict,
                 unconditional_dict=unconditional_dict,
