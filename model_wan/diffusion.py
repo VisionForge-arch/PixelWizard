@@ -289,7 +289,7 @@ class SelfForcingWan(nn.Module):
 
         log_dict = {
             "x0": clean_latent.detach(),
-            "x0_pred": x0_pred.detach()
+            #"x0_pred": x0_pred.detach()
         }
-        return loss, log_dict
+        return loss , log_dict
     
