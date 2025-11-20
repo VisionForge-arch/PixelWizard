@@ -267,7 +267,7 @@ class SelfForcingWan(nn.Module):
         
         
         # --------- 6. 过 generator ----------
-        flow_pred, x0_pred = self.generator(
+        flow_pred = self.generator(
             noisy_image_or_video=noisy_latents_fused,
             conditional_dict=conditional_dict,
             timestep=timestep,
