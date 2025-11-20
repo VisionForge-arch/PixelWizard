@@ -148,13 +148,10 @@ class WanDiffusionWrapper(torch.nn.Module):
 
         self.scheduler = FlowMatchScheduler(shift=timestep_shift, sigma_min=0.0, extra_one_step=True)
         
-        if sr is True:
-            print("==========Using latent SR mode scheduler==========")
-            self.scheduler.set_timesteps(200, denoising_strength=0.048, training=True)
-        else:
-            self.scheduler.set_timesteps(1000, training=True)
+        self.scheduler.set_timesteps(1000, training=True)
         
-        
+        self.proj_in = torch.nn.Conv3d(96, 48, kernel_size=1, stride=1, padding=0)
+        self.proj_in.requires_grad_(True)
 
         self.seq_len = seq_len
         self.post_init()
@@ -252,10 +249,15 @@ class WanDiffusionWrapper(torch.nn.Module):
         else:
             input_timestep = timestep
 
+        
+        x = noisy_image_or_video.permute(0, 2, 1, 3, 4)
+        if x.shape[1] == 96:
+            x = self.proj_in(x)
+        
         # X0 prediction
         if lr_context is not None:
             flow_pred = self.model(
-                noisy_image_or_video.permute(0, 2, 1, 3, 4),
+                x,
                 t=input_timestep, 
                 context=prompt_embeds,
                 seq_len=self.seq_len,
@@ -263,7 +265,7 @@ class WanDiffusionWrapper(torch.nn.Module):
             ).permute(0, 2, 1, 3, 4)
         else:
             flow_pred = self.model(
-                noisy_image_or_video.permute(0, 2, 1, 3, 4),
+                x,
                 t=input_timestep, 
                 context=prompt_embeds,
                 seq_len=self.seq_len,
