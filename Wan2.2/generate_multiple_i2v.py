@@ -162,7 +162,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/i2v/1440p",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/i2v/1440p_train",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
@@ -305,8 +305,8 @@ def _parse_args():
     parser.add_argument(
         "--wan_ckpt",
         type=str,
-        default=None,
-        #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_cross/checkpoint_model_002200/model.pt",
+        #default=None,
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_i2v/checkpoint_model_000500/model.pt",
         help="The path to the Wan checkpoint.")
     args = parser.parse_args()
     _validate_args(args)

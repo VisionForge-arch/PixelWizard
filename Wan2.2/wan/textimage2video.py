@@ -111,18 +111,41 @@ class WanTI2V:
         
         # ==============load the model from the checkpoint=============
         if wan_ckpt is not None:
-            print(f"Loading Wan model from {wan_ckpt}")
-            state_dict = torch.load(wan_ckpt, map_location="cpu")
-            generator_state_dict = state_dict['generator']
+            if use_sp is False:
+                print(f"Loading Wan model from {wan_ckpt}")
+                state_dict = torch.load(wan_ckpt, map_location="cpu")
+                generator_state_dict = state_dict['generator']
             
-            def strip_prefix(d, prefix="model."):
-                if all(k.startswith(prefix) for k in d.keys()):
-                    return {k[len(prefix):]: v for k, v in d.items()}
-                return d
-            generator_state_dict = strip_prefix(generator_state_dict)
+                def strip_prefix(d, prefix="model."):
+                    if all(k.startswith(prefix) for k in d.keys()):
+                        return {k[len(prefix):]: v for k, v in d.items()}
+                    return d
+                generator_state_dict = strip_prefix(generator_state_dict)
+                
+                self.model.load_state_dict(generator_state_dict)
             #generator_state_dict = {k.replace("base_attn.", ""): v for k, v in generator_state_dict.items()}
             
-            self.model.load_state_dict(generator_state_dict, strict=False)
+            else:
+                print(f"Loading Wan model from {wan_ckpt} for SP mode")
+                state_dict = None  # 先占位
+                if not dist.is_initialized() or dist.get_rank() == 0:
+                    state_dict = torch.load(wan_ckpt, map_location="cpu")
+                    print(f"[rank0] loaded Wan model from {wan_ckpt}")
+                    
+                if dist.is_initialized():
+                    dist.barrier()  # 确保其它 rank 等待
+                    obj_list = [state_dict]
+                    dist.broadcast_object_list(obj_list, src=0)
+                    state_dict = obj_list[0]  # 其它 rank 拿到同一个 state_dict
+
+                generator_state_dict = state_dict['generator']
+                
+                def strip_prefix(d, prefix="model."):
+                    if all(k.startswith(prefix) for k in d.keys()):
+                        return {k[len(prefix):]: v for k, v in d.items()}
+                    return d
+                generator_state_dict = strip_prefix(generator_state_dict)
+                self.model.load_state_dict(generator_state_dict)
         # ==============================================================
         
         if use_sp:
