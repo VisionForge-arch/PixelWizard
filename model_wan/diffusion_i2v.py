@@ -130,8 +130,8 @@ class SelfForcingWan(nn.Module):
         )
         timestep = self.scheduler.timesteps[index].to(dtype=self.dtype, device=self.device)
         timestep = timestep[:, None].expand(batch_size, num_frame)  # [B, F]
-        if cond_frames > 0:
-            timestep[:, :cond_frames] = 0
+        # if cond_frames > 0:
+        #     timestep[:, :cond_frames] = 0
         # Flow Matching: x_t = (1-sigma) * x0 + sigma * noise
         
         if clean_latent_lr is not None:
