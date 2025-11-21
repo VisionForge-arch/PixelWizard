@@ -438,8 +438,7 @@ def generate(args):
     
     dataloader = torch.utils.data.DataLoader(dataset, shuffle=False, collate_fn=lambda x: x[0], num_workers=1)
         
-    # ======== 对齐参数 ==========
-    denoising_strength = 0.5              
+    
 
     logging.info("Creating WanTI2V pipeline.")
     wan_ti2v = wan.WanTI2V_SR(
