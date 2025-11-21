@@ -99,7 +99,7 @@ class WanTI2V_SR:
         self.vae = Wan2_2_VAE(
             vae_pth=os.path.join(checkpoint_dir, config.vae_checkpoint),
             device=self.device)
-        self.sr_proj = torch.nn.Conv3d(96, 48, kernel_size=1, stride=1, padding=0).to(self.device, dtype=self.param_dtype)
+        #self.sr_proj = torch.nn.Conv3d(96, 48, kernel_size=1, stride=1, padding=0).to(self.device, dtype=self.param_dtype)
         
         logging.info(f"Creating WanModel from {checkpoint_dir}")
         self.model = WanModel.from_pretrained(checkpoint_dir)
