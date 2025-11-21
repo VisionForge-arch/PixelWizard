@@ -153,8 +153,19 @@ class WanTI2V_SR:
                     state_dict = obj_list[0]  # 其它 rank 拿到同一个 state_dict
 
                 generator_state_dict = state_dict['generator']
-                sr_proj_weight = generator_state_dict.pop("model.proj_in.weight", None)
-                sr_proj_bias = generator_state_dict.pop("model.proj_in.bias", None)
+                sr_proj_weight = None
+                for key in ("model.proj_in.weight", "proj_in.weight"):
+                    if key in generator_state_dict:
+                        sr_proj_weight = generator_state_dict.pop(key)
+                        break
+
+                sr_proj_bias = None
+                for key in ("model.proj_in.bias", "proj_in.bias"):
+                    if key in generator_state_dict:
+                        sr_proj_bias = generator_state_dict.pop(key)
+                        break
+
+
                 
                 def strip_prefix(d, prefix="model."):
                     new_dict = {}
