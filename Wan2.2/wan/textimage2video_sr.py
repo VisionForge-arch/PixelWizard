@@ -103,6 +103,10 @@ class WanTI2V_SR:
         
         logging.info(f"Creating WanModel from {checkpoint_dir}")
         self.model = WanModel.from_pretrained(checkpoint_dir)
+        old_in_dim = self.model.in_dim
+        new_in_dim = old_in_dim * 2
+        self.model.reinit_patch_embedding(new_in_dim=new_in_dim)
+        
         self.model = self._configure_model(
             model=self.model,
             use_sp=use_sp,
@@ -119,8 +123,8 @@ class WanTI2V_SR:
                 print(f"Loading Wan model from {wan_ckpt}")
                 state_dict = torch.load(wan_ckpt, map_location="cpu")
                 generator_state_dict = state_dict['generator']
-                sr_proj_weight = generator_state_dict.pop("model.proj_in.weight", None)
-                sr_proj_bias = generator_state_dict.pop("model.proj_in.bias", None)
+                # sr_proj_weight = generator_state_dict.pop("model.proj_in.weight", None)
+                # sr_proj_bias = generator_state_dict.pop("model.proj_in.bias", None)
 
                 
                 def strip_prefix(d, prefix="model."):
@@ -134,8 +138,8 @@ class WanTI2V_SR:
                 generator_state_dict = strip_prefix(generator_state_dict)
                 
                 self.model.load_state_dict(generator_state_dict)
-                self.sr_proj.weight.data.copy_(sr_proj_weight)
-                self.sr_proj.bias.data.copy_(sr_proj_bias)
+                # self.sr_proj.weight.data.copy_(sr_proj_weight)
+                # self.sr_proj.bias.data.copy_(sr_proj_bias)
                 
             #generator_state_dict = {k.replace("base_attn.", ""): v for k, v in generator_state_dict.items()}
             
@@ -153,17 +157,17 @@ class WanTI2V_SR:
                     state_dict = obj_list[0]  # 其它 rank 拿到同一个 state_dict
 
                 generator_state_dict = state_dict['generator']
-                sr_proj_weight = None
-                for key in ("model.proj_in.weight", "proj_in.weight"):
-                    if key in generator_state_dict:
-                        sr_proj_weight = generator_state_dict.pop(key)
-                        break
+                # sr_proj_weight = None
+                # for key in ("model.proj_in.weight", "proj_in.weight"):
+                #     if key in generator_state_dict:
+                #         sr_proj_weight = generator_state_dict.pop(key)
+                #         break
 
-                sr_proj_bias = None
-                for key in ("model.proj_in.bias", "proj_in.bias"):
-                    if key in generator_state_dict:
-                        sr_proj_bias = generator_state_dict.pop(key)
-                        break
+                # sr_proj_bias = None
+                # for key in ("model.proj_in.bias", "proj_in.bias"):
+                #     if key in generator_state_dict:
+                #         sr_proj_bias = generator_state_dict.pop(key)
+                #         break
 
 
                 
@@ -178,8 +182,8 @@ class WanTI2V_SR:
                 
                 generator_state_dict = strip_prefix(generator_state_dict)
                 self.model.load_state_dict(generator_state_dict)
-                self.sr_proj.weight.data.copy_(sr_proj_weight)
-                self.sr_proj.bias.data.copy_(sr_proj_bias)
+                # self.sr_proj.weight.data.copy_(sr_proj_weight)
+                # self.sr_proj.bias.data.copy_(sr_proj_bias)
                 
         # ==============================================================
         
