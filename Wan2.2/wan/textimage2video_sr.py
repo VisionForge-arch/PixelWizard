@@ -492,6 +492,7 @@ class WanTI2V_SR:
             for i, t in enumerate(tqdm(timesteps)):
                 #latent_model_input = latents
                 latent_model_input = [torch.cat([latents[0], cond_latent], dim=0)]
+                latent_model_input = [self.sr_proj(latent_model_input).squeeze(0)]
                 timestep = [t]
 
                 timestep = torch.stack(timestep)
