@@ -506,7 +506,7 @@ def generate(args):
                 
                 cond_latent = cond_latent.reshape(B*T, C, h, w)  # [B*T, C, h, w]
                 cond_latent = F.interpolate(cond_latent, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
-                cond_latent = cond_latent.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)
+                cond_latent = cond_latent.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)  # [B, C, T, H, W]
 
             
             

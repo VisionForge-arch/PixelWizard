@@ -11,6 +11,8 @@ from .attention import flash_attention
 __all__ = ['WanModel']
 
 
+
+
 def sinusoidal_embedding_1d(dim, position):
     # preprocess
     assert dim % 2 == 0
@@ -806,3 +808,55 @@ class WanModel(ModelMixin, ConfigMixin):
 
         # init output layer
         nn.init.zeros_(self.head.head.weight)
+        
+        
+    def reinit_patch_embedding(self, new_in_dim: int, new_param_init: str = "copy"):
+        """重新构造 `patch_embedding` 以适配更大的输入通道数。
+
+        Args:
+            new_in_dim (int): 新的输入通道数（如 96）。
+            new_param_init (str): 对新增通道权重的初始化方式，支持 "copy" | "zero"。
+        """
+        old_in_dim = self.config.in_dim  # 旧的输入通道数（如 48）
+        if new_in_dim <= old_in_dim:
+            raise ValueError(
+                f"new_in_dim({new_in_dim}) 必须大于旧的 in_dim({old_in_dim})")
+
+        # 保存旧卷积权重与 bias
+        old_weight = self.patch_embedding.weight.detach().clone()
+        old_bias = self.patch_embedding.bias.detach().clone()
+
+        # 构造新的卷积层，并保持 device / dtype 与旧权重一致
+        new_conv = torch.nn.Conv3d(
+            new_in_dim,
+            old_weight.shape[0],
+            kernel_size=self.patch_size,  # 与 __init__ 保持一致
+            stride=self.patch_size,
+            bias=True,
+        ).to(old_weight.device, dtype=old_weight.dtype)
+
+        with torch.no_grad():
+            # 复制旧通道权重
+            new_conv.weight[:, :old_in_dim] = old_weight
+
+            # 处理新增通道
+            extra_c = new_in_dim - old_in_dim
+            if new_param_init == "zero":
+                new_conv.weight[:, old_in_dim:] = 0.0
+            elif new_param_init == "copy":
+                # 复制模式要求新通道数必须是旧通道数的整数倍
+                if extra_c % old_in_dim != 0:
+                    raise ValueError(
+                        f"In 'copy' mode, (new_in_dim({new_in_dim}) - old_in_dim({old_in_dim})) must be divisible by old_in_dim({old_in_dim})")
+                # 将旧权重循环填充到新增通道
+                repeat_times = extra_c // old_in_dim
+                repeated = old_weight.repeat(1, repeat_times, 1, 1, 1)
+                new_conv.weight[:, old_in_dim:] = repeated
+            else:
+                raise ValueError(f"Invalid new_param_init: {new_param_init}")
+            new_conv.bias = torch.nn.Parameter(old_bias)
+
+        # 替换并同步配置
+        self.patch_embedding = new_conv
+        self.config.in_dim = new_in_dim
+        self.in_dim = new_in_dim

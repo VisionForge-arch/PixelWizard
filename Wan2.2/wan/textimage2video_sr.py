@@ -255,7 +255,7 @@ class WanTI2V_SR:
             input_prompt (`str`):
                 Text prompt for content generation
             cond_latent (`torch.Tensor`, *optional*, defaults to None):
-                Conditional latent tensor. Shape: [B, T, C, H, W]
+                Conditional latent tensor. Shape: [B, C, T, H, W]
             img (PIL.Image.Image):
                 Input image tensor. Shape: [3, H, W]
             size (`tuple[int]`, *optional*, defaults to (1280,704)):
@@ -399,7 +399,7 @@ class WanTI2V_SR:
 
         
         # 先处理 cond_latent 的维度（如果有的话）
-        if cond_latent is not None:
+        if cond_latent is not None:  # [B, C, T, H, W]
             if cond_latent.dim() == 5:  # [B, C, T, H, W]
                 cond_latent = cond_latent.squeeze(0)  # 变成 [C, T, H, W]
             print(f'cond_latent_shape: {cond_latent.shape}')

@@ -222,7 +222,6 @@ class SelfForcingWan(nn.Module):
                 cond_latent = cond_latent.unsqueeze(1)
             cond_latent = cond_latent.to(device=self.device, dtype=self.dtype)
             cond_frames = cond_latent.shape[1]
-            noise[:, :cond_frames] = 0
 
         # --------- 2. timestep 采样 ----------
         index = torch.randint(

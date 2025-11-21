@@ -142,6 +142,10 @@ class WanDiffusionWrapper(torch.nn.Module):
         else:   
             self.model = WanModel.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
         self.model.eval()
+        
+        old_in_dim = self.model.in_dim
+        new_in_dim = old_in_dim * 2
+        self.model.reinit_patch_embedding(new_in_dim=new_in_dim)
 
         # For non-causal diffusion, all frames share the same timestep
         self.uniform_timestep = not is_causal
@@ -150,8 +154,8 @@ class WanDiffusionWrapper(torch.nn.Module):
         
         self.scheduler.set_timesteps(1000, training=True)
         
-        self.proj_in = torch.nn.Conv3d(96, 48, kernel_size=1, stride=1, padding=0)
-        self.proj_in.requires_grad_(True)
+        # self.proj_in = torch.nn.Conv3d(96, 48, kernel_size=1, stride=1, padding=0)
+        # self.proj_in.requires_grad_(True)
 
         self.seq_len = seq_len
         self.post_init()
@@ -251,8 +255,8 @@ class WanDiffusionWrapper(torch.nn.Module):
 
         
         x = noisy_image_or_video.permute(0, 2, 1, 3, 4)
-        if x.shape[1] == 96:
-            x = self.proj_in(x)
+        # if x.shape[1] == 96:
+            #x = self.proj_in(x)
         
         # X0 prediction
         if lr_context is not None:
