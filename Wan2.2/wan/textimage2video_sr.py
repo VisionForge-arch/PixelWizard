@@ -510,9 +510,10 @@ class WanTI2V_SR:
             print(f'   CFG scale: {guide_scale}, Shift: {shift}')
             
             for i, t in enumerate(tqdm(timesteps)):
-                #latent_model_input = latents
-                latent_model_input = [torch.cat([latents[0], cond_latent], dim=0)]
-                latent_model_input = [self.sr_proj(latent_model_input).squeeze(0)]
+                fused_latent = torch.cat([latents[0], cond_latent], dim=0).unsqueeze(0)  # [1, C_hr+C_lr, T, H, W]
+                fused_latent = self.sr_proj(fused_latent).squeeze(0)
+                latent_model_input = [fused_latent]
+
                 timestep = [t]
 
                 timestep = torch.stack(timestep)
