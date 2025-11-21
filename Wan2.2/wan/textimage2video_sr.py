@@ -124,9 +124,13 @@ class WanTI2V_SR:
 
                 
                 def strip_prefix(d, prefix="model."):
-                    if all(k.startswith(prefix) for k in d.keys()):
-                        return {k[len(prefix):]: v for k, v in d.items()}
-                    return d
+                    new_dict = {}
+                    for k, v in d.items():
+                        if k.startswith(prefix):
+                            new_dict[k[len(prefix):]] = v
+                        else:
+                            new_dict[k] = v
+                    return new_dict
                 generator_state_dict = strip_prefix(generator_state_dict)
                 
                 self.model.load_state_dict(generator_state_dict)
