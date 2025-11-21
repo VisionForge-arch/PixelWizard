@@ -99,7 +99,8 @@ class WanTI2V_SR:
         self.vae = Wan2_2_VAE(
             vae_pth=os.path.join(checkpoint_dir, config.vae_checkpoint),
             device=self.device)
-
+        self.sr_proj = torch.nn.Conv3d(96, 48, kernel_size=1, stride=1, padding=0)
+        
         logging.info(f"Creating WanModel from {checkpoint_dir}")
         self.model = WanModel.from_pretrained(checkpoint_dir)
         self.model = self._configure_model(
@@ -109,13 +110,19 @@ class WanTI2V_SR:
             shard_fn=shard_fn,
             convert_model_dtype=convert_model_dtype)
         
+        
+        
+        
         # ==============load the model from the checkpoint=============
         if wan_ckpt is not None:
             if use_sp is False:
                 print(f"Loading Wan model from {wan_ckpt}")
                 state_dict = torch.load(wan_ckpt, map_location="cpu")
                 generator_state_dict = state_dict['generator']
-            
+                sr_proj_weight = generator_state_dict.pop("model.proj_in.weight", None)
+                sr_proj_bias = generator_state_dict.pop("model.proj_in.bias", None)
+
+                
                 def strip_prefix(d, prefix="model."):
                     if all(k.startswith(prefix) for k in d.keys()):
                         return {k[len(prefix):]: v for k, v in d.items()}
@@ -123,6 +130,9 @@ class WanTI2V_SR:
                 generator_state_dict = strip_prefix(generator_state_dict)
                 
                 self.model.load_state_dict(generator_state_dict)
+                self.sr_proj.weight.data.copy_(sr_proj_weight)
+                self.sr_proj.bias.data.copy_(sr_proj_bias)
+                
             #generator_state_dict = {k.replace("base_attn.", ""): v for k, v in generator_state_dict.items()}
             
             else:
@@ -139,6 +149,8 @@ class WanTI2V_SR:
                     state_dict = obj_list[0]  # 其它 rank 拿到同一个 state_dict
 
                 generator_state_dict = state_dict['generator']
+                sr_proj_weight = generator_state_dict.pop("model.proj_in.weight", None)
+                sr_proj_bias = generator_state_dict.pop("model.proj_in.bias", None)
                 
                 def strip_prefix(d, prefix="model."):
                     if all(k.startswith(prefix) for k in d.keys()):
@@ -146,6 +158,9 @@ class WanTI2V_SR:
                     return d
                 generator_state_dict = strip_prefix(generator_state_dict)
                 self.model.load_state_dict(generator_state_dict)
+                self.sr_proj.weight.data.copy_(sr_proj_weight)
+                self.sr_proj.bias.data.copy_(sr_proj_bias)
+                
         # ==============================================================
         
         if use_sp:
@@ -401,30 +416,30 @@ class WanTI2V_SR:
                     shift=1,
                     use_dynamic_shifting=False)
                 
-                if cond_latent is not None:
-                    # 手动计算 sigmas，从 denoising_strength 对应的值开始
-                    # 而不是从 sigma_max=1.0 开始
-                        # FlowMatchScheduler 的默认值
-                    sigma_max = 1.0
-                    sigma_min = 0.0  # 修正：应该是 0.0，不是接近 1 的值
-                    denoising_strength = 0.048  # 与训练对齐
+                # if cond_latent is not None:
+                #     # 手动计算 sigmas，从 denoising_strength 对应的值开始
+                #     # 而不是从 sigma_max=1.0 开始
+                #         # FlowMatchScheduler 的默认值
+                #     sigma_max = 1.0
+                #     sigma_min = 0.0  # 修正：应该是 0.0，不是接近 1 的值
+                #     denoising_strength = 0.048  # 与训练对齐
                     
-                    # 计算起始 sigma（对应 denoising_strength）
-                    sigma_start = sigma_min + (sigma_max - sigma_min) * denoising_strength
+                #     # 计算起始 sigma（对应 denoising_strength）
+                #     sigma_start = sigma_min + (sigma_max - sigma_min) * denoising_strength
                     
-                    # 生成从 sigma_start 到 sigma_min 的 sigmas
-                    import numpy as np
-                    sigmas = np.linspace(sigma_start, sigma_min, sampling_steps + 1)[:-1]
-                    print(f'SR mode: Custom sigmas range [{sigma_start:.4f}, {sigma_min:.4f}], '
-                            f'{len(sigmas)} steps (before shift transform)')
+                #     # 生成从 sigma_start 到 sigma_min 的 sigmas
+                #     import numpy as np
+                #     sigmas = np.linspace(sigma_start, sigma_min, sampling_steps + 1)[:-1]
+                #     print(f'SR mode: Custom sigmas range [{sigma_start:.4f}, {sigma_min:.4f}], '
+                #             f'{len(sigmas)} steps (before shift transform)')
                     
-                    # 调用 set_timesteps，传入自定义的 sigmas
-                    sample_scheduler.set_timesteps(
-                        sampling_steps, device=self.device, sigmas=sigmas, shift=shift)
-                else:
+                #     # 调用 set_timesteps，传入自定义的 sigmas
+                #     sample_scheduler.set_timesteps(
+                #         sampling_steps, device=self.device, sigmas=sigmas, shift=shift)
+                # else:
                     # 标准的 t2v，从纯噪声开始
-                    sample_scheduler.set_timesteps(
-                        sampling_steps, device=self.device, shift=shift)
+                sample_scheduler.set_timesteps(
+                    sampling_steps, device=self.device, shift=shift)
                     
 
                 timesteps = sample_scheduler.timesteps
@@ -443,24 +458,24 @@ class WanTI2V_SR:
             else:
                 raise NotImplementedError("Unsupported solver.")
 
-            # 重要：根据 scheduler 的第一个 sigma 初始化 latent
-            if cond_latent is not None:
-                # 获取第一个 timestep 对应的 sigma（经过 shift transform 后的）
-                first_sigma = sample_scheduler.sigmas[0].item()
+            # # 重要：根据 scheduler 的第一个 sigma 初始化 latent
+            # if cond_latent is not None:
+            #     # 获取第一个 timestep 对应的 sigma（经过 shift transform 后的）
+            #     first_sigma = sample_scheduler.sigmas[0].item()
                 
-                print(f'✓ SR Mode Initialization:')
-                print(f'  First timestep: {timesteps[0].item():.1f}')
-                print(f'  First sigma (after shift): {first_sigma:.4f}')
+            #     print(f'✓ SR Mode Initialization:')
+            #     print(f'  First timestep: {timesteps[0].item():.1f}')
+            #     print(f'  First sigma (after shift): {first_sigma:.4f}')
                 
-                # 使用正确的 sigma 初始化 latent
-                # Flow Matching: x_t = (1-sigma) * x0 + sigma * noise
-                latents = [(1 - first_sigma) * cond_latent + first_sigma * pure_noise]
+            #     # 使用正确的 sigma 初始化 latent
+            #     # Flow Matching: x_t = (1-sigma) * x0 + sigma * noise
+            #     latents = [(1 - first_sigma) * cond_latent + first_sigma * pure_noise]
                 
-                print(f'  Initialized latent: mean={latents[0].mean():.4f}, std={latents[0].std():.4f}')
-            else:
+            #     print(f'  Initialized latent: mean={latents[0].mean():.4f}, std={latents[0].std():.4f}')
+            # else:
                 # 纯 T2V 模式：使用纯噪声
-                latents = [pure_noise]
-                print(f'✓ T2V Mode: pure noise, mean={latents[0].mean():.4f}, std={latents[0].std():.4f}')
+            latents = [pure_noise]
+            print(f'✓ T2V Mode: pure noise, mean={latents[0].mean():.4f}, std={latents[0].std():.4f}')
             
             mask1, mask2 = masks_like(latents, zero=False)
 
@@ -475,7 +490,8 @@ class WanTI2V_SR:
             print(f'   CFG scale: {guide_scale}, Shift: {shift}')
             
             for i, t in enumerate(tqdm(timesteps)):
-                latent_model_input = latents
+                #latent_model_input = latents
+                latent_model_input = [torch.cat([latents[0], cond_latent], dim=0)]
                 timestep = [t]
 
                 timestep = torch.stack(timestep)
