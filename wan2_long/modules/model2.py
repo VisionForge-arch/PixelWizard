@@ -928,17 +928,17 @@ if __name__ == "__main__":
     model.eval()
     model.to("cuda")
     
-    
-    noisy_image_or_video = torch.randn(1, 3, 48, 90, 160).to("cuda")
-    input_timestep = torch.randint(0, 1000, (1,)).to("cuda")
-    prompt_embeds = torch.randn(1, 512, 4096).to("cuda")
-    seq_len = 90*160*3
-    
-    
-    flow_pred = model(
-                noisy_image_or_video.permute(0, 2, 1, 3, 4),
-                t=input_timestep, context=prompt_embeds,
-                seq_len=seq_len,
-            ).permute(0, 2, 1, 3, 4)
-    
-    print("flow_pred: ", flow_pred.shape)
+    with torch.no_grad():
+        noisy_image_or_video = torch.randn(1, 3, 48, 30, 52).to("cuda")
+        input_timestep = torch.randint(0, 1000, (1,)).to("cuda")
+        prompt_embeds = torch.randn(1, 512, 4096).to("cuda")
+        seq_len = 90*160*3
+        
+        
+        flow_pred = model(
+                    noisy_image_or_video.permute(0, 2, 1, 3, 4),
+                    t=input_timestep, context=prompt_embeds,
+                    seq_len=seq_len,
+                ).permute(0, 2, 1, 3, 4)
+        
+        print("flow_pred: ", flow_pred.shape)
