@@ -311,7 +311,7 @@ class WanAttentionBlock(nn.Module):
         """
         #assert e.dtype == torch.float32
         #with torch.amp.autocast('cuda', dtype=torch.float32):
-        print(f"DEBUG: modulation shape={self.modulation.unsqueeze(0).shape}, e shape={e.shape}")
+        #print(f"DEBUG: modulation shape={self.modulation.unsqueeze(0).shape}, e shape={e.shape}")
         e = (self.modulation.unsqueeze(0) + e).chunk(6, dim=2) # list 六个 [1, seq_len, 1, C]
         #assert e[0].dtype == torch.float32
 
@@ -452,7 +452,7 @@ class WanSpatialControlAdapter(nn.Module):
         t_sinusoidal_emb: [B, freq_dim] <- 这是原始的正弦位置编码
         """
         # A. 提取特征
-        print(lr_latents.shape)
+        #print(lr_latents.shape)
         
         x = self.backbone(lr_latents)  # [B, C, T, H, ]
         x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
