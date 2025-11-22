@@ -415,7 +415,7 @@ class WanSpatialControlAdapter(nn.Module):
             nn.Conv3d(in_dim, mid_dim, kernel_size=patch_size, stride=patch_size),
             nn.GroupNorm(16, mid_dim),
             nn.SiLU(),
-            nn.Conv3d(mid_dim, mid_dim, kernel_size=3, padding=1),
+            nn.Conv3d(mid_dim, model_dim, kernel_size=3, padding=1),
             nn.SiLU(),
             # 这里可以加深网络，或者用 ResNet Block
             
