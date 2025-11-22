@@ -412,12 +412,13 @@ class WanSpatialControlAdapter(nn.Module):
         # 1. 特征提取器 (简单的 3D CNN 提取结构)
         mid_dim = model_dim // 4
         self.backbone = nn.Sequential(
-            nn.Conv3d(in_dim, mid_dim, kernel_size=patch_size, padding=patch_size),
+            nn.Conv3d(in_dim, mid_dim, kernel_size=3, padding=1),
             nn.GroupNorm(16, mid_dim),
             nn.SiLU(),
-            nn.Conv3d(mid_dim, model_dim, kernel_size=3, padding=1),
+            nn.Conv3d(mid_dim, mid_dim, kernel_size=3, padding=1),
             nn.SiLU(),
             # 这里可以加深网络，或者用 ResNet Block
+            nn.Conv3d(mid_dim, model_dim, kernel_size=patch_size, padding=patch_size),
         )
         # --- 2. Feature Normalization (关键) ---
         # 在 Flatten 之后、进入 ZeroLinear 之前，做一个 LayerNorm
