@@ -947,7 +947,7 @@ class WanModel(ModelMixin, ConfigMixin):
         
 if __name__ == "__main__":
     
-    lr_x = torch.randn(1, 3, 48, 30, 52, device="cuda", dtype=torch.bfloat16) # [B, F, C, H, W]
+    lr_x = torch.randn(1, 3, 48, 16, 26, device="cuda", dtype=torch.bfloat16) # [B, F, C, H, W]
     lr_x = lr_x.permute(0, 2, 1, 3, 4).contiguous()
     
     model = WanModel.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
@@ -956,7 +956,7 @@ if __name__ == "__main__":
     model.eval()
     model.to("cuda")
     
-    noisy_image_or_video = torch.randn(1, 3, 48, 30, 52).to("cuda")
+    noisy_image_or_video = torch.randn(1, 3, 48, 16, 26).to("cuda")
     input_timestep = torch.randint(0, 1000, (1,)).to("cuda")
     prompt_embeds = torch.randn(1, 512, 4096).to("cuda")
     seq_len = 90*160*3
