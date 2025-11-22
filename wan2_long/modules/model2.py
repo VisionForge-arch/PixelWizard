@@ -307,6 +307,7 @@ class WanAttentionBlock(nn.Module):
         """
         #assert e.dtype == torch.float32
         #with torch.amp.autocast('cuda', dtype=torch.float32):
+        print(f"DEBUG: modulation shape={self.modulation.unsqueeze(0).shape}, e shape={e.shape}")
         e = (self.modulation.unsqueeze(0) + e).chunk(6, dim=2) # list 六个 [1, seq_len, 1, C]
         #assert e[0].dtype == torch.float32
 
