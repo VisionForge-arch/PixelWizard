@@ -451,8 +451,7 @@ class WanSpatialControlAdapter(nn.Module):
         """
         # A. 提取特征
         x = self.backbone(lr_latents)  # [B, C, T, H, ]
-        print(x.shape)
-        exit()
+        
         x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
         
         x = self.feature_norm(x)
@@ -466,6 +465,10 @@ class WanSpatialControlAdapter(nn.Module):
         # C. 生成每一层的控制特征
         # 5. Generate Per-Layer Controls
         controls = [layer(x) for layer in self.zero_layers]
+        
+        print(x.shape)
+        print(controls[0].shape)
+        exit()
             
         return controls
     
