@@ -151,7 +151,7 @@ class SelfForcingWan_Upsample(nn.Module):
             noisy_latents[:, :cond_frames] = cond_latent
 
 
-        flow_pred, x0_pred = self.generator(
+        flow_pred = self.generator(
             noisy_image_or_video=noisy_latents,
             conditional_dict=conditional_dict,
             timestep=timestep,
@@ -172,6 +172,6 @@ class SelfForcingWan_Upsample(nn.Module):
 
         log_dict = {
             "x0": clean_latent.detach(),
-            "x0_pred": x0_pred.detach()
+            #"x0_pred": x0_pred.detach()
         }
         return loss, log_dict
