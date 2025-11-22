@@ -956,7 +956,7 @@ if __name__ == "__main__":
     model.eval()
     model.to("cuda")
     
-    noisy_image_or_video = torch.randn(1, 3, 48, 90, 160).to("cuda")
+    noisy_image_or_video = torch.randn(1, 3, 48, 45, 80).to("cuda")
     input_timestep = torch.randint(0, 1000, (1,)).to("cuda")
     prompt_embeds = torch.randn(1, 512, 4096).to("cuda")
     seq_len = 90*160*3
