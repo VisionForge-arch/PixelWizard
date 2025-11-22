@@ -402,7 +402,7 @@ class WanSpatialControlAdapter(nn.Module):
                  model_dim,       # Transformer Hidden Dim (e.g., 1536)
                  patch_size,      # (1, 2, 2)
                  num_blocks,      # 主干网络的层数，我们需要为每一层准备一个 ZeroLayer
-                 guidance_dim=256 # 你的 guidance timestep 维度
+                 freq_dim=256 # 你的 guidance timestep 维度
                  ):
         super().__init__()
         self.model_dim = model_dim
@@ -424,9 +424,10 @@ class WanSpatialControlAdapter(nn.Module):
         self.feature_norm = nn.LayerNorm(model_dim, eps=1e-6)
 
         # 3. Guidance Timestep Embedding (控制强度的开关)
-        self.guidance_proj = nn.Sequential(
+        self.adapter_time_proj = nn.Sequential(
+            nn.Linear(freq_dim, model_dim),
             nn.SiLU(),
-            nn.Linear(guidance_dim, model_dim),
+            nn.Linear(model_dim, model_dim),
         )
         
         # 4. [核心] Per-Block Zero Layers
@@ -458,7 +459,8 @@ class WanSpatialControlAdapter(nn.Module):
 
     def forward(self, lr_latents, guidance_t_emb):
         """
-        返回一个列表，包含 num_blocks 个 tensor，对应每一层的注入特征
+        lr_latents: [B, C, F, H, W]
+        t_sinusoidal_emb: [B, freq_dim] <- 这是原始的正弦位置编码
         """
         # A. 提取特征
         x = self.backbone(lr_latents)
@@ -468,10 +470,9 @@ class WanSpatialControlAdapter(nn.Module):
         
         # B. 注入 Guidance Timestep (控制强度)
         # 类似于把 guidance 加到 feature 上
-        if guidance_t_emb is not None:
-            # guidance_t_emb: [B, Dim]
-            w = self.guidance_proj(guidance_t_emb)
-            x = x * (1 + w.unsqueeze(1)) # Scale 调制，或者 add 也可以
+        # guidance_t_emb: [B, Dim]
+        w = self.adapter_time_proj(guidance_t_emb)
+        x = x * (1 + w.unsqueeze(1)) # Scale 调制，或者 add 也可以
             
         # C. 生成每一层的控制特征
         # 5. Generate Per-Layer Controls
@@ -547,29 +548,40 @@ def register_spatial_control(model):
     # =======================================================
     original_forward = model.forward
 
-    def forward_with_spatial_control(self, *args, lr_latents=None, guidance_timestep=None, **kwargs):
-        if lr_latents is not None and guidance_timestep is not None:
-            
-            # 1. 预计算 Guidance Embedding
-            # 假设 guidance_timestep 是 [B] 的 int
-            if isinstance(guidance_timestep, torch.Tensor) and guidance_timestep.dim() == 1:
-                t_emb = sinusoidal_embedding_1d(self.freq_dim, guidance_timestep).type_as(lr_latents)
-            else:
-                t_emb = guidance_timestep # 假设已经 embed 好了
+    def forward_with_spatial_control(self, x, t, context, seq_len, lr_latents=None, **kwargs):
+        # 处理 I2V 的拼接逻辑 (如果原模型有)
+        x_in = x
+        if kwargs.get('y') is not None:
+             x_in = [torch.cat([u, v], dim=0) for u, v in zip(x, kwargs['y'])]
+        
+        # 1. 计算基础的 Sinusoidal Embedding (公用)
+        # 这段逻辑是从原模型里提取出来的，为了让 Adapter 复用
+        if t.dim() == 1:
+            # 这里的 t 是 [Batch]
+            # 扩展到 sequence 维度虽然是 WanModel 内部做的，
+            # 但为了 Adapter，我们只需要 [Batch, FreqDim] 的 embedding 即可
+            from .wan_model import sinusoidal_embedding_1d
+            t_freq = sinusoidal_embedding_1d(self.freq_dim, t).type_as(x_in[0]) # [B, freq_dim]
+        else:
+            # 如果 t 已经是 embedding (极少情况)
+            t_freq = t
 
-            # 2. [一次性运行 Adapter]
-            # 得到所有层的控制特征列表
-            controls = self.spatial_adapter(lr_latents, t_emb)
+        # 2. 运行 Adapter (如果提供了 LR)
+        if lr_latents is not None:
+            # 将 LR 和 公用的 Time Freq 传入 Adapter
+            # Adapter 内部会用自己的 MLP 处理这个 t_freq
+            controls = self.spatial_adapter(lr_latents, t_freq)
             
-            # 3. 设置上下文供 Hooks 读取
-            self._current_spatial_ctx = {
-                'controls': controls
-            }
+            self._current_spatial_ctx = {'controls': controls}
         else:
             self._current_spatial_ctx = None
 
         try:
-            return original_forward(*args, **kwargs)
+            # 3. 调用原始 forward
+            # 注意：原始 forward 内部还会算一遍 time embedding，
+            # 虽然有点重复计算，但为了不魔改 _forward 内部代码，这是最干净的写法。
+            # 只要 t 没变，逻辑就是一致的。
+            return original_forward(x, t, context, seq_len, **kwargs)
         finally:
             self._current_spatial_ctx = None
 
