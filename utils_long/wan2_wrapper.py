@@ -4,6 +4,7 @@ import torch
 from torch import nn
 
 from utils_long.scheduler import SchedulerInterface, FlowMatchScheduler
+from wan2_long.modules.model_upsample import WanModel_Upsample
 from wan2_long.modules.tokenizers import HuggingfaceTokenizer
 from wan2_long.modules.model import WanModel, RegisterTokens, GanAttentionBlock
 from wan2_long.modules.model_cross import WanModel_Cross
@@ -139,13 +140,19 @@ class WanDiffusionWrapper(torch.nn.Module):
             from wan2_long.modules.model_cross import register_lr_adapter
             self.model = WanModel_Cross.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
             self.model, _ = register_lr_adapter(self.model)
+        elif sr is True:
+            # old_in_dim = self.model.in_dim
+            # new_in_dim = old_in_dim * 2
+            # self.model.reinit_patch_embedding(new_in_dim=new_in_dim)
+            
+            from wan2_long.modules.model_upsample import register_spatial_control
+            self.model = WanModel_Upsample.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
+            self.model, _ = register_spatial_control(self.model)
         else:   
             self.model = WanModel.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
         self.model.eval()
         
-        old_in_dim = self.model.in_dim
-        new_in_dim = old_in_dim * 2
-        self.model.reinit_patch_embedding(new_in_dim=new_in_dim)
+        
 
         # For non-causal diffusion, all frames share the same timestep
         self.uniform_timestep = not is_causal
@@ -265,7 +272,7 @@ class WanDiffusionWrapper(torch.nn.Module):
                 t=input_timestep, 
                 context=prompt_embeds,
                 seq_len=self.seq_len,
-                lr_context=lr_context,
+                lr_latents=lr_context,
             ).permute(0, 2, 1, 3, 4)
         else:
             flow_pred = self.model(

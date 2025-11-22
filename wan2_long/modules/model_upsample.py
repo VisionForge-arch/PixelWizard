@@ -7,9 +7,9 @@ import torch.nn.functional as F
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.models.modeling_utils import ModelMixin
 
-from attention import flash_attention
+from .attention import flash_attention
 
-__all__ = ['WanModel']
+__all__ = ['WanModel_Upsample']
 
 
 
@@ -412,13 +412,13 @@ class WanSpatialControlAdapter(nn.Module):
         # 1. 特征提取器 (简单的 3D CNN 提取结构)
         mid_dim = model_dim // 4
         self.backbone = nn.Sequential(
-            nn.Conv3d(in_dim, mid_dim, kernel_size=3, padding=1),
+            nn.Conv3d(mid_dim, model_dim, kernel_size=patch_size, stride=patch_size),
             nn.GroupNorm(16, mid_dim),
             nn.SiLU(),
             nn.Conv3d(mid_dim, mid_dim, kernel_size=3, padding=1),
             nn.SiLU(),
             # 这里可以加深网络，或者用 ResNet Block
-            nn.Conv3d(mid_dim, model_dim, kernel_size=patch_size, stride=patch_size),
+            
         )
         # --- 2. Feature Normalization (关键) ---
         # 在 Flatten 之后、进入 ZeroLinear 之前，做一个 LayerNorm
@@ -576,7 +576,7 @@ def register_spatial_control(model):
     
     return model, model.spatial_adapter
 
-class WanModel(ModelMixin, ConfigMixin):
+class WanModel_Upsample(ModelMixin, ConfigMixin):
     r"""
     Wan diffusion backbone supporting both text-to-video and image-to-video.
     """
@@ -733,6 +733,7 @@ class WanModel(ModelMixin, ConfigMixin):
         gan_ca_blocks=None,
         clip_fea=None,
         y=None,
+        lr_latents=None,
     ):
         r"""
         Forward pass through the diffusion model
@@ -800,7 +801,7 @@ class WanModel(ModelMixin, ConfigMixin):
             context = torch.concat([context_clip, context], dim=1)
 
         # arguments
-        kwargs = dict(
+        common_kwargs = dict(
             e=e0,
             seq_lens=seq_lens,
             grid_sizes=grid_sizes,
@@ -808,9 +809,10 @@ class WanModel(ModelMixin, ConfigMixin):
             context=context,
             context_lens=context_lens)
 
-        def create_custom_forward(module):
-            def custom_forward(*inputs, **kwargs):
-                return module(*inputs, **kwargs)
+        def create_custom_forward(module, **module_kwargs):
+            def custom_forward(*inputs):
+                inp_x, inp_lr_context = inputs
+                return module(inp_x, lr_latents=inp_lr_context, **module_kwargs)
             return custom_forward
 
         # TODO: Tune the number of blocks for feature extraction
@@ -820,12 +822,13 @@ class WanModel(ModelMixin, ConfigMixin):
         for ii, block in enumerate(self.blocks):
             if torch.is_grad_enabled() and self.gradient_checkpointing:
                 x = torch.utils.checkpoint.checkpoint(
-                    create_custom_forward(block),
-                    x, **kwargs,
+                    create_custom_forward(block, **common_kwargs),
+                    x, 
+                    lr_latents, 
                     use_reentrant=False,
                 )
             else:
-                x = block(x, **kwargs)
+                x = block(x, lr_latents=lr_latents, **common_kwargs)
                 
                 #print(f"the shape in {ii}, x.shape: {x.shape}")
                 
@@ -948,7 +951,7 @@ if __name__ == "__main__":
     
     
     
-    model = WanModel.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
+    model = WanModel_Upsample.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
     model, lr_layers = register_spatial_control(model)
     
     model.eval()

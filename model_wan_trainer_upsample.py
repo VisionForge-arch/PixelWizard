@@ -3,7 +3,7 @@ import logging
 from PIL import Image
 import torchvision.transforms as transforms
 
-from model_wan import SelfForcingWan
+from model_wan import SelfForcingWan_Upsample
 import torch
 from utils_long.misc import (
     set_seed,
@@ -76,7 +76,7 @@ class WanModel_Trainer:
         self.dataloader = cycle(dataloader)
 
         # Step 2: Initialize the model and optimizer
-        self.model = SelfForcingWan(config, device=self.device)
+        self.model = SelfForcingWan_Upsample(config, device=self.device)
         
         self.model.generator = fsdp_wrap(
             self.model.generator,
@@ -187,7 +187,7 @@ class WanModel_Trainer:
                 unconditional_dict = self.unconditional_dict
                 
                 
-        generator_loss, generator_log_dict = self.model.generator_loss_upsample(
+        generator_loss, generator_log_dict = self.model.generator_loss(
                 image_or_video_shape=image_or_video_shape,
                 conditional_dict=conditional_dict,
                 unconditional_dict=unconditional_dict,
