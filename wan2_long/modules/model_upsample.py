@@ -451,6 +451,8 @@ class WanSpatialControlAdapter(nn.Module):
         """
         # A. 提取特征
         x = self.backbone(lr_latents)  # [B, C, T, H, ]
+        print(x.shape)
+        exit()
         x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
         
         x = self.feature_norm(x)
