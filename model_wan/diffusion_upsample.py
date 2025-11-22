@@ -175,4 +175,3 @@ class SelfForcingWan_Upsample(nn.Module):
             "x0_pred": x0_pred.detach()
         }
         return loss, log_dict
-    åå
