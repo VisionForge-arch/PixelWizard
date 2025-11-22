@@ -57,7 +57,8 @@ def main():
     config.logdir = args.logdir
     config.generator_ckpt = args.generator_ckpt
     
-    config.seq_len = int(config.height // 32) * int(config.width // 32) * int((config.num_frames - 1) // config.time_division_factor)
+    time_part = int((config.num_frames - 1) // config.time_division_factor) + 1
+    config.seq_len = int(config.height // 32) * int(config.width // 32) * time_part
     config.sr_mode = True
     
     # =========init dataset=========
