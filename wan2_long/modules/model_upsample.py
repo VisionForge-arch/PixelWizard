@@ -299,6 +299,7 @@ class WanAttentionBlock(nn.Module):
         freqs,
         context,
         context_lens,
+        lr_latents=None,
     ):
         r"""
         Args:
