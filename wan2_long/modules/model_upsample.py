@@ -965,7 +965,7 @@ if __name__ == "__main__":
     model, lr_layers = register_spatial_control(model)
     
     model.eval()
-    model.to("cuda")
+    model.to("cuda", dtype=torch.bfloat16)
     with torch.no_grad():
         lr_x = torch.randn(1, 3, 48, 16, 26, device="cuda", dtype=torch.bfloat16) # [B, F, C, H, W]
         lr_x = lr_x.permute(0, 2, 1, 3, 4).contiguous()
