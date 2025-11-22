@@ -418,7 +418,7 @@ class WanSpatialControlAdapter(nn.Module):
             nn.Conv3d(mid_dim, mid_dim, kernel_size=3, padding=1),
             nn.SiLU(),
             # 这里可以加深网络，或者用 ResNet Block
-            nn.Conv3d(mid_dim, model_dim, kernel_size=patch_size, padding=patch_size),
+            nn.Conv3d(mid_dim, model_dim, kernel_size=patch_size, stride=patch_size),
         )
         # --- 2. Feature Normalization (关键) ---
         # 在 Flatten 之后、进入 ZeroLinear 之前，做一个 LayerNorm
