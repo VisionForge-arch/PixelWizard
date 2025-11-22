@@ -487,7 +487,7 @@ def register_spatial_control(model):
         model_dim=model.dim,
         patch_size=model.patch_size,
         num_blocks=len(model.blocks),
-        guidance_dim=model.freq_dim
+        freq_dim=model.freq_dim
     ).to(model.patch_embedding.weight.device)
     
     model.spatial_adapter = adapter
@@ -560,7 +560,6 @@ def register_spatial_control(model):
             # 这里的 t 是 [Batch]
             # 扩展到 sequence 维度虽然是 WanModel 内部做的，
             # 但为了 Adapter，我们只需要 [Batch, FreqDim] 的 embedding 即可
-            from .wan_model import sinusoidal_embedding_1d
             t_freq = sinusoidal_embedding_1d(self.freq_dim, t).type_as(x_in[0]) # [B, freq_dim]
         else:
             # 如果 t 已经是 embedding (极少情况)
@@ -982,6 +981,7 @@ if __name__ == "__main__":
                     t=input_timestep, 
                     context=prompt_embeds,
                     seq_len=seq_len,
+                    lr_latents=lr_x # 只需要这一路输入
                 ).permute(0, 2, 1, 3, 4)
         
         print("flow_pred: ", flow_pred.shape)
