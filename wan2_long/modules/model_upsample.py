@@ -771,7 +771,7 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
 
         # embeddings
         x = [self.patch_embedding(u.unsqueeze(0)) for u in x]  # list 1个 [1, 3072, t, h, w]
-        print(x.shape)
+        print(x[0].shape)
         exit()
         grid_sizes = torch.stack(
             [torch.tensor(u.shape[2:], dtype=torch.long) for u in x])
