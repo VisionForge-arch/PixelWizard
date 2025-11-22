@@ -412,7 +412,7 @@ class WanSpatialControlAdapter(nn.Module):
         # 1. 特征提取器 (简单的 3D CNN 提取结构)
         mid_dim = model_dim // 4
         self.backbone = nn.Sequential(
-            nn.Conv3d(mid_dim, model_dim, kernel_size=patch_size, stride=patch_size),
+            nn.Conv3d(in_dim, mid_dim, kernel_size=patch_size, stride=patch_size),
             nn.GroupNorm(16, mid_dim),
             nn.SiLU(),
             nn.Conv3d(mid_dim, mid_dim, kernel_size=3, padding=1),
@@ -959,8 +959,7 @@ if __name__ == "__main__":
     model.eval()
     model.to("cuda", dtype=torch.bfloat16)
     with torch.no_grad():
-        lr_x = torch.randn(1, 13, 48, 16, 26, device="cuda", dtype=torch.bfloat16) # [B, F, C, H, W]
-        lr_x = lr_x.permute(0, 2, 1, 3, 4).contiguous()
+        lr_x = torch.randn(1, 48, 13, 16, 26, device="cuda", dtype=torch.bfloat16) # [B, F, C, H, W]
         
         
         noisy_image_or_video = torch.randn(1, 13, 48, 16, 26).to("cuda").to(dtype=torch.bfloat16)
