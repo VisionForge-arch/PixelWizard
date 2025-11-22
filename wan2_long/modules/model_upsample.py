@@ -407,11 +407,12 @@ class WanSpatialControlAdapter(nn.Module):
         super().__init__()
         self.model_dim = model_dim
         self.num_blocks = num_blocks
+        self.freq_dim = freq_dim
         
         # 1. 特征提取器 (简单的 3D CNN 提取结构)
         mid_dim = model_dim // 4
         self.backbone = nn.Sequential(
-            nn.Conv3d(in_dim, mid_dim, kernel_size=3, padding=1),
+            nn.Conv3d(in_dim, mid_dim, kernel_size=patch_size, padding=patch_size),
             nn.GroupNorm(16, mid_dim),
             nn.SiLU(),
             nn.Conv3d(mid_dim, model_dim, kernel_size=3, padding=1),
@@ -443,27 +444,13 @@ class WanSpatialControlAdapter(nn.Module):
             nn.init.zeros_(layer.weight)
             nn.init.zeros_(layer.bias)
 
-    
-    def sinusoidal_embedding_1d(self, position):
-        # 辅助函数：位置编码
-        half = self.freq_dim // 2
-        position = position.float()
-        sinusoid = torch.outer(
-            position, 
-            torch.pow(10000, -torch.arange(half, device=position.device).float().div(half))
-        )
-        x = torch.cat([torch.cos(sinusoid), torch.sin(sinusoid)], dim=1)
-        if self.freq_dim % 2 == 1:
-             x = torch.nn.functional.pad(x, (0, 1, 0, 0))
-        return x
-
     def forward(self, lr_latents, guidance_t_emb):
         """
         lr_latents: [B, C, F, H, W]
         t_sinusoidal_emb: [B, freq_dim] <- 这是原始的正弦位置编码
         """
         # A. 提取特征
-        x = self.backbone(lr_latents)
+        x = self.backbone(lr_latents)  # [B, C, T, H, ]
         x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
         
         x = self.feature_norm(x)
@@ -565,15 +552,13 @@ def register_spatial_control(model):
             # 如果 t 已经是 embedding (极少情况)
             t_freq = t
 
-        # 2. 运行 Adapter (如果提供了 LR)
-        if lr_latents is not None:
-            # 将 LR 和 公用的 Time Freq 传入 Adapter
-            # Adapter 内部会用自己的 MLP 处理这个 t_freq
-            controls = self.spatial_adapter(lr_latents, t_freq)
-            
-            self._current_spatial_ctx = {'controls': controls}
-        else:
-            self._current_spatial_ctx = None
+        # 2. 运行 Adapter 
+        # 将 LR 和 公用的 Time Freq 传入 Adapter
+        # Adapter 内部会用自己的 MLP 处理这个 t_freq
+        controls = self.spatial_adapter(lr_latents, t_freq)
+        
+        self._current_spatial_ctx = {'controls': controls}
+
 
         try:
             # 3. 调用原始 forward
@@ -977,7 +962,7 @@ if __name__ == "__main__":
         seq_len = 90*160*3
         
         flow_pred = model(
-                    noisy_image_or_video.permute(0, 2, 1, 3, 4),
+                    noisy_image_or_video.permute(0, 2, 1, 3, 4),  # [b, c, t, h, w]
                     t=input_timestep, 
                     context=prompt_embeds,
                     seq_len=seq_len,
