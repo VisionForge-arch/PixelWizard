@@ -412,7 +412,7 @@ class WanSpatialControlAdapter(nn.Module):
         # 1. 特征提取器 (简单的 3D CNN 提取结构)
         mid_dim = model_dim // 4
         self.backbone = nn.Sequential(
-            nn.Conv3d(in_dim, mid_dim, kernel_size=3, padding=1),
+            nn.Conv3d(in_dim, mid_dim, kernel_size=patch_size, padding=patch_size),
             nn.GroupNorm(16, mid_dim),
             nn.SiLU(),
             nn.Conv3d(mid_dim, model_dim, kernel_size=3, padding=1),
@@ -451,7 +451,6 @@ class WanSpatialControlAdapter(nn.Module):
         """
         # A. 提取特征
         x = self.backbone(lr_latents)  # [B, C, T, H, ]
-        print(x.shape)
         x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
         
         x = self.feature_norm(x)
@@ -465,11 +464,7 @@ class WanSpatialControlAdapter(nn.Module):
         # C. 生成每一层的控制特征
         # 5. Generate Per-Layer Controls
         controls = [layer(x) for layer in self.zero_layers]
-        
-        print(x.shape)
-        print(controls[0].shape)
-        exit()
-            
+                
         return controls
     
 def register_spatial_control(model):
@@ -513,6 +508,7 @@ def register_spatial_control(model):
             x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
 
             # 4. [关键] 特征相加 (Feature Injection)
+            print(x.shape)
             x_new = x + control_feat.type_as(x)
             
             # 5. 重新打包 args
