@@ -512,7 +512,7 @@ def register_spatial_control(model):
             x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
 
             # 4. [关键] 特征相加 (Feature Injection)
-            print(x.shape)
+            #print(x.shape)
             x_new = x + control_feat.type_as(x)
             
             # 5. 重新打包 args
