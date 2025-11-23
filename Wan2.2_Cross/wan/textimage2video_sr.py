@@ -126,7 +126,7 @@ class WanTI2V_Upsample:
             
             # 分离 adapter 的权重
             adapter_keys = [k for k in generator_state_dict.keys() if k.startswith('spatial_adapter.')]
-            adapter_state_dict = {k: generator_state_dict.pop(k) for k in adapter_keys}
+            adapter_state_dict = {k[len('spatial_adapter.'):]: generator_state_dict.pop(k) for k in adapter_keys}
             print(f"Found {len(adapter_keys)} adapter keys in checkpoint")
         
             # 加载主模型权重
