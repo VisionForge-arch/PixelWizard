@@ -428,8 +428,10 @@ def register_spatial_control(model):
 
             # 4. [关键] 特征相加 (Feature Injection)
             print(x.shape)
-            exit()
             x_new = x + control_feat.type_as(x)
+            
+            print(x_new.shape)
+            print("add successfully!!!")
             
             # 5. 重新打包 args
             # Tuple 是不可变的，所以要新建一个
