@@ -468,11 +468,19 @@ def register_spatial_control(model):
         
         # 1. 计算基础的 Sinusoidal Embedding (公用)
         # 这段逻辑是从原模型里提取出来的，为了让 Adapter 复用
+        print(t)
         if t.dim() == 1:
             # 这里的 t 是 [Batch]
             # 扩展到 sequence 维度虽然是 WanModel 内部做的，
             # 但为了 Adapter，我们只需要 [Batch, FreqDim] 的 embedding 即可
             t_freq = sinusoidal_embedding_1d(self.freq_dim, t).type_as(x_in[0]) # [B, freq_dim]
+        elif t.dim() == 2 and t.shape[1] != self.freq_dim:
+            # 识别出这是被 pipeline 扩展过的 [1, SeqLen] 大张量
+            # 我们只需要取第一个值作为全局时间步
+            t_input = t[:, 0] 
+            # 重新生成正确的 [1, 256] Embedding
+            t_freq = sinusoidal_embedding_1d(self.freq_dim, t_input).type_as(x_in[0])
+        
         else:
             # 如果 t 已经是 embedding (极少情况)
             t_freq = t
