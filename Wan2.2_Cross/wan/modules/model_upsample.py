@@ -476,6 +476,7 @@ def register_spatial_control(model):
         # 将 LR 和 公用的 Time Freq 传入 Adapter
         # Adapter 内部会用自己的 MLP 处理这个 t_freq
         controls = self.spatial_adapter(lr_latents, t_freq)
+        print(f'control_shape{controls[0].shape}')
         
         self._current_spatial_ctx = {'controls': controls}
 
