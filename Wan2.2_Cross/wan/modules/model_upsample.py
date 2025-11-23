@@ -690,6 +690,19 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
             e0 = self.time_projection(e).unflatten(2, (6, self.dim))
             assert e.dtype == torch.float32 and e0.dtype == torch.float32
 
+        # 取每个 batch 的第一个时间步即可 (因为 batch 内时间相同)
+            t_for_adapter = t.view(bt, seq_len)[:, 0] # [Batch]
+            
+            with torch.no_grad():
+                t_freq_adapter = sinusoidal_embedding_1d(self.freq_dim, t_for_adapter).to(device)
+            
+            # 2. 运行 Adapter
+            controls = self.spatial_adapter(lr_context, t_freq_adapter)
+            
+            # 3. 设置 Context
+            self._current_spatial_ctx = {'controls': controls}
+
+
         # context
         context_lens = None
         context = self.text_embedding(

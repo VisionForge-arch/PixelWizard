@@ -433,8 +433,6 @@ class WanTI2V_Upsample:
                 ])
                 timestep = temp_ts.unsqueeze(0)
 
-                print("Current forward method:", self.model.forward)
-                exit()
                 noise_pred_cond = self.model(latent_model_input, t=timestep, **arg_c)[0]
                 #noise_pred_uncond = self.model(latent_model_input, t=timestep, **arg_null)[0]
 
