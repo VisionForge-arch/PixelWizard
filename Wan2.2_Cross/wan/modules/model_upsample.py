@@ -446,11 +446,11 @@ def register_spatial_control(model):
             
             
             # 4. [关键] 特征相加 (Feature Injection)
-            print(x.shape)
+            # print(x.shape)
             x_new = x + control_feat.type_as(x)
             
-            print(x_new.shape)
-            print("add successfully!!!")
+            # print(x_new.shape)
+            # print("add successfully!!!")
             
             # 5. 重新打包 args
             # Tuple 是不可变的，所以要新建一个
@@ -516,6 +516,7 @@ def register_spatial_control(model):
             # 注意：原始 forward 内部还会算一遍 time embedding，
             # 虽然有点重复计算，但为了不魔改 _forward 内部代码，这是最干净的写法。
             # 只要 t 没变，逻辑就是一致的。
+            kwargs['lr_latents'] = lr_latents
             return original_forward(x, t, context, seq_len, **kwargs)
         finally:
             self._current_spatial_ctx = None
