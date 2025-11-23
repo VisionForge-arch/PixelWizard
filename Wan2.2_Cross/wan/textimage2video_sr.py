@@ -104,6 +104,47 @@ class WanTI2V_Upsample:
         from .modules.model_upsample import register_spatial_control
         self.model = WanModel_Upsample.from_pretrained(checkpoint_dir)
         
+        self.model, _ = register_spatial_control(self.model)
+        
+        # ==============load the model from the checkpoint (在 FSDP 之前加载)=============
+        adapter_state_dict = None
+        if wan_ckpt is not None:
+            print(f"Loading Wan model from {wan_ckpt}")
+            state_dict = torch.load(wan_ckpt, map_location="cpu")
+            generator_state_dict = state_dict['generator']
+            
+            def strip_prefix(d, prefix="model."):
+                new_dict = {}
+                for k, v in d.items():
+                    if k.startswith(prefix):
+                        new_dict[k[len(prefix):]] = v
+                    else:
+                        new_dict[k] = v
+                return new_dict
+            
+            generator_state_dict = strip_prefix(generator_state_dict)
+            
+            # 分离 adapter 的权重
+            adapter_keys = [k for k in generator_state_dict.keys() if k.startswith('spatial_adapter.')]
+            adapter_state_dict = {k: generator_state_dict.pop(k) for k in adapter_keys}
+            print(f"Found {len(adapter_keys)} adapter keys in checkpoint")
+        
+            # 加载主模型权重
+            missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict, strict=False)
+            if missing_keys:
+                print(f"Missing keys (ignored): {len(missing_keys)} keys")
+            if unexpected_keys:
+                print(f"Unexpected keys (ignored): {len(unexpected_keys)} keys")
+        
+            try:
+                self.model.spatial_adapter.load_state_dict(adapter_state_dict)
+                print("Successfully loaded spatial_adapter weights")
+            except Exception as e:
+                print(f"Warning: Failed to load spatial_adapter weights: {e}")
+        
+        # ==============================================================
+       
+        
         
         self.model = self._configure_model(
             model=self.model,
@@ -112,78 +153,7 @@ class WanTI2V_Upsample:
             shard_fn=shard_fn,
             convert_model_dtype=convert_model_dtype)
         
-        self.model, _ = register_spatial_control(self.model)
-        
-        # ==============load the model from the checkpoint=============
-        if wan_ckpt is not None:
-            if use_sp is False:
-                print(f"Loading Wan model from {wan_ckpt}")
-                state_dict = torch.load(wan_ckpt, map_location="cpu")
-                generator_state_dict = state_dict['generator']
-                # sr_proj_weight = generator_state_dict.pop("model.proj_in.weight", None)
-                # sr_proj_bias = generator_state_dict.pop("model.proj_in.bias", None)
 
-                
-                def strip_prefix(d, prefix="model."):
-                    new_dict = {}
-                    for k, v in d.items():
-                        if k.startswith(prefix):
-                            new_dict[k[len(prefix):]] = v
-                        else:
-                            new_dict[k] = v
-                    return new_dict
-                generator_state_dict = strip_prefix(generator_state_dict)
-                
-                self.model.load_state_dict(generator_state_dict)
-                # self.sr_proj.weight.data.copy_(sr_proj_weight)
-                # self.sr_proj.bias.data.copy_(sr_proj_bias)
-                
-            #generator_state_dict = {k.replace("base_attn.", ""): v for k, v in generator_state_dict.items()}
-            
-            else:
-                print(f"Loading Wan model from {wan_ckpt} for SP mode")
-                state_dict = None  # 先占位
-                if not dist.is_initialized() or dist.get_rank() == 0:
-                    state_dict = torch.load(wan_ckpt, map_location="cpu")
-                    print(f"[rank0] loaded Wan model from {wan_ckpt}")
-                    
-                if dist.is_initialized():
-                    dist.barrier()  # 确保其它 rank 等待
-                    obj_list = [state_dict]
-                    dist.broadcast_object_list(obj_list, src=0)
-                    state_dict = obj_list[0]  # 其它 rank 拿到同一个 state_dict
-
-                generator_state_dict = state_dict['generator']
-                # sr_proj_weight = None
-                # for key in ("model.proj_in.weight", "proj_in.weight"):
-                #     if key in generator_state_dict:
-                #         sr_proj_weight = generator_state_dict.pop(key)
-                #         break
-
-                # sr_proj_bias = None
-                # for key in ("model.proj_in.bias", "proj_in.bias"):
-                #     if key in generator_state_dict:
-                #         sr_proj_bias = generator_state_dict.pop(key)
-                #         break
-
-
-                
-                def strip_prefix(d, prefix="model."):
-                    new_dict = {}
-                    for k, v in d.items():
-                        if k.startswith(prefix):
-                            new_dict[k[len(prefix):]] = v
-                        else:
-                            new_dict[k] = v
-                    return new_dict
-                
-                generator_state_dict = strip_prefix(generator_state_dict)
-                self.model.load_state_dict(generator_state_dict)
-                # self.sr_proj.weight.data.copy_(sr_proj_weight)
-                # self.sr_proj.bias.data.copy_(sr_proj_bias)
-                
-        # ==============================================================
-   
         
         if use_sp:
             self.sp_size = get_world_size()
