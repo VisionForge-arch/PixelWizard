@@ -428,6 +428,23 @@ def register_spatial_control(model):
             
             x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
 
+            
+            # --- FIX STARTS HERE: Handle Sequence Parallelism Slicing ---
+            # If input x is smaller than control, we assume SP is active and slice control
+            if x.shape[1] != control_feat.shape[1]:
+                if torch.distributed.is_initialized():
+                    rank = torch.distributed.get_rank()
+                    # Calculate the slice for this rank
+                    # We assume the sequence is split evenly across the SP group (world_size)
+                    local_len = x.shape[1]
+                    start_idx = rank * local_len
+                    end_idx = start_idx + local_len
+                    
+                    # Slice the global control feature to match local x
+                    control_feat = control_feat[:, start_idx:end_idx, :]
+            # -----------------------------------------------------------
+            
+            
             # 4. [关键] 特征相加 (Feature Injection)
             print(x.shape)
             x_new = x + control_feat.type_as(x)
