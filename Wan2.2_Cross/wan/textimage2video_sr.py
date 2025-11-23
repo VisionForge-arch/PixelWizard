@@ -265,7 +265,7 @@ class WanTI2V_Upsample:
 
     def t2v(self,
             input_prompt,
-            cond_latent=None,
+            cond_latent,
             size=(1280, 704),
             frame_num=121,
             shift=5.0,

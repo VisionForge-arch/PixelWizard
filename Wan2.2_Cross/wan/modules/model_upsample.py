@@ -427,7 +427,8 @@ def register_spatial_control(model):
             x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
 
             # 4. [关键] 特征相加 (Feature Injection)
-            #print(x.shape)
+            print(x.shape)
+            exit()
             x_new = x + control_feat.type_as(x)
             
             # 5. 重新打包 args
@@ -691,16 +692,16 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
             assert e.dtype == torch.float32 and e0.dtype == torch.float32
 
         # 取每个 batch 的第一个时间步即可 (因为 batch 内时间相同)
-            t_for_adapter = t.view(bt, seq_len)[:, 0] # [Batch]
-            
-            with torch.no_grad():
-                t_freq_adapter = sinusoidal_embedding_1d(self.freq_dim, t_for_adapter).to(device)
-            
-            # 2. 运行 Adapter
-            controls = self.spatial_adapter(lr_context, t_freq_adapter)
-            
-            # 3. 设置 Context
-            self._current_spatial_ctx = {'controls': controls}
+        t_for_adapter = t.view(bt, seq_len)[:, 0] # [Batch]
+        
+        with torch.no_grad():
+            t_freq_adapter = sinusoidal_embedding_1d(self.freq_dim, t_for_adapter).to(device)
+        
+        # 2. 运行 Adapter
+        controls = self.spatial_adapter(lr_context, t_freq_adapter)
+        
+        # 3. 设置 Context
+        self._current_spatial_ctx = {'controls': controls}
 
 
         # context
