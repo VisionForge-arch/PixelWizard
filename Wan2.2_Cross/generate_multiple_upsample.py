@@ -509,6 +509,7 @@ def generate(args):
                 cond_latent_lr = cond_latent_lr.to(device=wan_ti2v.device, dtype=torch.float32)
   
             
+            print("Current forward method:", self.model.forward)
  
             video = wan_ti2v.generate(
                     current_prompt,
