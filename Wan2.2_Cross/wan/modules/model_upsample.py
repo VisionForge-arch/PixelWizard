@@ -242,7 +242,7 @@ class WanAttentionBlock(nn.Module):
         freqs,
         context,
         context_lens,
-        lr_context=None,
+        lr_latents=None,
     ):
         r"""
         Args:
@@ -636,7 +636,7 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
         t,
         context,
         seq_len,
-        lr_context,
+        lr_latents,
         y=None,
     ):
         r"""
@@ -710,7 +710,7 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
             freqs=self.freqs,
             context=context,
             context_lens=context_lens,
-            lr_context=lr_context,
+            lr_latents=lr_latents,
         )
 
         for block in self.blocks:

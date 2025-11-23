@@ -103,7 +103,7 @@ class WanTI2V_Upsample:
         logging.info(f"Creating WanModel from {checkpoint_dir}")
         from .modules.model_upsample import register_spatial_control
         self.model = WanModel_Upsample.from_pretrained(checkpoint_dir)
-        self.model, _ = register_spatial_control(self.model)
+        
         
         self.model = self._configure_model(
             model=self.model,
@@ -111,6 +111,8 @@ class WanTI2V_Upsample:
             dit_fsdp=dit_fsdp,
             shard_fn=shard_fn,
             convert_model_dtype=convert_model_dtype)
+        
+        self.model, _ = register_spatial_control(self.model)
         
         # ==============load the model from the checkpoint=============
         if wan_ckpt is not None:
@@ -410,7 +412,7 @@ class WanTI2V_Upsample:
             # ============ LR Context ============
             #cond_latent = cond_latent.permute(0, 2, 1, 3, 4).contiguous()   # [B, C, T, h, w]
 
-            arg_c = {'context': context, 'seq_len': seq_len, 'lr_context':cond_latent}
+            arg_c = {'context': context, 'seq_len': seq_len, 'lr_latents':cond_latent}
             #arg_null = {'context': context_null, 'seq_len': seq_len, 'lr_context':cond_latent}
 
             if offload_model or self.init_on_cpu:
