@@ -375,8 +375,8 @@ class WanTI2V_Upsample:
         
         # 先处理 cond_latent 的维度（如果有的话）
         if cond_latent is not None:
-            if cond_latent.dim() == 5:  # [B, C, T, H, W]
-                cond_latent = cond_latent.squeeze(0)  # 变成 [C, T, H, W]
+            # if cond_latent.dim() == 5:  # [B, C, T, H, W]
+            #     cond_latent = cond_latent.squeeze(0)  # 变成 [C, T, H, W]
             print(f'cond_latent_shape: {cond_latent.shape}')
         
         # 暂时先生成纯噪声（后面会根据 scheduler 的第一个 sigma 重新初始化）
