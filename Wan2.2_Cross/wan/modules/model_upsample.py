@@ -367,7 +367,7 @@ class WanSpatialControlAdapter(nn.Module):
         t_sinusoidal_emb: [B, freq_dim] <- 这是原始的正弦位置编码
         """
         # A. 提取特征
-        #print(lr_latents.shape)
+        print(lr_latents.shape)
         
         x = self.backbone(lr_latents)  # [B, C, T, H, ]
         x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
