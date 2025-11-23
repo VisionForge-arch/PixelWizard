@@ -103,7 +103,7 @@ class WanTI2V_Upsample:
         logging.info(f"Creating WanModel from {checkpoint_dir}")
         from .modules.model_upsample import register_spatial_control
         self.model = WanModel_Upsample.from_pretrained(checkpoint_dir)
-        
+        self.model, _ = register_spatial_control(self.model)
         
         self.model = self._configure_model(
             model=self.model,
@@ -112,7 +112,7 @@ class WanTI2V_Upsample:
             shard_fn=shard_fn,
             convert_model_dtype=convert_model_dtype)
         
-        self.model, _ = register_spatial_control(self.model)
+        
         
         # ==============load the model from the checkpoint=============
         if wan_ckpt is not None:
