@@ -377,6 +377,8 @@ class WanSpatialControlAdapter(nn.Module):
         # B. 注入 Guidance Timestep (控制强度)
         # 类似于把 guidance 加到 feature 上
         # guidance_t_emb: [B, Dim]
+        print(guidance_t_emb.shape)
+        
         w = self.adapter_time_proj(guidance_t_emb)
         x = x * (1 + w.unsqueeze(1)) # Scale 调制，或者 add 也可以
             
