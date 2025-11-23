@@ -343,7 +343,7 @@ def encode_to_latent(model, pixel: torch.Tensor) -> torch.Tensor:
     output = torch.stack(output, dim=0)
     # from [batch_size, num_channels, num_frames, height, width]
     # to [batch_size, num_frames, num_channels, height, width]
-    output = output.permute(0, 2, 1, 3, 4)
+    # output = output.permute(0, 2, 1, 3, 4)
     return output
 
 
@@ -438,10 +438,10 @@ def generate(args):
     
     dataloader = torch.utils.data.DataLoader(dataset, shuffle=False, collate_fn=lambda x: x[0], num_workers=1)
         
-    
+    # ======== 对齐参数 ==========           
 
     logging.info("Creating WanTI2V pipeline.")
-    wan_ti2v = wan.WanTI2V_SR(
+    wan_ti2v = wan.WanTI2V_Upsample(
         config=cfg,
         checkpoint_dir=args.ckpt_dir,
         device_id=device,
@@ -496,24 +496,23 @@ def generate(args):
             print(video_input.shape)
 
             with torch.no_grad():
-                cond_latent = encode_to_latent(wan_ti2v, video_input)  # [1,T,C,h',w']
-                B, T, C, h, w = cond_latent.shape
+                cond_latent_lr = encode_to_latent(wan_ti2v, video_input)  # [B,C,T,h',w']
+                B, C, T, h, w = cond_latent_lr.shape
                 H = 90
                 W = 160
+                print("cond_latent_lr.shape:", cond_latent_lr.shape)
                 
+                cond_latent_lr = cond_latent_lr.reshape(B*C, T, h, w)  # [B*T, C, h, w]
+                cond_latent_lr = F.interpolate(cond_latent_lr, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
+                cond_latent_lr = cond_latent_lr.reshape(B, C, T, h, w)  # [B*T, C, h, w]
                 #print(cond_latent.shape) # [1, 31, 48, 30, 52]
-                cond_latent = cond_latent.to(device=wan_ti2v.device, dtype=torch.float32)
-                
-                cond_latent = cond_latent.reshape(B*T, C, h, w)  # [B*T, C, h, w]
-                cond_latent = F.interpolate(cond_latent, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
-                cond_latent = cond_latent.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)  # [B, C, T, H, W]
-
-            
+                cond_latent_lr = cond_latent_lr.to(device=wan_ti2v.device, dtype=torch.float32)
+  
             
  
             video = wan_ti2v.generate(
                     current_prompt,
-                    cond_latent=cond_latent,
+                    cond_latent=cond_latent_lr,
                     img=img,
                     size=SIZE_CONFIGS[resolution],
                     max_area=MAX_AREA_CONFIGS[resolution],

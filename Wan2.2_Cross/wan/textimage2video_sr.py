@@ -19,7 +19,7 @@ from tqdm import tqdm
 from .distributed.fsdp import shard_model
 from .distributed.sequence_parallel import sp_attn_forward, sp_dit_forward
 from .distributed.util import get_world_size
-from .modules.model import WanModel
+from .modules.model_upsample import WanModel_Upsample
 from .modules.t5 import T5EncoderModel
 from .modules.vae2_2 import Wan2_2_VAE
 from .utils.fm_solvers import (
@@ -31,7 +31,7 @@ from .utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
 from .utils.utils import best_output_size, masks_like
 
 
-class WanTI2V_SR:
+class WanTI2V_Upsample:
 
     def __init__(
         self,
@@ -101,7 +101,9 @@ class WanTI2V_SR:
             device=self.device)
 
         logging.info(f"Creating WanModel from {checkpoint_dir}")
-        self.model = WanModel.from_pretrained(checkpoint_dir)
+        from .modules.model_upsample import register_spatial_control
+        self.model = WanModel_Upsample.from_pretrained(checkpoint_dir)
+        self.mdoel, _ = register_spatial_control(self.model)
         self.model = self._configure_model(
             model=self.model,
             use_sp=use_sp,
@@ -377,29 +379,7 @@ class WanTI2V_SR:
                     shift=1,
                     use_dynamic_shifting=False)
                 
-                if cond_latent is not None:
-                    # 手动计算 sigmas，从 denoising_strength 对应的值开始
-                    # 而不是从 sigma_max=1.0 开始
-                        # FlowMatchScheduler 的默认值
-                    sigma_max = 1.0
-                    sigma_min = 0.0  # 修正：应该是 0.0，不是接近 1 的值
-                    denoising_strength = 0.048  # 与训练对齐
-                    
-                    # 计算起始 sigma（对应 denoising_strength）
-                    sigma_start = sigma_min + (sigma_max - sigma_min) * denoising_strength
-                    
-                    # 生成从 sigma_start 到 sigma_min 的 sigmas
-                    import numpy as np
-                    sigmas = np.linspace(sigma_start, sigma_min, sampling_steps + 1)[:-1]
-                    print(f'SR mode: Custom sigmas range [{sigma_start:.4f}, {sigma_min:.4f}], '
-                            f'{len(sigmas)} steps (before shift transform)')
-                    
-                    # 调用 set_timesteps，传入自定义的 sigmas
-                    sample_scheduler.set_timesteps(
-                        sampling_steps, device=self.device, sigmas=sigmas, shift=shift)
-                else:
-                    # 标准的 t2v，从纯噪声开始
-                    sample_scheduler.set_timesteps(
+                sample_scheduler.set_timesteps(
                         sampling_steps, device=self.device, shift=shift)
                     
 
@@ -419,29 +399,18 @@ class WanTI2V_SR:
             else:
                 raise NotImplementedError("Unsupported solver.")
 
-            # 重要：根据 scheduler 的第一个 sigma 初始化 latent
-            if cond_latent is not None:
-                # 获取第一个 timestep 对应的 sigma（经过 shift transform 后的）
-                first_sigma = sample_scheduler.sigmas[0].item()
-                
-                print(f'✓ SR Mode Initialization:')
-                print(f'  First timestep: {timesteps[0].item():.1f}')
-                print(f'  First sigma (after shift): {first_sigma:.4f}')
-                
-                # 使用正确的 sigma 初始化 latent
-                # Flow Matching: x_t = (1-sigma) * x0 + sigma * noise
-                latents = [(1 - first_sigma) * cond_latent + first_sigma * pure_noise]
-                
-                print(f'  Initialized latent: mean={latents[0].mean():.4f}, std={latents[0].std():.4f}')
-            else:
-                # 纯 T2V 模式：使用纯噪声
-                latents = [pure_noise]
-                print(f'✓ T2V Mode: pure noise, mean={latents[0].mean():.4f}, std={latents[0].std():.4f}')
+
+            latents = [pure_noise]
+            print(f'✓ T2V Mode: pure noise, mean={latents[0].mean():.4f}, std={latents[0].std():.4f}')
             
             mask1, mask2 = masks_like(latents, zero=False)
+            
+            
+            # ============ LR Context ============
+            #cond_latent = cond_latent.permute(0, 2, 1, 3, 4).contiguous()   # [B, C, T, h, w]
 
-            arg_c = {'context': context, 'seq_len': seq_len}
-            arg_null = {'context': context_null, 'seq_len': seq_len}
+            arg_c = {'context': context, 'seq_len': seq_len, 'lr_context':cond_latent}
+            #arg_null = {'context': context_null, 'seq_len': seq_len, 'lr_context':cond_latent}
 
             if offload_model or self.init_on_cpu:
                 self.model.to(self.device)
@@ -464,11 +433,11 @@ class WanTI2V_SR:
                 timestep = temp_ts.unsqueeze(0)
 
                 noise_pred_cond = self.model(latent_model_input, t=timestep, **arg_c)[0]
-                noise_pred_uncond = self.model(latent_model_input, t=timestep, **arg_null)[0]
+                #noise_pred_uncond = self.model(latent_model_input, t=timestep, **arg_null)[0]
 
-                noise_pred = noise_pred_uncond + guide_scale * (
-                    noise_pred_cond - noise_pred_uncond)
-
+                #noise_pred = noise_pred_uncond + guide_scale * (noise_pred_cond - noise_pred_uncond)
+                noise_pred = noise_pred_cond
+                
                 temp_x0 = sample_scheduler.step(
                     noise_pred.unsqueeze(0),
                     t,
