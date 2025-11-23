@@ -224,31 +224,6 @@ class WanCrossAttention(WanSelfAttention):
 
 
 
-class WanGanCrossAttention(WanSelfAttention):
-
-    def forward(self, x, context, crossattn_cache=None):
-        r"""
-        Args:
-            x(Tensor): Shape [B, L1, C]
-            context(Tensor): Shape [B, L2, C]
-            context_lens(Tensor): Shape [B]
-            crossattn_cache (List[dict], *optional*): Contains the cached key and value tensors for context embedding.
-        """
-        b, n, d = x.size(0), self.num_heads, self.head_dim
-
-        # compute query, key, value
-        qq = self.norm_q(self.q(context)).view(b, 1, -1, d)
-
-        kk = self.norm_k(self.k(x)).view(b, -1, n, d)
-        vv = self.v(x).view(b, -1, n, d)
-
-        # compute attention
-        x = flash_attention(qq, kk, vv)
-
-        # output
-        x = x.flatten(2)
-        x = self.o(x)
-        return x
 
 WAN_CROSSATTENTION_CLASSES = {
     'cross_attn': WanCrossAttention,
@@ -462,6 +437,7 @@ class WanSpatialControlAdapter(nn.Module):
         # B. 注入 Guidance Timestep (控制强度)
         # 类似于把 guidance 加到 feature 上
         # guidance_t_emb: [B, Dim]
+        print(guidance_t_emb.shape)
         w = self.adapter_time_proj(guidance_t_emb)
         x = x * (1 + w.unsqueeze(1)) # Scale 调制，或者 add 也可以
             
@@ -514,8 +490,8 @@ def register_spatial_control(model):
             # 4. [关键] 特征相加 (Feature Injection)
             #print(x.shape)
             x_new = x + control_feat.type_as(x)
-            print(x_new.shape)
-            print("add successfully!!!")
+            # print(x_new.shape)
+            # print("add successfully!!!")
             
             # 5. 重新打包 args
             # Tuple 是不可变的，所以要新建一个
