@@ -104,7 +104,7 @@ class WanTI2V_Upsample:
         from .modules.model_upsample import register_spatial_control
         self.model = WanModel_Upsample.from_pretrained(checkpoint_dir)
         
-        self.model, _ = register_spatial_control(self.model)
+        
         
         # ==============load the model from the checkpoint (在 FSDP 之前加载)=============
         adapter_state_dict = None
@@ -136,11 +136,7 @@ class WanTI2V_Upsample:
             if unexpected_keys:
                 print(f"Unexpected keys (ignored): {len(unexpected_keys)} keys")
         
-            try:
-                self.model.spatial_adapter.load_state_dict(adapter_state_dict)
-                print("Successfully loaded spatial_adapter weights")
-            except Exception as e:
-                print(f"Warning: Failed to load spatial_adapter weights: {e}")
+            
         
         # ==============================================================
        
@@ -153,7 +149,14 @@ class WanTI2V_Upsample:
             shard_fn=shard_fn,
             convert_model_dtype=convert_model_dtype)
         
-
+        
+        self.model, _ = register_spatial_control(self.model)
+        
+        try:
+            self.model.spatial_adapter.load_state_dict(adapter_state_dict)
+            print("Successfully loaded spatial_adapter weights")
+        except Exception as e:
+            print(f"Warning: Failed to load spatial_adapter weights: {e}")
         
         if use_sp:
             self.sp_size = get_world_size()
