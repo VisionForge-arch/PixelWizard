@@ -441,7 +441,7 @@ def generate(args):
     # ======== 对齐参数 ==========           
 
     logging.info("Creating WanTI2V pipeline.")
-    wan_ti2v = wan.WanTI2V_Upsample(
+    wan_ti2v = wan.WanTI2V(
         config=cfg,
         checkpoint_dir=args.ckpt_dir,
         device_id=device,
