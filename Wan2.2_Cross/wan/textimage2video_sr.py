@@ -112,42 +112,41 @@ class WanTI2V_Upsample:
             convert_model_dtype=convert_model_dtype)
         
         # ==============load the model from the checkpoint (在 FSDP 之前加载)=============
-        adapter_state_dict = None
-        if wan_ckpt is not None:
-            print(f"Loading Wan model from {wan_ckpt}")
-            state_dict = torch.load(wan_ckpt, map_location="cpu")
-            generator_state_dict = state_dict['generator']
+        # adapter_state_dict = None
+        # if wan_ckpt is not None:
+        #     print(f"Loading Wan model from {wan_ckpt}")
+        #     state_dict = torch.load(wan_ckpt, map_location="cpu")
+        #     generator_state_dict = state_dict['generator']
             
-            def strip_prefix(d, prefix="model."):
-                new_dict = {}
-                for k, v in d.items():
-                    if k.startswith(prefix):
-                        new_dict[k[len(prefix):]] = v
-                    else:
-                        new_dict[k] = v
-                return new_dict
+        #     def strip_prefix(d, prefix="model."):
+        #         new_dict = {}
+        #         for k, v in d.items():
+        #             if k.startswith(prefix):
+        #                 new_dict[k[len(prefix):]] = v
+        #             else:
+        #                 new_dict[k] = v
+        #         return new_dict
             
-            generator_state_dict = strip_prefix(generator_state_dict)
+        #     generator_state_dict = strip_prefix(generator_state_dict)
             
-            # 分离 adapter 的权重
-            adapter_keys = [k for k in generator_state_dict.keys() if k.startswith('spatial_adapter.')]
-            adapter_state_dict = {k[len('spatial_adapter.'):]: generator_state_dict.pop(k) for k in adapter_keys}
-            print(f"Found {len(adapter_keys)} adapter keys in checkpoint")
+        #     # 分离 adapter 的权重
+        #     adapter_keys = [k for k in generator_state_dict.keys() if k.startswith('spatial_adapter.')]
+        #     adapter_state_dict = {k[len('spatial_adapter.'):]: generator_state_dict.pop(k) for k in adapter_keys}
+        #     print(f"Found {len(adapter_keys)} adapter keys in checkpoint")
         
-            # 加载主模型权重
-            missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict)
-            if missing_keys:
-                print(f"Missing keys (ignored): {len(missing_keys)} keys")
-            if unexpected_keys:
-                print(f"Unexpected keys (ignored): {len(unexpected_keys)} keys")
+        #     # 加载主模型权重
+        #     missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict)
+        #     if missing_keys:
+        #         print(f"Missing keys (ignored): {len(missing_keys)} keys")
+        #     if unexpected_keys:
+        #         print(f"Unexpected keys (ignored): {len(unexpected_keys)} keys")
         
             
         
         # ==============================================================
        
         
-        
-        
+    
         
         
         
@@ -443,7 +442,7 @@ class WanTI2V_Upsample:
 
             #arg_c = {'context': context, 'seq_len': seq_len, 'lr_latents':cond_latent}
             arg_c = {'context': context, 'seq_len': seq_len}
-            #arg_null = {'context': context_null, 'seq_len': seq_len, 'lr_context':cond_latent}
+            arg_null = {'context': context_null, 'seq_len': seq_len}
 
             if offload_model or self.init_on_cpu:
                 self.model.to(self.device)
@@ -463,10 +462,10 @@ class WanTI2V_Upsample:
                 timestep = temp_ts.unsqueeze(0)
 
                 noise_pred_cond = self.model(latent_model_input, t=timestep, **arg_c)[0]
-                #noise_pred_uncond = self.model(latent_model_input, t=timestep, **arg_null)[0]
+                noise_pred_uncond = self.model(latent_model_input, t=timestep, **arg_null)[0]
 
-                #noise_pred = noise_pred_uncond + guide_scale * (noise_pred_cond - noise_pred_uncond)
-                noise_pred = noise_pred_cond
+                noise_pred = noise_pred_uncond + guide_scale * (noise_pred_cond - noise_pred_uncond)
+                #noise_pred = noise_pred_cond
                 
                 temp_x0 = sample_scheduler.step(
                     noise_pred.unsqueeze(0),
