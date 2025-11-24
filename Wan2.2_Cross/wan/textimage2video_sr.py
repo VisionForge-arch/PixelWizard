@@ -104,7 +104,12 @@ class WanTI2V_Upsample:
         from .modules.model_upsample import register_spatial_control
         self.model = WanModel_Upsample.from_pretrained(checkpoint_dir)
         
-        
+        self.model = self._configure_model(
+            model=self.model,
+            use_sp=use_sp,
+            dit_fsdp=dit_fsdp,
+            shard_fn=shard_fn,
+            convert_model_dtype=convert_model_dtype)
         
         # ==============load the model from the checkpoint (在 FSDP 之前加载)=============
         adapter_state_dict = None
@@ -142,12 +147,7 @@ class WanTI2V_Upsample:
        
         
         
-        self.model = self._configure_model(
-            model=self.model,
-            use_sp=use_sp,
-            dit_fsdp=dit_fsdp,
-            shard_fn=shard_fn,
-            convert_model_dtype=convert_model_dtype)
+        
         
         
         
