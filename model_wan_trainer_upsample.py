@@ -154,6 +154,9 @@ class WanModel_Trainer:
             clean_latent = self.model.vae.encode_to_latent(frames).to(device=self.device, dtype=self.dtype)           # [B, T, C, 90, 160]
             clean_latent_lr = self.model.vae.encode_to_latent(frames_480p).to(device=self.device, dtype=self.dtype)   # [B, T, C, 30, 52]
             
+            print(f"clean_latent.shape: {clean_latent.shape}")
+            print(f"clean_latent_lr.shape: {clean_latent_lr.shape}")
+            exit()
             
             B, T, C, H, W   = clean_latent.shape
             _, _, _, h, w   = clean_latent_lr.shape
