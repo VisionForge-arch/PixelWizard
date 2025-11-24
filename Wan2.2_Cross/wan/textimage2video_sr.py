@@ -313,7 +313,7 @@ class WanTI2V_Upsample:
             input_prompt (`str`):
                 Text prompt for content generation
             cond_latent (`torch.Tensor`, *optional*, defaults to None):
-                Conditional latent tensor. Shape: [B, T, C, H, W]
+                Conditional latent tensor. Shape: [B, C, T, H, W]
             size (`tuple[int]`, *optional*, defaults to (1280,704)):
                 Controls video resolution, (width,height).
             frame_num (`int`, *optional*, defaults to 121):
