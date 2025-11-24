@@ -101,8 +101,45 @@ class WanTI2V_Upsample:
             device=self.device)
 
         logging.info(f"Creating WanModel from {checkpoint_dir}")
-        #from .modules.model_upsample import register_spatial_control
+        from .modules.model_upsample import register_spatial_control
         self.model = WanModel_Upsample.from_pretrained(checkpoint_dir)
+        
+        
+        
+        #==============load the model from the checkpoint (在 FSDP 之前加载)=============
+        adapter_state_dict = None
+        if wan_ckpt is not None:
+            print(f"Loading Wan model from {wan_ckpt}")
+            state_dict = torch.load(wan_ckpt, map_location="cpu")
+            generator_state_dict = state_dict['generator']
+            
+            def strip_prefix(d, prefix="model."):
+                new_dict = {}
+                for k, v in d.items():
+                    if k.startswith(prefix):
+                        new_dict[k[len(prefix):]] = v
+                    else:
+                        new_dict[k] = v
+                return new_dict
+            
+            generator_state_dict = strip_prefix(generator_state_dict)
+            
+            # 分离 adapter 的权重
+            adapter_keys = [k for k in generator_state_dict.keys() if k.startswith('spatial_adapter.')]
+            adapter_state_dict = {k[len('spatial_adapter.'):]: generator_state_dict.pop(k) for k in adapter_keys}
+            print(f"Found {len(adapter_keys)} adapter keys in checkpoint")
+        
+            # 加载主模型权重
+            missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict)
+            if missing_keys:
+                print(f"Missing keys (ignored): {len(missing_keys)} keys")
+            if unexpected_keys:
+                print(f"Unexpected keys (ignored): {len(unexpected_keys)} keys")
+        
+            
+        
+        #==============================================================
+
         
         self.model = self._configure_model(
             model=self.model,
@@ -111,54 +148,19 @@ class WanTI2V_Upsample:
             shard_fn=shard_fn,
             convert_model_dtype=convert_model_dtype)
         
-        # ==============load the model from the checkpoint (在 FSDP 之前加载)=============
-        # adapter_state_dict = None
-        # if wan_ckpt is not None:
-        #     print(f"Loading Wan model from {wan_ckpt}")
-        #     state_dict = torch.load(wan_ckpt, map_location="cpu")
-        #     generator_state_dict = state_dict['generator']
-            
-        #     def strip_prefix(d, prefix="model."):
-        #         new_dict = {}
-        #         for k, v in d.items():
-        #             if k.startswith(prefix):
-        #                 new_dict[k[len(prefix):]] = v
-        #             else:
-        #                 new_dict[k] = v
-        #         return new_dict
-            
-        #     generator_state_dict = strip_prefix(generator_state_dict)
-            
-        #     # 分离 adapter 的权重
-        #     adapter_keys = [k for k in generator_state_dict.keys() if k.startswith('spatial_adapter.')]
-        #     adapter_state_dict = {k[len('spatial_adapter.'):]: generator_state_dict.pop(k) for k in adapter_keys}
-        #     print(f"Found {len(adapter_keys)} adapter keys in checkpoint")
-        
-        #     # 加载主模型权重
-        #     missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict)
-        #     if missing_keys:
-        #         print(f"Missing keys (ignored): {len(missing_keys)} keys")
-        #     if unexpected_keys:
-        #         print(f"Unexpected keys (ignored): {len(unexpected_keys)} keys")
-        
-            
-        
-        # ==============================================================
-       
-        
     
         
         
         
-        # ============
-        # self.model, _ = register_spatial_control(self.model)
+        #============
+        self.model, _ = register_spatial_control(self.model)
         
-        # try:
-        #     self.model.spatial_adapter.load_state_dict(adapter_state_dict)
-        #     print("Successfully loaded spatial_adapter weights")
-        # except Exception as e:
-        #     print(f"Warning: Failed to load spatial_adapter weights: {e}")
-         # ============
+        try:
+            self.model.spatial_adapter.load_state_dict(adapter_state_dict)
+            print("Successfully loaded spatial_adapter weights")
+        except Exception as e:
+            print(f"Warning: Failed to load spatial_adapter weights: {e}")
+        # ============
          
          
         if use_sp:
@@ -440,9 +442,9 @@ class WanTI2V_Upsample:
             # ============ LR Context ============
             #cond_latent = cond_latent.permute(0, 2, 1, 3, 4).contiguous()   # [B, C, T, h, w]
 
-            #arg_c = {'context': context, 'seq_len': seq_len, 'lr_latents':cond_latent}
-            arg_c = {'context': context, 'seq_len': seq_len}
-            arg_null = {'context': context_null, 'seq_len': seq_len}
+            arg_c = {'context': context, 'seq_len': seq_len, 'lr_latents':cond_latent}
+            #arg_c = {'context': context, 'seq_len': seq_len}
+            #arg_null = {'context': context_null, 'seq_len': seq_len}
 
             if offload_model or self.init_on_cpu:
                 self.model.to(self.device)

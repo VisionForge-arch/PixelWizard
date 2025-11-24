@@ -441,7 +441,7 @@ def generate(args):
     # ======== 对齐参数 ==========           
 
     logging.info("Creating WanTI2V pipeline.")
-    wan_ti2v = wan.WanTI2V(
+    wan_ti2v = wan.WanTI2V_Upsample(
         config=cfg,
         checkpoint_dir=args.ckpt_dir,
         device_id=device,
@@ -511,7 +511,7 @@ def generate(args):
  
             video = wan_ti2v.generate(
                     current_prompt,
-                    #cond_latent=cond_latent_lr,
+                    cond_latent=cond_latent_lr,
                     img=img,
                     size=SIZE_CONFIGS[resolution],
                     max_area=MAX_AREA_CONFIGS[resolution],
