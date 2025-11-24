@@ -357,6 +357,7 @@ class MLPProj(torch.nn.Module):
         clip_extra_context_tokens = self.proj(image_embeds)
         return clip_extra_context_tokens
 
+
 class RegisterTokens(nn.Module):
     def __init__(self, num_registers: int, dim: int):
         super().__init__()
@@ -403,9 +404,9 @@ class WanSpatialControlAdapter(nn.Module):
 
         # 3. Guidance Timestep Embedding (控制强度的开关)
         self.adapter_time_proj = nn.Sequential(
-            nn.Linear(freq_dim, model_dim),
+            nn.Linear(freq_dim, model_dim * 2),
             nn.SiLU(),
-            nn.Linear(model_dim, model_dim),
+            nn.Linear(model_dim * 2, model_dim * 2),
         )
         
         # 4. [核心] Per-Block Zero Layers
@@ -432,14 +433,17 @@ class WanSpatialControlAdapter(nn.Module):
         x = self.backbone(lr_latents)  # [B, C, T, H, ]
         x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
         
+        w = self.adapter_time_proj(guidance_t_emb)           # [B, 2*D]
+        scale, shift = w.chunk(2, dim=-1)                    # [B, D], [B, D]
+
+        
         x = self.feature_norm(x)
         
         # B. 注入 Guidance Timestep (控制强度)
         # 类似于把 guidance 加到 feature 上
         # guidance_t_emb: [B, Dim]
         #print(guidance_t_emb.shape)
-        w = self.adapter_time_proj(guidance_t_emb)
-        x = x * (1 + w.unsqueeze(1)) # Scale 调制，或者 add 也可以
+        x = x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1) # Scale 调制，或者 add 也可以
             
         # C. 生成每一层的控制特征
         # 5. Generate Per-Layer Controls
