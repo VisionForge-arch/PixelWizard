@@ -210,7 +210,7 @@ def _parse_args():
         choices=['unipc', 'dpm++'],
         help="The solver used to sample.")
     parser.add_argument(
-        "--sample_steps", type=int, default=20, help="The sampling steps.")
+        "--sample_steps", type=int, default=10, help="The sampling steps.")
     parser.add_argument(
         "--sample_shift",
         type=float,
