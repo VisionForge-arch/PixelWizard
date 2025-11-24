@@ -384,7 +384,7 @@ class WanTI2V_Upsample:
             print(f'cond_latent_shape: {cond_latent.shape}')
         
         # 暂时先生成纯噪声（后面会根据 scheduler 的第一个 sigma 重新初始化）
-        pure_noise = torch.randn(
+        noise = [torch.randn(
             target_shape[0],
             target_shape[1],
             target_shape[2],
@@ -392,8 +392,7 @@ class WanTI2V_Upsample:
             dtype=torch.float32,
             device=self.device,
             generator=seed_g)
-        
-        print(f'pure_noise_shape: {pure_noise.shape}')
+        ]
         
 
         @contextmanager
@@ -414,11 +413,8 @@ class WanTI2V_Upsample:
                     num_train_timesteps=self.num_train_timesteps,
                     shift=1,
                     use_dynamic_shifting=False)
-                
                 sample_scheduler.set_timesteps(
                         sampling_steps, device=self.device, shift=shift)
-                    
-
                 timesteps = sample_scheduler.timesteps
                 print(f'Timesteps: {len(timesteps)} steps, range [{timesteps[0]:.1f}, {timesteps[-1]:.1f}]')
                 
@@ -436,7 +432,7 @@ class WanTI2V_Upsample:
                 raise NotImplementedError("Unsupported solver.")
 
 
-            latents = [pure_noise]
+            latents = noise
             print(f'✓ T2V Mode: pure noise, mean={latents[0].mean():.4f}, std={latents[0].std():.4f}')
             
             mask1, mask2 = masks_like(latents, zero=False)
@@ -445,7 +441,8 @@ class WanTI2V_Upsample:
             # ============ LR Context ============
             #cond_latent = cond_latent.permute(0, 2, 1, 3, 4).contiguous()   # [B, C, T, h, w]
 
-            arg_c = {'context': context, 'seq_len': seq_len, 'lr_latents':cond_latent}
+            #arg_c = {'context': context, 'seq_len': seq_len, 'lr_latents':cond_latent}
+            arg_c = {'context': context, 'seq_len': seq_len}
             #arg_null = {'context': context_null, 'seq_len': seq_len, 'lr_context':cond_latent}
 
             if offload_model or self.init_on_cpu:
