@@ -242,6 +242,7 @@ class WanAttentionBlock(nn.Module):
         freqs,
         context,
         context_lens,
+        lr_context=None,
     ):
         r"""
         Args:
@@ -264,15 +265,23 @@ class WanAttentionBlock(nn.Module):
             x = x + y * e[2].squeeze(2)
 
         # cross-attention & ffn function
-        def cross_attn_ffn(x, context, context_lens, e):
-            x = x + self.cross_attn(self.norm3(x), context, context_lens)
+        def cross_attn_ffn(x, context, context_lens, e, lr_context=None):
+            attn_mod = self.cross_attn
+            if hasattr(attn_mod, "module"):
+                attn_mod = attn_mod.module
+            
+            attn_out = self.cross_attn(self.norm3(x), context, context_lens, lr_context=lr_context)
+            
+            x = x + attn_out
+                       
             y = self.ffn(
                 self.norm2(x).float() * (1 + e[4].squeeze(2)) + e[3].squeeze(2))
+            
             with torch.amp.autocast('cuda', dtype=torch.float32):
                 x = x + y * e[5].squeeze(2)
             return x
 
-        x = cross_attn_ffn(x, context, context_lens, e)
+        x = cross_attn_ffn(x, context, context_lens, e, lr_context=lr_context)
         return x
 
 
@@ -306,6 +315,143 @@ class Head(nn.Module):
                 self.head(
                     self.norm(x) * (1 + e[1].squeeze(2)) + e[0].squeeze(2)))
         return x
+
+
+class WanLRAttnProcessor(torch.nn.Module):
+    def __init__(
+        self,
+        base_attn: WanCrossAttention,
+        cross_attention_dim: int,
+        dim: int, 
+        n_registers: int,
+        bias: bool = False,
+        lr_scale: float = 1.0,
+        init_method: str = 'zero',
+    ):
+        super().__init__()
+        
+        # 保留原始 cross-attn
+        self.base_attn = base_attn
+        self.dim = dim
+        self.num_heads = base_attn.num_heads
+        self.head_dim = dim // self.num_heads
+        self.lr_scale = lr_scale
+        
+        # LR 分支的 k/v 投影（与原 to_k/to_v 解耦）
+        self.to_k_lr = nn.Linear(cross_attention_dim, dim, bias=bias)
+        self.to_v_lr = nn.Linear(cross_attention_dim, dim, bias=bias)
+        
+        # 与 base_attn 保持相同的 q/k 归一化策略
+        self.norm_q = self.base_attn.norm_q
+        self.norm_k = self.base_attn.norm_k
+        
+        if n_registers > 0:
+            self.register_tokens = nn.Parameter(torch.randn(1, n_registers, dim) * 0.02)
+        else:
+            self.register_tokens = None
+            
+        if init_method == 'zero':
+            torch.nn.init.zeros_(self.to_k_lr.weight)
+            torch.nn.init.zeros_(self.to_k_lr.bias)
+            torch.nn.init.zeros_(self.to_v_lr.weight)
+            torch.nn.init.zeros_(self.to_v_lr.bias)
+
+    
+    
+    def forward(
+        self, 
+        x,
+        context, 
+        context_lens=None,
+        lr_context=None,
+        lr_context_lens=None,
+    ):
+        
+        B, Lq, C = x.shape
+        n = self.num_heads
+        d = self.head_dim
+        
+        q = self.base_attn.q(x)  # [B, Lq, C]
+        q = self.norm_q(q).view(B, Lq, n, d)
+        
+        k = self.norm_k(self.base_attn.k(context)).view(B, -1, n, d)
+        v = self.base_attn.v(context).view(B, -1, n, d)
+        
+        # 3) base 注意力输出（未 out）
+        base_out = flash_attention(q, k, v, k_lens=context_lens)  # [B,Lq,n,d]
+        
+        if lr_context is None:
+            raise ValueError(
+                "WanLRAttnProcessor expects `lr_context` but received None. "
+                "Ensure the caller supplies low-resolution context tokens."
+            )
+
+        # 拼接 register tokens 到 lr_context 前面
+        if self.register_tokens is not None:
+            reg = self.register_tokens.expand(B, -1, -1)        # [B, n_reg, C_lr]
+            lr_context = torch.cat([reg, lr_context], dim=1)
+            if lr_context_lens is not None:
+                lr_context_lens = lr_context_lens + reg.shape[1]
+                if lr_context_lens is not None:
+                    lr_context_lens = lr_context_lens + reg.shape[1]
+        
+        # 2) LR 分支处理
+        lr_k = self.to_k_lr(lr_context)
+        lr_v = self.to_v_lr(lr_context)
+        
+        if isinstance(self.norm_k, nn.Module):
+            lr_k = self.norm_k(lr_k)
+            
+        lr_k = lr_k.view(B, -1, n, d)
+        lr_v = lr_v.view(B, -1, n, d)
+        
+        # 3) 混合输出
+        lr_out = flash_attention(q, lr_k, lr_v, k_lens=lr_context_lens)
+        
+        out = base_out + lr_out * self.lr_scale
+        
+        out = out.flatten(2)
+        out = self.base_attn.o(out)
+        
+        return out        
+    
+        
+
+
+def register_lr_adapter(
+    transformer, 
+    cross_attention_dim=None,
+    n_registers=0,
+    init_method='zero',
+    lr_scale=1.0,
+):
+    transformer_sd = transformer.state_dict()
+    #print("transformer_sd.keys(): ", transformer_sd.keys())
+    
+    for layer_idx, block in enumerate(transformer.blocks):
+        name = f"blocks.{layer_idx}.cross_attn"
+        dim = transformer_sd[name + '.k.weight'].shape[1]   # 3072
+        
+        base_attn = block.cross_attn
+        
+        #print("base_attn: ", base_attn)
+        
+        wrapper = WanLRAttnProcessor(
+            base_attn=base_attn,
+            cross_attention_dim=dim,
+            dim=dim,
+            n_registers=n_registers,
+            bias=True,
+            init_method=init_method,
+            lr_scale=lr_scale,
+        )
+        block.cross_attn = wrapper
+        #exit()
+    lr_layers = nn.ModuleList([block.cross_attn for block in transformer.blocks])
+    return transformer, lr_layers
+
+
+
 
 
 class WanModel(ModelMixin, ConfigMixin):
@@ -443,6 +589,7 @@ class WanModel(ModelMixin, ConfigMixin):
         t,
         context,
         seq_len,
+        lr_context,
         y=None,
     ):
         r"""
@@ -515,7 +662,9 @@ class WanModel(ModelMixin, ConfigMixin):
             grid_sizes=grid_sizes,
             freqs=self.freqs,
             context=context,
-            context_lens=context_lens)
+            context_lens=context_lens,
+            lr_context=lr_context,
+        )
 
         for block in self.blocks:
             x = block(x, **kwargs)
@@ -575,55 +724,3 @@ class WanModel(ModelMixin, ConfigMixin):
 
         # init output layer
         nn.init.zeros_(self.head.head.weight)
-
-
-    def reinit_patch_embedding(self, new_in_dim: int, new_param_init: str = "copy"):
-        """重新构造 `patch_embedding` 以适配更大的输入通道数。
-
-        Args:
-            new_in_dim (int): 新的输入通道数（如 96）。
-            new_param_init (str): 对新增通道权重的初始化方式，支持 "copy" | "zero"。
-        """
-        old_in_dim = self.config.in_dim  # 旧的输入通道数（如 48）
-        if new_in_dim <= old_in_dim:
-            raise ValueError(
-                f"new_in_dim({new_in_dim}) 必须大于旧的 in_dim({old_in_dim})")
-
-        # 保存旧卷积权重与 bias
-        old_weight = self.patch_embedding.weight.detach().clone()
-        old_bias = self.patch_embedding.bias.detach().clone()
-
-        # 构造新的卷积层，并保持 device / dtype 与旧权重一致
-        new_conv = torch.nn.Conv3d(
-            new_in_dim,
-            old_weight.shape[0],
-            kernel_size=self.patch_size,  # 与 __init__ 保持一致
-            stride=self.patch_size,
-            bias=True,
-        ).to(old_weight.device, dtype=old_weight.dtype)
-
-        with torch.no_grad():
-            # 复制旧通道权重
-            new_conv.weight[:, :old_in_dim] = old_weight
-
-            # 处理新增通道
-            extra_c = new_in_dim - old_in_dim
-            if new_param_init == "zero":
-                new_conv.weight[:, old_in_dim:] = 0.0
-            elif new_param_init == "copy":
-                # 复制模式要求新通道数必须是旧通道数的整数倍
-                if extra_c % old_in_dim != 0:
-                    raise ValueError(
-                        f"In 'copy' mode, (new_in_dim({new_in_dim}) - old_in_dim({old_in_dim})) must be divisible by old_in_dim({old_in_dim})")
-                # 将旧权重循环填充到新增通道
-                repeat_times = extra_c // old_in_dim
-                repeated = old_weight.repeat(1, repeat_times, 1, 1, 1)
-                new_conv.weight[:, old_in_dim:] = repeated
-            else:
-                raise ValueError(f"Invalid new_param_init: {new_param_init}")
-            new_conv.bias = torch.nn.Parameter(old_bias)
-
-        # 替换并同步配置
-        self.patch_embedding = new_conv
-        self.config.in_dim = new_in_dim
-        self.in_dim = new_in_dim
