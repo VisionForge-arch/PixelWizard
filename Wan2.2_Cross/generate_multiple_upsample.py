@@ -307,8 +307,8 @@ def _parse_args():
     parser.add_argument(
         "--wan_ckpt",
         type=str,
-        #default=None,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up/checkpoint_model_001600/model.pt",
+        default=None,
+        #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up/checkpoint_model_001600/model.pt",
         help="The path to the Wan checkpoint.")
     args = parser.parse_args()
     _validate_args(args)
