@@ -462,10 +462,10 @@ class WanTI2V_Upsample:
                 timestep = temp_ts.unsqueeze(0)
 
                 noise_pred_cond = self.model(latent_model_input, t=timestep, **arg_c)[0]
-                noise_pred_uncond = self.model(latent_model_input, t=timestep, **arg_null)[0]
+                #noise_pred_uncond = self.model(latent_model_input, t=timestep, **arg_null)[0]
 
-                noise_pred = noise_pred_uncond + guide_scale * (noise_pred_cond - noise_pred_uncond)
-                #noise_pred = noise_pred_cond
+                #noise_pred = noise_pred_uncond + guide_scale * (noise_pred_cond - noise_pred_uncond)
+                noise_pred = noise_pred_cond
                 
                 temp_x0 = sample_scheduler.step(
                     noise_pred.unsqueeze(0),
@@ -487,7 +487,7 @@ class WanTI2V_Upsample:
             # if self.rank == 0:
             #     videos = self.vae.decode(x0)
 
-        del pure_noise, latents
+        del noise, latents
         del sample_scheduler
         if offload_model:
             gc.collect()
