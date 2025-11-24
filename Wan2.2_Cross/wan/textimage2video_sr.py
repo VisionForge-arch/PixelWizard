@@ -150,14 +150,18 @@ class WanTI2V_Upsample:
             convert_model_dtype=convert_model_dtype)
         
         
-        self.model, _ = register_spatial_control(self.model)
         
-        try:
-            self.model.spatial_adapter.load_state_dict(adapter_state_dict)
-            print("Successfully loaded spatial_adapter weights")
-        except Exception as e:
-            print(f"Warning: Failed to load spatial_adapter weights: {e}")
+        # ============
+        # self.model, _ = register_spatial_control(self.model)
         
+        # try:
+        #     self.model.spatial_adapter.load_state_dict(adapter_state_dict)
+        #     print("Successfully loaded spatial_adapter weights")
+        # except Exception as e:
+        #     print(f"Warning: Failed to load spatial_adapter weights: {e}")
+         # ============
+         
+         
         if use_sp:
             self.sp_size = get_world_size()
         else:
