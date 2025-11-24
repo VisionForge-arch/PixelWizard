@@ -101,7 +101,7 @@ class WanTI2V_Upsample:
             device=self.device)
 
         logging.info(f"Creating WanModel from {checkpoint_dir}")
-        from .modules.model_upsample import register_spatial_control
+        #from .modules.model_upsample import register_spatial_control
         self.model = WanModel_Upsample.from_pretrained(checkpoint_dir)
         
         self.model = self._configure_model(

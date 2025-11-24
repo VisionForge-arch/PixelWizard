@@ -241,7 +241,6 @@ class WanAttentionBlock(nn.Module):
         freqs,
         context,
         context_lens,
-        lr_latents=None,
     ):
         r"""
         Args:
@@ -446,7 +445,6 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
         t,
         context,
         seq_len,
-        lr_latents=None,
         y=None,
     ):
         r"""
