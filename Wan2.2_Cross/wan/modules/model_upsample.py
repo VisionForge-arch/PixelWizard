@@ -218,8 +218,7 @@ class WanAttentionBlock(nn.Module):
 
         # layers
         self.norm1 = WanLayerNorm(dim, eps)
-        self.self_attn = WanSelfAttention(dim, num_heads, window_size, qk_norm,
-                                          eps)
+        self.self_attn = WanSelfAttention(dim, num_heads, window_size, qk_norm, eps)
         self.norm3 = WanLayerNorm(
             dim, eps,
             elementwise_affine=True) if cross_attn_norm else nn.Identity()
@@ -664,7 +663,7 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
         t,
         context,
         seq_len,
-        lr_latents,
+        lr_latents=None,
         y=None,
     ):
         r"""
@@ -738,7 +737,7 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
             freqs=self.freqs,
             context=context,
             context_lens=context_lens,
-            lr_latents=lr_latents,
+            #lr_latents=lr_latents,
         )
 
         for block in self.blocks:

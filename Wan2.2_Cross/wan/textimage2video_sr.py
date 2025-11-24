@@ -448,9 +448,6 @@ class WanTI2V_Upsample:
             if offload_model or self.init_on_cpu:
                 self.model.to(self.device)
                 torch.cuda.empty_cache()
-
-            print(f'\n🚀 Starting sampling loop with {len(timesteps)} steps')
-            print(f'   CFG scale: {guide_scale}, Shift: {shift}')
             
             for i, t in enumerate(tqdm(timesteps)):
                 latent_model_input = latents
