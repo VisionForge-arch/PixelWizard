@@ -162,7 +162,7 @@ class SelfForcingWan(nn.Module):
         #     clean_x=clean_latent_aug if self.teacher_forcing else None,
         #     aug_t=timestep_clean_aug if self.teacher_forcing else None
         # )
-        flow_pred, x0_pred = self.generator(
+        flow_pred = self.generator(
             noisy_image_or_video=noisy_latents,
             conditional_dict=conditional_dict,
             timestep=timestep,
@@ -182,7 +182,7 @@ class SelfForcingWan(nn.Module):
 
         log_dict = {
             "x0": clean_latent.detach(),
-            "x0_pred": x0_pred.detach()
+            #"x0_pred": x0_pred.detach()
         }
         return loss, log_dict
     
