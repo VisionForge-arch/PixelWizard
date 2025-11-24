@@ -264,7 +264,7 @@ class WanAttentionBlock(nn.Module):
 
         # cross-attention & ffn function
         def cross_attn_ffn(x, context, context_lens, e):
-            x = self.cross_attn(self.norm3(x), context, context_lens)
+            x =x + self.cross_attn(self.norm3(x), context, context_lens)
                        
             y = self.ffn(
                 self.norm2(x).float() * (1 + e[4].squeeze(2)) + e[3].squeeze(2))
