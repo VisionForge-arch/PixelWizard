@@ -8,7 +8,7 @@ from diffusers.models.modeling_utils import ModelMixin
 
 from .attention import flash_attention
 
-__all__ = ['WanModel']
+__all__ = ['WanModel_Cross']
 
 
 def sinusoidal_embedding_1d(dim, position):
