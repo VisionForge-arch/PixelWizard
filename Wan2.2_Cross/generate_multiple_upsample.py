@@ -501,10 +501,10 @@ def generate(args):
                 H = 90
                 W = 160
                 print("cond_latent_lr.shape:", cond_latent_lr.shape)
-                
+                cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)  
                 cond_latent_lr = cond_latent_lr.reshape(B*C, T, h, w)  # [B*C, T, h, w]
                 cond_latent_lr = F.interpolate(cond_latent_lr, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
-                cond_latent_lr = cond_latent_lr.reshape(B, C, T, H, W)  # [B*C, T, h, w]
+                cond_latent_lr = cond_latent_lr.reshape(B, C, T, H, W).permute(0, 2, 1, 3, 4)  # [B*C, T, h, w]
                 #print(cond_latent.shape) # [1, 31, 48, 30, 52]
                 cond_latent_lr = cond_latent_lr.to(device=wan_ti2v.device, dtype=torch.float32)
   
