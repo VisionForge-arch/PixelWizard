@@ -491,6 +491,16 @@ def register_spatial_control(model):
             
             x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
 
+            L_x = x.shape[1]
+            L_c = control_feat.shape[1]
+             # 对齐长度：pad 或截断到和 x 一样长
+            if L_c < L_x:
+                pad = control_feat.new_zeros(control_feat.shape[0], L_x - L_c, control_feat.shape[2])
+                control_feat = torch.cat([control_feat, pad], dim=1)
+            elif L_c > L_x:
+                control_feat = control_feat[:, :L_x, :]
+            
+            
             # 4. [关键] 特征相加 (Feature Injection)
             #print(x.shape)
             x_new = x + control_feat.type_as(x)
