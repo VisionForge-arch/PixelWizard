@@ -160,7 +160,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/480p_5s",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/tempt_test",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
@@ -303,8 +303,8 @@ def _parse_args():
     parser.add_argument(
         "--wan_ckpt",
         type=str,
-        default=None,
-        #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_cross/checkpoint_model_002200/model.pt",
+        #default=None,
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_yarn/checkpoint_model_000050/model.pt",
         help="The path to the Wan checkpoint.")
     args = parser.parse_args()
     _validate_args(args)
@@ -364,7 +364,7 @@ def generate(args):
     
     # 定义要使用的分辨率
     #resolutions = ['1920*1056', '2560*1440', '3840*2144'，'1280*704']
-    resolutions = ['832*480']
+    resolutions = ['2560*1440']
     
     # 创建保存文件夹
     output_dir = args.save_file 
@@ -460,7 +460,7 @@ def generate(args):
                 logging.info(f"Saving latent to {args.save_file}")
                 torch.save({
                     'latent': video,
-                    'prompt':current_prompt,
+                    'prompt': args.prompt,
                     'seed': args.base_seed,
                     'size': resolution,
                     'frame_num': args.frame_num,
