@@ -298,7 +298,7 @@ def _parse_args():
     parser.add_argument(
         "--prompt_file",
         type=str,
-        default="/root/ultrawan/Wan2.2/prompt.txt",
+        default="/root/ultrawan/Wan2.2/prompt2.txt",
         help="The file to read the prompts from.")
     parser.add_argument(
         "--wan_ckpt",
