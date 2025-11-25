@@ -162,7 +162,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/i2v/1440p_train",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/i2v/1440p",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
@@ -300,13 +300,13 @@ def _parse_args():
     parser.add_argument(
         "--prompt_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/I2V/i2v_test_samples.json",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/I2V/i2v_vbench.json",
         help="The file to read the prompts from.")
     parser.add_argument(
         "--wan_ckpt",
         type=str,
-        #default=None,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_i2v/checkpoint_model_000100/model.pt",
+        default=None,
+        #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_i2v/checkpoint_model_000100/model.pt",
         help="The path to the Wan checkpoint.")
     args = parser.parse_args()
     _validate_args(args)
@@ -366,7 +366,7 @@ def generate(args):
     
     # 定义要使用的分辨率
     #resolutions = ['1920*1056', '2560*1440', '3840*2144'，'1280*704']
-    resolutions = ['2560*1440']
+    resolutions = [args.size]
     
     # 创建保存文件夹
     output_dir = args.save_file 
