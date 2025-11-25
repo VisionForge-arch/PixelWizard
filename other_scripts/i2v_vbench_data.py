@@ -9,8 +9,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Convert a folder of prompt-named images to caption/frame JSON."
     )
-    parser.add_argument("image_dir", default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Dataset", help="Folder that holds the images")
-    parser.add_argument("output_json", default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/I2V/i2v_vbench.json", help="Path to write the JSON list")
+    parser.add_argument("image_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Dataset", help="Folder that holds the images")
+    parser.add_argument("output_json", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/I2V/i2v_vbench.json", help="Path to write the JSON list")
     parser.add_argument(
         "--frame-prefix",
         help="Optional override for frame_path (will append the filename to this prefix)",
