@@ -118,7 +118,7 @@ def _parse_args():
     parser.add_argument(
         "--size",
         type=str,
-        default="1920*1080",
+        default="",
         choices=list(SIZE_CONFIGS.keys()),
         help="The area (width*height) of the generated video. For the I2V task, the aspect ratio of the output video will follow that of the input image."
     )
@@ -300,7 +300,7 @@ def _parse_args():
     parser.add_argument(
         "--prompt_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/I2V/i2v_test_samples.json",
+        #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/I2V/i2v_test_samples.json",
         help="The file to read the prompts from.")
     parser.add_argument(
         "--wan_ckpt",
