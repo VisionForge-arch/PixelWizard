@@ -116,7 +116,7 @@ def _parse_args():
     parser.add_argument(
         "--size",
         type=str,
-        default="2560*1440",
+        default="832*480",
         choices=list(SIZE_CONFIGS.keys()),
         help="The area (width*height) of the generated video. For the I2V task, the aspect ratio of the output video will follow that of the input image."
     )
@@ -298,7 +298,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/14b_infer/1440p",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/14b_infer/480p",
         help="The file to save the generated video to.")
     args = parser.parse_args()
     _validate_args(args)
@@ -386,7 +386,7 @@ def generate(args):
         convert_model_dtype=args.convert_model_dtype,
     )
     
-    resolutions = ['2560*1440']
+    resolutions = [args.size]
     # 创建保存文件夹
     output_dir = args.save_file 
     os.makedirs(output_dir, exist_ok=True)
