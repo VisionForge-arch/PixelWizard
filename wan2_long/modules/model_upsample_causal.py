@@ -666,7 +666,7 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
 
 if __name__ == "__main__":
     # Debug helper, keep for quick manual testing.
-    from .model_upsample import register_spatial_control
+    from model_upsample import register_spatial_control
 
     model = WanModel_Upsample.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
     model, lr_layers = register_spatial_control(model)
