@@ -7,7 +7,7 @@ from omegaconf import OmegaConf
 
 import wandb
 #from model_wan_trainer import WanModel_Trainer
-from model_wan_trainer_upsample import WanModel_Trainer
+from model_wan_trainer_upsample_causal import WanModel_Trainer
     
     
 

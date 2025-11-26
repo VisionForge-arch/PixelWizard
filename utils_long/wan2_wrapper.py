@@ -129,7 +129,6 @@ class WanDiffusionWrapper(torch.nn.Module):
             self,
             model_name="Wan2.1-T2V-1.3B",
             timestep_shift=8.0,
-            is_causal=False,
             local_attn_size=-1,
             sink_size=0,
             seq_len=35*52*21,
@@ -151,6 +150,7 @@ class WanDiffusionWrapper(torch.nn.Module):
             self.model = WanModel_Upsample.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
             self.model, _ = register_spatial_control(self.model)
         elif causal is True:
+            print("=======causal model Init")
             from wan2_long.modules.model_upsample import register_spatial_control
             self.model = WanModel_Upsample_Causal.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
             self.model, _ = register_spatial_control(self.model)
@@ -161,7 +161,7 @@ class WanDiffusionWrapper(torch.nn.Module):
         
 
         # For non-causal diffusion, all frames share the same timestep
-        self.uniform_timestep = not is_causal
+        self.uniform_timestep = not causal
 
         self.scheduler = FlowMatchScheduler(shift=timestep_shift, sigma_min=0.0, extra_one_step=True)
         
