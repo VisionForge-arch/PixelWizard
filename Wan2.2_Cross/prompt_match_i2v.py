@@ -39,6 +39,7 @@ for f in files:
         frags.append(frag)
 
 mapping = []
+unmatched = 0
 for entry in prompts:
     p = entry["caption"]
     np = normalize(p)
@@ -49,15 +50,21 @@ for entry in prompts:
         cand = difflib.get_close_matches(np, frags, n=1, cutoff=0.75)
         if cand:
             exact = next(fn for fn, frag in file_frag_by_name.items() if frag == cand[0])
+    if exact is None:
+        unmatched += 1
+        continue
+
     mapping.append({
         "prompt": p,
         "normalized": np,
         "frame_path": entry["frame_path"],
-        "file": os.path.join(video_dir, exact) if exact else None
+        "file": os.path.join(video_dir, exact)
     })
 
 out_json = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/480p_i2v_matched.json"
 with open(out_json, "w", encoding="utf-8") as f:
     json.dump(mapping, f, indent=2, ensure_ascii=False)
 
-print(f"✅ 完成 {len(mapping)} 条匹配，结果已写入 {out_json}")
+print(
+    f"✅ 完成 {len(mapping)} 条匹配，跳过 {unmatched} 条未匹配，结果已写入 {out_json}"
+)
