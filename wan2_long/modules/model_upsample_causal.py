@@ -19,19 +19,13 @@ from model import (
     sinusoidal_embedding_1d,
 )
 from model_upsample import register_spatial_control
-__all__ = ["WanModel_Upsample"]
+__all__ = ["WanModel_Upsample_Causal"]
 
 
 # wan 1.3B model has a weird channel / head configurations and require max-autotune to work with flexattention
 # see https://github.com/pytorch/pytorch/issues/133254
 # change to default for other models
 flex_attention = torch.compile(flex_attention, dynamic=False, mode="max-autotune")
-
-
-
-
-
-
 
 
 
@@ -274,7 +268,7 @@ class CausalHead(nn.Module):
         return x
 
 
-class WanModel_Upsample(ModelMixin, ConfigMixin):
+class WanModel_Upsample_Causal(ModelMixin, ConfigMixin):
     r"""
     Wan diffusion backbone supporting both text-to-video and image-to-video.
     """
@@ -397,7 +391,7 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
 
         self.block_mask = None
 
-        self.num_frame_per_block = 1
+        self.num_frame_per_block = 3
 
     def _set_gradient_checkpointing(self, module, value=False):
         self.gradient_checkpointing = value
@@ -674,7 +668,7 @@ if __name__ == "__main__":
     # Debug helper, keep for quick manual testing.
     from model_upsample import register_spatial_control
 
-    model = WanModel_Upsample.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
+    model = WanModel_Upsample_Causal.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
     model, lr_layers = register_spatial_control(model)
 
     model.eval()
