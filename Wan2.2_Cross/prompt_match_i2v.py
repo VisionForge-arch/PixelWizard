@@ -5,7 +5,7 @@ import json
 
 # === 配置路径 ===
 i2v_json  = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/I2V/i2v_vbench.json"  # JSON 中包含 caption/frame
-video_dir = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/i2v/480p/decode_video"        # 存放 .mp4 或 .pt 文件的目录
+video_dir = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/i2v/720p/decode_video"        # 存放 .mp4 或 .pt 文件的目录
 
 
 pat = re.compile(r"^ti2v-5B_832\*480_8_(?:\+?prompt_)?(?P<frag>.+?)_\d{8}_\d{6}\.(?:pt|mp4)$")
@@ -61,7 +61,7 @@ for entry in prompts:
         "file": os.path.join(video_dir, exact)
     })
 
-out_json = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/480p_i2v_matched.json"
+out_json = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/720p_i2v_matched.json"
 with open(out_json, "w", encoding="utf-8") as f:
     json.dump(mapping, f, indent=2, ensure_ascii=False)
 
