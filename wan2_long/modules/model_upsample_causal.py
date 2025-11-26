@@ -7,8 +7,8 @@ from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.models.modeling_utils import ModelMixin
 from torch.nn.attention.flex_attention import BlockMask, create_block_mask, flex_attention
 
-from attention import attention
-from model import (
+from .attention import attention
+from .model import (
     MLPProj,
     WAN_CROSSATTENTION_CLASSES,
     WanLayerNorm,
@@ -18,7 +18,7 @@ from model import (
     rope_params,
     sinusoidal_embedding_1d,
 )
-from model_upsample import register_spatial_control
+from .model_upsample import register_spatial_control
 __all__ = ["WanModel_Upsample_Causal"]
 
 
