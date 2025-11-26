@@ -7,7 +7,10 @@ import torch.nn.functional as F
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.models.modeling_utils import ModelMixin
 
-from .attention import flash_attention
+try:
+    from .attention import flash_attention
+except:
+    from attention import flash_attention
 
 __all__ = ['WanModel_Upsample']
 

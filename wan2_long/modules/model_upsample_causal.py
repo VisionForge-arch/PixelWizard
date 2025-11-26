@@ -28,6 +28,14 @@ __all__ = ["WanModel_Upsample"]
 flex_attention = torch.compile(flex_attention, dynamic=False, mode="max-autotune")
 
 
+
+
+
+
+
+
+
+
 def causal_rope_apply(x, grid_sizes, freqs, start_frame=0):
     n, c = x.size(2), x.size(3) // 2
 
