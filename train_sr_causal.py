@@ -60,7 +60,7 @@ def main():
     time_part = int((config.num_frames - 1) // config.time_division_factor) + 1
     config.seq_len = int(config.height // 32) * int(config.width // 32) * time_part
     config.sr_mode = True
-    config.causal=True
+    config.causal = True
     
     # =========init dataset=========
     
