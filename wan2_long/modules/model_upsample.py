@@ -544,13 +544,11 @@ def register_spatial_control(model):
         # 1. 计算基础的 Sinusoidal Embedding (公用)
         # 这段逻辑是从原模型里提取出来的，为了让 Adapter 复用
         if t.dim() == 1:
-            # 这里的 t 是 [Batch]
-            # 扩展到 sequence 维度虽然是 WanModel 内部做的，
-            # 但为了 Adapter，我们只需要 [Batch, FreqDim] 的 embedding 即可
-            t_freq = sinusoidal_embedding_1d(self.freq_dim, t).type_as(x_in[0]) # [B, freq_dim]
+            # t: [B]
+            t_freq = sinusoidal_embedding_1d(self.freq_dim, t).type_as(x_in[0])  # [B, freq_dim]
         else:
-            # 如果 t 已经是 embedding (极少情况)
-            t_freq = t
+            # t: [B, F] (per-frame); 取首帧代表，避免传入 [B, F] 形状破坏 adapter 的线性层
+            t_freq = sinusoidal_embedding_1d(self.freq_dim, t[:, 0]).type_as(x_in[0])  # [B, freq_dim]
 
         # 2. 运行 Adapter 
         # 将 LR 和 公用的 Time Freq 传入 Adapter
