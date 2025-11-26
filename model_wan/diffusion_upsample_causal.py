@@ -132,13 +132,23 @@ class SelfForcingWan_Upsample_Causal(nn.Module):
         if self.num_frame_per_block > 1:
             if self.independent_first_frame:
                 # 第一帧单独，其余帧按块共享
-                idx_rest = index[:, 1:].reshape(batch_size, -1, self.num_frame_per_block)
+                frames_rest = num_frame - 1
+                pad = (self.num_frame_per_block - frames_rest % self.num_frame_per_block) % self.num_frame_per_block
+                idx_rest = index[:, 1:]
+                if pad > 0:
+                    idx_rest = torch.cat([idx_rest, idx_rest[:, -1:].expand(-1, pad)], dim=1)
+                idx_rest = idx_rest.reshape(batch_size, -1, self.num_frame_per_block)
                 idx_rest[:, :, 1:] = idx_rest[:, :, 0:1]
-                index = torch.cat([index[:, :1], idx_rest.reshape(batch_size, -1)], dim=1)
+                idx_rest = idx_rest.reshape(batch_size, -1)
+                index = torch.cat([index[:, :1], idx_rest[:, :frames_rest]], dim=1)
             else:
-                idx_block = index.reshape(batch_size, -1, self.num_frame_per_block)
+                pad = (self.num_frame_per_block - num_frame % self.num_frame_per_block) % self.num_frame_per_block
+                idx_work = index
+                if pad > 0:
+                    idx_work = torch.cat([idx_work, idx_work[:, -1:].expand(-1, pad)], dim=1)
+                idx_block = idx_work.reshape(batch_size, -1, self.num_frame_per_block)
                 idx_block[:, :, 1:] = idx_block[:, :, 0:1]
-                index = idx_block.reshape(batch_size, -1)
+                index = idx_block.reshape(batch_size, -1)[:, :num_frame]
 
         timestep = self.scheduler.timesteps[index].to(dtype=self.dtype, device=self.device)  # [B, F]
  
