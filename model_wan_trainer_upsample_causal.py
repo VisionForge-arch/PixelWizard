@@ -3,7 +3,7 @@ import logging
 from PIL import Image
 import torchvision.transforms as transforms
 
-from model_wan import SelfForcingWan_Upsample
+from model_wan import SelfForcingWan_Upsample_Causal
 import torch
 from utils_long.misc import (
     set_seed,
@@ -76,7 +76,7 @@ class WanModel_Trainer:
         self.dataloader = cycle(dataloader)
 
         # Step 2: Initialize the model and optimizer
-        self.model = SelfForcingWan_Upsample(config, device=self.device)
+        self.model = SelfForcingWan_Upsample_Causal(config, device=self.device)
         
         self.model.generator = fsdp_wrap(
             self.model.generator,

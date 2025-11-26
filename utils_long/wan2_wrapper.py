@@ -5,6 +5,7 @@ from torch import nn
 
 from utils_long.scheduler import SchedulerInterface, FlowMatchScheduler
 from wan2_long.modules.model_upsample import WanModel_Upsample
+from wan2_long.modules.model_upsample_causal import WanModel_Upsample_Causal
 from wan2_long.modules.tokenizers import HuggingfaceTokenizer
 from wan2_long.modules.model import WanModel, RegisterTokens, GanAttentionBlock
 from wan2_long.modules.model_cross import WanModel_Cross
@@ -134,6 +135,7 @@ class WanDiffusionWrapper(torch.nn.Module):
             seq_len=35*52*21,
             sr=False,
             cross=False,
+            causal=True,
     ):
         super().__init__()
         if cross is True:
@@ -147,6 +149,10 @@ class WanDiffusionWrapper(torch.nn.Module):
             
             from wan2_long.modules.model_upsample import register_spatial_control
             self.model = WanModel_Upsample.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
+            self.model, _ = register_spatial_control(self.model)
+        elif causal is True:
+            from wan2_long.modules.model_upsample import register_spatial_control
+            self.model = WanModel_Upsample_Causal.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
             self.model, _ = register_spatial_control(self.model)
         else:   
             self.model = WanModel.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
@@ -255,6 +261,7 @@ class WanDiffusionWrapper(torch.nn.Module):
         prompt_embeds = conditional_dict["prompt_embeds"]
 
         # [B, F] -> [B]
+        # timesteps: [B, F_total]，因因果推理分块推时需要截取当前块
         if self.uniform_timestep:
             input_timestep = timestep[:, 0]
         else:
