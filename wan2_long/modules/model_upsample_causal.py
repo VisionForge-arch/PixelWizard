@@ -204,6 +204,7 @@ class CausalWanAttentionBlock(nn.Module):
         crossattn_cache=None,
         current_start=0,
         current_end=0,
+        lr_latents=None,  # interface parity with spatial control wrapper
     ):
         r"""
         Args:
@@ -458,6 +459,7 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
         crossattn_cache: dict = None,
         current_start: int = 0,
         current_end: int = 0,
+        lr_latents=None,
     ):
         r"""
         Run the diffusion model with kv caching.
@@ -515,6 +517,7 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
                     "crossattn_cache": crossattn_cache[block_index],
                     "current_start": current_start,
                     "current_end": current_end,
+                    "lr_latents": lr_latents,
                 }
             )
             x = block(x, **kwargs)
@@ -534,6 +537,7 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
         seq_len,
         clip_fea=None,
         y=None,
+        lr_latents=None,
     ):
         r"""
         Forward pass through the diffusion model
@@ -590,22 +594,23 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
             block_mask=self.block_mask,
         )
 
-        def create_custom_forward(module):
-            def custom_forward(*inputs, **kwargs):
-                return module(*inputs, **kwargs)
+        def create_custom_forward(module, **module_kwargs):
+            def custom_forward(*inputs):
+                inp_x, inp_lr_context = inputs
+                return module(inp_x, lr_latents=inp_lr_context, **module_kwargs)
 
             return custom_forward
 
         for block in self.blocks:
             if torch.is_grad_enabled() and self.gradient_checkpointing:
                 x = torch.utils.checkpoint.checkpoint(
-                    create_custom_forward(block),
+                    create_custom_forward(block, **kwargs),
                     x,
-                    **kwargs,
+                    lr_latents,
                     use_reentrant=False,
                 )
             else:
-                x = block(x, **kwargs)
+                x = block(x, lr_latents=lr_latents, **kwargs)
 
         # head
         x = self.head(x, e.unflatten(dim=0, sizes=t.shape).unsqueeze(2))
@@ -661,7 +666,7 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
 
 if __name__ == "__main__":
     # Debug helper, keep for quick manual testing.
-    
+    from .model_upsample import register_spatial_control
 
     model = WanModel_Upsample.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
     model, lr_layers = register_spatial_control(model)
