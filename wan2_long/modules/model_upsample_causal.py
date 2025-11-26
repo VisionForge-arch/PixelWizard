@@ -391,7 +391,7 @@ class WanModel_Upsample_Causal(ModelMixin, ConfigMixin):
 
         self.block_mask = None
 
-        self.num_frame_per_block = 3
+        self.num_frame_per_block = 6
 
     def _set_gradient_checkpointing(self, module, value=False):
         self.gradient_checkpointing = value
