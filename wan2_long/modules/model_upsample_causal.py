@@ -483,7 +483,10 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
         assert seq_lens.max() <= seq_len
         x = torch.cat(x)
 
-        # time embeddings
+        # time embeddings (expand timestep to per-frame for modulation)
+        num_frames = grid_sizes[0][0].item()
+        if t.dim() == 1:
+            t = t.unsqueeze(1).expand(-1, num_frames)
         e = self.time_embedding(sinusoidal_embedding_1d(self.freq_dim, t.flatten()).type_as(x))
         e0 = self.time_projection(e).unflatten(1, (6, self.dim)).unflatten(dim=0, sizes=t.shape)
 
@@ -569,7 +572,10 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
         assert seq_lens.max() <= seq_len
         x = torch.cat([torch.cat([u, u.new_zeros(1, seq_len - u.size(1), u.size(2))], dim=1) for u in x])
 
-        # time embeddings
+        # time embeddings (expand timestep to per-frame for modulation)
+        num_frames = grid_sizes[0][0].item()
+        if t.dim() == 1:
+            t = t.unsqueeze(1).expand(-1, num_frames)
         e = self.time_embedding(sinusoidal_embedding_1d(self.freq_dim, t.flatten()).type_as(x))
         e0 = self.time_projection(e).unflatten(1, (6, self.dim)).unflatten(dim=0, sizes=t.shape)
 
