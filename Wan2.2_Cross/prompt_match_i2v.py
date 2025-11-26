@@ -7,8 +7,8 @@ import json
 i2v_json  = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/I2V/i2v_vbench.json"  # JSON 中包含 caption/frame
 video_dir = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/i2v/720p/decode_video"        # 存放 .mp4 或 .pt 文件的目录
 
-
-pat = re.compile(r"^ti2v-5B_832\*480_8_(?:\+?prompt_)?(?P<frag>.+?)_\d{8}_\d{6}\.(?:pt|mp4)$")
+pat = re.compile(r"^ti2v-5B_1280\*720_8_(?:\+?prompt_)?(?P<frag>.+?)_\d{8}_\d{6}\.(?:pt|mp4)$")
+#pat = re.compile(r"^ti2v-5B_832\*480_8_(?:\+?prompt_)?(?P<frag>.+?)_\d{8}_\d{6}\.(?:pt|mp4)$")
 
 def normalize(p: str) -> str:
     # 和你保存时完全一致：只做空格与斜杠替换，然后截断 50
