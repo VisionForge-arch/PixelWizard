@@ -780,9 +780,21 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
 
         # time embeddings
         if t.dim() == 1:
-            t = t.expand(t.size(0), seq_len)    # [1, seq_lens]
-        bt = t.size(0) 
-        t = t.flatten()      # [seq_lens]
+            t = t.expand(t.size(0), seq_len)  # [B, seq_len]
+        else:
+            # support per-frame timestep: expand each frame value to its patch tokens, then pad/crop to seq_len
+            if t.shape[1] != seq_len:
+                num_frames = grid_sizes[0][0].item()
+                frame_len = seq_lens[0].item() // num_frames  # tokens per frame (unpadded length)
+                t_expanded = torch.repeat_interleave(t, frame_len, dim=1)  # [B, num_frames*frame_len]
+                if t_expanded.shape[1] < seq_len:
+                    pad = seq_len - t_expanded.shape[1]
+                    t = torch.cat([t_expanded, t_expanded[:, -1:].expand(-1, pad)], dim=1)
+                else:
+                    t = t_expanded[:, :seq_len]
+            # else: already [B, seq_len]
+        bt = t.size(0)
+        t = t.flatten()      # [B*seq_len]
         e = self.time_embedding(
             sinusoidal_embedding_1d(self.freq_dim, t).unflatten(0, (bt, seq_len)).type_as(x)) # [1, seqlen, 3072]
         e0 = self.time_projection(e).unflatten(2, (6, self.dim))           # [1, 27280, 6, 3072]
