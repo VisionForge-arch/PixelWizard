@@ -374,6 +374,7 @@ class RegisterTokens(nn.Module):
         nn.init.normal_(self.register_tokens, std=0.02)
         
         
+
 # [新增] Scale Adapter 模块
 class WanSpatialControlAdapter(nn.Module):
     def __init__(self, 
@@ -435,17 +436,16 @@ class WanSpatialControlAdapter(nn.Module):
         x = self.backbone(lr_latents)  # [B, C, T, H, ]
         x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
         
-        w = self.adapter_time_proj(guidance_t_emb)
+        w = self.adapter_time_proj(guidance_t_emb)           # [B, 2*D]
         scale, shift = w.chunk(2, dim=-1)                    # [B, D], [B, D]
+
         
         x = self.feature_norm(x)
         
         # B. 注入 Guidance Timestep (控制强度)
         # 类似于把 guidance 加到 feature 上
         # guidance_t_emb: [B, Dim]
-        # print(guidance_t_emb.shape)
-        
-        
+        #print(guidance_t_emb.shape)
         x = x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1) # Scale 调制，或者 add 也可以
             
         # C. 生成每一层的控制特征
@@ -494,35 +494,19 @@ def register_spatial_control(model):
             
             x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
 
-            # L_x = x.shape[1]
-            # L_c = control_feat.shape[1]
+            L_x = x.shape[1]
+            L_c = control_feat.shape[1]
              # 对齐长度：pad 或截断到和 x 一样长
-            # if L_c < L_x:
-            #     pad = control_feat.new_zeros(control_feat.shape[0], L_x - L_c, control_feat.shape[2])
-            #     control_feat = torch.cat([control_feat, pad], dim=1)
-            # elif L_c > L_x:
-            #     control_feat = control_feat[:, :L_x, :]
-            
-            # --- FIX STARTS HERE: Handle Sequence Parallelism Slicing ---
-            # If input x is smaller than control, we assume SP is active and slice control
-            if x.shape[1] != control_feat.shape[1]:
-                if torch.distributed.is_initialized():
-                    rank = torch.distributed.get_rank()
-                    # Calculate the slice for this rank
-                    # We assume the sequence is split evenly across the SP group (world_size)
-                    local_len = x.shape[1]
-                    start_idx = rank * local_len
-                    end_idx = start_idx + local_len
-                    
-                    # Slice the global control feature to match local x
-                    control_feat = control_feat[:, start_idx:end_idx, :]
-            # -----------------------------------------------------------
+            if L_c < L_x:
+                pad = control_feat.new_zeros(control_feat.shape[0], L_x - L_c, control_feat.shape[2])
+                control_feat = torch.cat([control_feat, pad], dim=1)
+            elif L_c > L_x:
+                control_feat = control_feat[:, :L_x, :]
             
             
             # 4. [关键] 特征相加 (Feature Injection)
-            # print(x.shape)
+            #print(x.shape)
             x_new = x + control_feat.type_as(x)
-            
             # print(x_new.shape)
             # print("add successfully!!!")
             
@@ -559,28 +543,17 @@ def register_spatial_control(model):
         
         # 1. 计算基础的 Sinusoidal Embedding (公用)
         # 这段逻辑是从原模型里提取出来的，为了让 Adapter 复用
-        print(t)
         if t.dim() == 1:
-            # 这里的 t 是 [Batch]
-            # 扩展到 sequence 维度虽然是 WanModel 内部做的，
-            # 但为了 Adapter，我们只需要 [Batch, FreqDim] 的 embedding 即可
-            t_freq = sinusoidal_embedding_1d(self.freq_dim, t).type_as(x_in[0]) # [B, freq_dim]
-        elif t.dim() == 2 and t.shape[1] != self.freq_dim:
-            # 识别出这是被 pipeline 扩展过的 [1, SeqLen] 大张量
-            # 我们只需要取第一个值作为全局时间步
-            t_input = t[:, 0] 
-            # 重新生成正确的 [1, 256] Embedding
-            t_freq = sinusoidal_embedding_1d(self.freq_dim, t_input).type_as(x_in[0])
-        
+            # t: [B]
+            t_freq = sinusoidal_embedding_1d(self.freq_dim, t).type_as(x_in[0])  # [B, freq_dim]
         else:
-            # 如果 t 已经是 embedding (极少情况)
-            t_freq = t
+            # t: [B, F] (per-frame); 取首帧代表，避免传入 [B, F] 形状破坏 adapter 的线性层
+            t_freq = sinusoidal_embedding_1d(self.freq_dim, t[:, 0]).type_as(x_in[0])  # [B, freq_dim]
 
         # 2. 运行 Adapter 
         # 将 LR 和 公用的 Time Freq 传入 Adapter
         # Adapter 内部会用自己的 MLP 处理这个 t_freq
         controls = self.spatial_adapter(lr_latents, t_freq)
-        print(f'control_shape{controls[0].shape}')
         
         self._current_spatial_ctx = {'controls': controls}
 
@@ -599,9 +572,6 @@ def register_spatial_control(model):
     model.forward = types.MethodType(forward_with_spatial_control, model)
     
     return model, model.spatial_adapter
-
-
-
 
 class WanModel_Upsample(ModelMixin, ConfigMixin):
     r"""
