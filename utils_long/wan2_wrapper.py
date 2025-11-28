@@ -134,7 +134,7 @@ class WanDiffusionWrapper(torch.nn.Module):
             seq_len=35*52*21,
             sr=False,
             cross=False,
-            causal=True,
+            causal=False,
     ):
         super().__init__()
         if cross is True:
