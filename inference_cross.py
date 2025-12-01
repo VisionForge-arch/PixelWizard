@@ -192,6 +192,19 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
             #cond_latent_lr = cond_latent_lr.to(device=device, dtype=torch.bfloat16)
 
     
+    # 扩散需要 3 的倍数
+    target_frames = args.num_output_frames       # 想要生成的总帧数
+    pad3 = (-target_frames) % 3                  # 0/1/2
+    total_frames = target_frames + pad3
+
+    # cond_latent_lr 时间维补 pad3，末帧复制即可
+    if cond_latent_lr is not None and pad3:
+        cond_latent_lr = F.pad(cond_latent_lr, (0,0,0,0,0,0,0,pad3), mode="replicate")
+
+    # 噪声也用 total_frames
+    sampled_noise = torch.randn([args.num_samples, total_frames, 48, 90, 160], device=device, dtype=torch.bfloat16)
+    print("sampled_noise.shape:", sampled_noise.shape)
+        
     # Generate 81 frames
     video, latents = pipeline.inference(
         noise=sampled_noise,
