@@ -35,7 +35,7 @@ class CausalInferencePipeline(torch.nn.Module):
             self.denoising_step_list = timesteps[1000 - self.denoising_step_list]
 
         self.num_transformer_blocks = 30
-        self.frame_seq_length = 1560 # 30*52
+        self.frame_seq_length = 90*160 # 30*52
 
         self.kv_cache1 = None
         self.args = args
@@ -51,7 +51,7 @@ class CausalInferencePipeline(torch.nn.Module):
     def inference(
         self,
         noise: torch.Tensor,
-        clean_latent_lr,
+        clean_latent_lr: torch.Tensor,
         text_prompts: List[str],
         initial_latent: Optional[torch.Tensor] = None,
         return_latents: bool = False,
@@ -89,6 +89,8 @@ class CausalInferencePipeline(torch.nn.Module):
         conditional_dict = self.text_encoder(
             text_prompts=text_prompts
         )
+        if clean_latent_lr is not None:
+            assert clean_latent_lr.shape[1] >= num_frames, "clean_latent_lr must cover target frames"
 
         if low_memory:
             gpu_memory_preservation = get_cuda_free_memory_gb(gpu) + 5
@@ -145,6 +147,7 @@ class CausalInferencePipeline(torch.nn.Module):
                 assert (num_input_frames - 1) % self.num_frame_per_block == 0
                 num_input_blocks = (num_input_frames - 1) // self.num_frame_per_block
                 output[:, :1] = initial_latent[:, :1]
+                lr_ctx = None if clean_latent_lr is None else clean_latent_lr[:, :1]
                 self.generator(
                     noisy_image_or_video=initial_latent[:, :1],
                     conditional_dict=conditional_dict,
@@ -152,6 +155,7 @@ class CausalInferencePipeline(torch.nn.Module):
                     kv_cache=self.kv_cache1,
                     crossattn_cache=self.crossattn_cache,
                     current_start=current_start_frame * self.frame_seq_length,
+                    lr_context=lr_ctx,
                 )
                 current_start_frame += 1
             else:
@@ -163,6 +167,7 @@ class CausalInferencePipeline(torch.nn.Module):
                 current_ref_latents = \
                     initial_latent[:, current_start_frame:current_start_frame + self.num_frame_per_block]
                 output[:, current_start_frame:current_start_frame + self.num_frame_per_block] = current_ref_latents
+                lr_ctx = None if clean_latent_lr is None else clean_latent_lr[:, current_start_frame:current_start_frame + self.num_frame_per_block]
                 self.generator(
                     noisy_image_or_video=current_ref_latents,
                     conditional_dict=conditional_dict,
@@ -170,6 +175,7 @@ class CausalInferencePipeline(torch.nn.Module):
                     kv_cache=self.kv_cache1,
                     crossattn_cache=self.crossattn_cache,
                     current_start=current_start_frame * self.frame_seq_length,
+                    lr_context=lr_ctx,
                 )
                 current_start_frame += self.num_frame_per_block
 
@@ -188,6 +194,7 @@ class CausalInferencePipeline(torch.nn.Module):
 
             noisy_input = noise[
                 :, current_start_frame - num_input_frames:current_start_frame + current_num_frames - num_input_frames]
+            lr_chunk = None if clean_latent_lr is None else clean_latent_lr[:, current_start_frame:current_start_frame + current_num_frames]
 
             # Step 3.1: Spatial denoising loop
             for index, current_timestep in enumerate(self.denoising_step_list):
@@ -205,7 +212,8 @@ class CausalInferencePipeline(torch.nn.Module):
                         timestep=timestep,
                         kv_cache=self.kv_cache1,
                         crossattn_cache=self.crossattn_cache,
-                        current_start=current_start_frame * self.frame_seq_length
+                        current_start=current_start_frame * self.frame_seq_length,
+                        lr_context=lr_chunk,
                     )
                     next_timestep = self.denoising_step_list[index + 1]
                     noisy_input = self.scheduler.add_noise(
@@ -222,7 +230,8 @@ class CausalInferencePipeline(torch.nn.Module):
                         timestep=timestep,
                         kv_cache=self.kv_cache1,
                         crossattn_cache=self.crossattn_cache,
-                        current_start=current_start_frame * self.frame_seq_length
+                        current_start=current_start_frame * self.frame_seq_length,
+                        lr_context=lr_chunk,
                     )
 
             # Step 3.2: record the model's output
@@ -237,6 +246,7 @@ class CausalInferencePipeline(torch.nn.Module):
                 kv_cache=self.kv_cache1,
                 crossattn_cache=self.crossattn_cache,
                 current_start=current_start_frame * self.frame_seq_length,
+                lr_context=lr_chunk,
             )
 
             if profile:
