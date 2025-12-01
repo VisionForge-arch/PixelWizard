@@ -81,7 +81,7 @@ class CausalWanSelfAttention(nn.Module):
         self.norm_q = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
         self.norm_k = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
 
-    def forward(self, x, seq_lens, grid_sizes, freqs, block_mask, kv_cache=None, current_start=0, current_end=0):
+    def forward(self, x, seq_lens, grid_sizes, freqs, block_mask, kv_cache=None, current_start=0):
         r"""
         Args:
             x(Tensor): Shape [B, L, num_heads, C / num_heads]
@@ -249,7 +249,6 @@ class CausalWanAttentionBlock(nn.Module):
             block_mask,
             kv_cache,
             current_start,
-            current_end,
         )
 
         x = x + (y.unflatten(dim=1, sizes=(num_frames, frame_seqlen)) * e[2]).flatten(1, 2)
@@ -482,7 +481,6 @@ class WanModel_Upsample_Causal(ModelMixin, ConfigMixin):
         kv_cache: dict = None,
         crossattn_cache: dict = None,
         current_start: int = 0,
-        current_end: int = 0,
         cache_start: int = None,
     ):
         r"""
