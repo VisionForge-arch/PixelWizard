@@ -179,7 +179,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
 
         with torch.no_grad():
             cond_latent_lr = pipeline.vae.encode_to_latent(video_input).to(device=device, dtype=torch.bfloat16)  # [B,T,C,h',w']
-            B, C, T, h, w = cond_latent_lr.shape
+            B, T, C, h, w = cond_latent_lr.shape
             H = 90
             W = 160
             print("cond_latent_lr.shape:", cond_latent_lr.shape)
