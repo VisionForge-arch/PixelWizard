@@ -185,7 +185,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
             #cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)  
             cond_latent_lr = cond_latent_lr.reshape(B*T, C, h, w)  # [B*T, C, h, w]
             cond_latent_lr = F.interpolate(cond_latent_lr, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
-            cond_latent_lr = cond_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)    # [B*T, C, h, w]
+            cond_latent_lr = cond_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)    # [B, C, T, h, w]
             #print(cond_latent.shape) # [1, 48, 21, 90, 160]
             #cond_latent_lr = cond_latent_lr.to(device=device, dtype=torch.bfloat16)
 

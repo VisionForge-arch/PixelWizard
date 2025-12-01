@@ -150,7 +150,7 @@ class CausalInferencePipeline(torch.nn.Module):
                 assert (num_input_frames - 1) % self.num_frame_per_block == 0
                 num_input_blocks = (num_input_frames - 1) // self.num_frame_per_block
                 output[:, :1] = initial_latent[:, :1]
-                lr_ctx = None if clean_latent_lr is None else clean_latent_lr[:, :1]
+                lr_ctx = None if clean_latent_lr is None else clean_latent_lr[:, :, :1]
                 self.generator(
                     noisy_image_or_video=initial_latent[:, :1],
                     conditional_dict=conditional_dict,
@@ -197,7 +197,7 @@ class CausalInferencePipeline(torch.nn.Module):
 
             noisy_input = noise[
                 :, current_start_frame - num_input_frames:current_start_frame + current_num_frames - num_input_frames]
-            lr_chunk = None if clean_latent_lr is None else clean_latent_lr[:, current_start_frame:current_start_frame + current_num_frames]
+            lr_chunk = None if clean_latent_lr is None else clean_latent_lr[:, :, current_start_frame:current_start_frame + current_num_frames]
 
             # Step 3.1: Spatial denoising loop
             for index, current_timestep in enumerate(self.denoising_step_list):
