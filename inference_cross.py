@@ -216,6 +216,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         low_memory=low_memory,
         
     )
+    print(latents.shape)
 
     # Remove any temporal padding we added for 3x blocks.
     num_input_frames = 0 if initial_latent is None else initial_latent.shape[1]
