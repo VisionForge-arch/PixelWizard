@@ -145,8 +145,8 @@ class CausalWanSelfAttention(nn.Module):
 
             current_end = current_start + roped_query.shape[1]  # 这里补上
 
-            sink_tokens = self.sink_size * frame_seqlen
-            kv_cache_size = kv_cache["k"].shape[1]
+            # sink_tokens = self.sink_size * frame_seqlen
+            # kv_cache_size = kv_cache["k"].shape[1]
             num_new_tokens = roped_query.shape[1]
 
             # if self.local_attn_size != -1 and (current_end > kv_cache["global_end_index"].item()) and (
