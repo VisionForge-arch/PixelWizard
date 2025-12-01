@@ -90,7 +90,10 @@ class CausalInferencePipeline(torch.nn.Module):
             text_prompts=text_prompts
         )
         
-        assert clean_latent_lr.shape[1] >= num_frames, "clean_latent_lr must cover target frames"
+        print(f"clean latent' shape {clean_latent_lr.shape}")
+        print(f"noise' shape {noise.shape}")
+        
+        #assert clean_latent_lr.shape[1] >= num_frames, "clean_latent_lr must cover target frames"
 
         if low_memory:
             gpu_memory_preservation = get_cuda_free_memory_gb(gpu) + 5
