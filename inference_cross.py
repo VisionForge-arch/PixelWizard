@@ -165,9 +165,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         prompt = batch["prompt"]
         video_input = batch["file"].to(device=device, dtype=torch.bfloat16)
         prompts = prompt
-        
-        print(prompt)
-        print(prompts)
+
         
         initial_latent = None
 
@@ -199,7 +197,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
 
     # cond_latent_lr 时间维补 pad3，末帧复制即可
     if cond_latent_lr is not None and pad3:
-        cond_latent_lr = F.pad(cond_latent_lr, (0,0,0,0,0,0,0,pad3), mode="replicate")
+        cond_latent_lr = F.pad(cond_latent_lr, (0,0,0,0,0,pad3), mode="replicate")
 
     # 噪声也用 total_frames
     sampled_noise = torch.randn([args.num_samples, total_frames, 48, 90, 160], device=device, dtype=torch.bfloat16)
