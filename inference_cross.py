@@ -189,7 +189,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
             cond_latent_lr = F.interpolate(cond_latent_lr, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
             cond_latent_lr = cond_latent_lr.reshape(B, T, C, H, W)  # [B*T, C, h, w]
             #print(cond_latent.shape) # [1, 48, 21, 90, 160]
-            cond_latent_lr = cond_latent_lr.to(device=device, dtype=torch.float32)
+            #cond_latent_lr = cond_latent_lr.to(device=device, dtype=torch.bfloat16)
 
     
     # Generate 81 frames
