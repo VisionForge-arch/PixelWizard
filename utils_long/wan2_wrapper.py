@@ -286,7 +286,6 @@ class WanDiffusionWrapper(torch.nn.Module):
                 cache_start=cache_start
             ).permute(0, 2, 1, 3, 4)
         else:
-            # X0 prediction
             if lr_context is not None:
                 flow_pred = self.model(
                     x,
@@ -303,15 +302,17 @@ class WanDiffusionWrapper(torch.nn.Module):
                     seq_len=self.seq_len,
                 ).permute(0, 2, 1, 3, 4)
 
-        # flow_pred: [1, 33, 16, 30, 52]
-        # pred_x0 = self._convert_flow_pred_to_x0(
-        #     flow_pred=flow_pred.flatten(0, 1),
-        #     xt=noisy_image_or_video.flatten(0, 1),
-        #     timestep=timestep.flatten(0, 1)
-        # ).unflatten(0, flow_pred.shape[:2])
+        # Convert flow prediction (noise - x0) to x0 so callers can use denoised latents directly.
+        if self.training is False:
+            pred_x0 = self._convert_flow_pred_to_x0(
+                flow_pred=flow_pred.flatten(0, 1),
+                xt=noisy_image_or_video.flatten(0, 1),
+                timestep=timestep.flatten(0, 1)
+            ).unflatten(0, flow_pred.shape[:2])
 
-
-        return flow_pred #, pred_x0
+            return flow_pred, pred_x0
+        else:
+            return flow_pred
 
     def get_scheduler(self) -> SchedulerInterface:
         """

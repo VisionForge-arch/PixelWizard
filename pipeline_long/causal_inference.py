@@ -209,7 +209,7 @@ class CausalInferencePipeline(torch.nn.Module):
                     dtype=torch.int64) * current_timestep
 
                 if index < len(self.denoising_step_list) - 1:
-                    denoised_pred = self.generator(
+                    flow_pred, denoised_pred = self.generator(
                         noisy_image_or_video=noisy_input,
                         conditional_dict=conditional_dict,
                         timestep=timestep,
@@ -227,7 +227,7 @@ class CausalInferencePipeline(torch.nn.Module):
                     ).unflatten(0, denoised_pred.shape[:2])
                 else:
                     # for getting real output
-                    denoised_pred = self.generator(
+                    flow_pred, denoised_pred = self.generator(
                         noisy_image_or_video=noisy_input,
                         conditional_dict=conditional_dict,
                         timestep=timestep,
