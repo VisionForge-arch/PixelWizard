@@ -51,6 +51,7 @@ class CausalInferencePipeline(torch.nn.Module):
     def inference(
         self,
         noise: torch.Tensor,
+        clean_latent_lr,
         text_prompts: List[str],
         initial_latent: Optional[torch.Tensor] = None,
         return_latents: bool = False,

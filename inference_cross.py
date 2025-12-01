@@ -191,7 +191,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         print(video_input.shape)
 
         with torch.no_grad():
-            cond_latent_lr = pipeline.vae.encode_to_latent(pipeline, video_input).to(device=device)  # [B,T,C,h',w']
+            cond_latent_lr = pipeline.vae.encode_to_latent(video_input).to(device=device)  # [B,T,C,h',w']
             B, C, T, h, w = cond_latent_lr.shape
             H = 90
             W = 160
@@ -211,10 +211,12 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
     # Generate 81 frames
     video, latents = pipeline.inference(
         noise=sampled_noise,
+        clean_latent_lr=cond_latent_lr,
         text_prompts=prompts,
         return_latents=True,
         initial_latent=initial_latent,
         low_memory=low_memory,
+        
     )
     current_video = rearrange(video, 'b t c h w -> b t h w c').cpu()
     all_video.append(current_video)
