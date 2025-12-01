@@ -41,7 +41,7 @@ class CausalInferencePipeline(torch.nn.Module):
         self.args = args
         self.num_frame_per_block = getattr(args, "num_frame_per_block", 3)
         self.independent_first_frame = args.independent_first_frame
-        self.local_attn_size = self.generator.model.local_attn_size
+        #self.local_attn_size = self.generator.model.local_attn_size
 
         print(f"KV inference with {self.num_frame_per_block} frames per block")
 
