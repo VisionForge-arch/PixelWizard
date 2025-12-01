@@ -222,26 +222,25 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
     target_total_frames = target_frames + num_input_frames
     latents = latents[:, :target_total_frames].contiguous()
 
-    if local_rank == 0:
-        prompt_text = prompts[0] if isinstance(prompts, (list, tuple)) else prompts
-        formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-        formatted_prompt = str(prompt_text).replace(" ", "_").replace("/", "_")[:50]
-        file_name = f"latent_{i}_{formatted_prompt}_{formatted_time}.pt"
-        output_path = os.path.join(args.output_folder, file_name)
+    prompt_text = prompts[0] if isinstance(prompts, (list, tuple)) else prompts
+    formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+    formatted_prompt = str(prompt_text).replace(" ", "_").replace("/", "_")[:50]
+    file_name = f"latent_{i}_{formatted_prompt}_{formatted_time}.pt"
+    output_path = os.path.join(args.output_folder, file_name)
 
-        logging.info(f"Saving latent to {output_path}")
-        torch.save(
-            {
-                "latent": latents.cpu(),
-                "prompt": prompt_text,
-                "seed": args.seed,
-                "frame_num": latents.shape[1],
-                "num_samples": args.num_samples,
-                "size": f"{config.height}x{config.width}",
-            },
-            output_path,
-        )
-        logging.info("Latent saved successfully.")
+    logging.info(f"Saving latent to {output_path}")
+    torch.save(
+        {
+            "latent": latents.cpu(),
+            "prompt": prompt_text,
+            "seed": args.seed,
+            "frame_num": latents.shape[1],
+            "num_samples": args.num_samples,
+            "size": f"{config.height}x{config.width}",
+        },
+        output_path,
+    )
+    logging.info("Latent saved successfully.")
 
     if dist.is_initialized():
         dist.barrier()
