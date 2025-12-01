@@ -23,7 +23,7 @@ from demo_utils.memory import gpu, get_cuda_free_memory_gb, DynamicSwapInstaller
 from dataset_upsample import UnifiedDataset
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--config_path", type=str, default="./configs/self_forcing_dmd0.yaml", help="Path to the config file")
+parser.add_argument("--config_path", type=str, default="./configs/self_forcing_dmd.yaml", help="Path to the config file")
 parser.add_argument("--checkpoint_path", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up_2/checkpoint_model_009800/model.pt", help="Path to the checkpoint folder")
 parser.add_argument("--prompt_file", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file.json", help="JSON file with prompts/files for upsample inference")
 parser.add_argument("--output_folder", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/outputs/", help="Output folder")
@@ -55,7 +55,7 @@ low_memory = get_cuda_free_memory_gb(gpu) < 40
 torch.set_grad_enabled(False)
 
 config = OmegaConf.load(args.config_path)
-default_config = OmegaConf.load("./configs/default_config0.yaml")
+default_config = OmegaConf.load("./configs/default_config.yaml")
 config = OmegaConf.merge(default_config, config)
 # set SR/causal flags to match training
 config.sr_mode = True
