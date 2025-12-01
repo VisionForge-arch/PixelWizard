@@ -191,15 +191,16 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         print(video_input.shape)
 
         with torch.no_grad():
-            cond_latent_lr = encode_to_latent(pipeline, video_input)  # [B,C,T,h',w']
+            cond_latent_lr = pipeline.vae.encode_to_latent(pipeline, video_input).to(device=device)  # [B,T,C,h',w']
             B, C, T, h, w = cond_latent_lr.shape
             H = 90
             W = 160
             print("cond_latent_lr.shape:", cond_latent_lr.shape)
-            cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)  
-            cond_latent_lr = cond_latent_lr.reshape(B*T, C, h, w)  # [B*C, T, h, w]
+            
+            #cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)  
+            cond_latent_lr = cond_latent_lr.reshape(B*T, C, h, w)  # [B*T, C, h, w]
             cond_latent_lr = F.interpolate(cond_latent_lr, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
-            cond_latent_lr = cond_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)  # [B*C, T, h, w]
+            cond_latent_lr = cond_latent_lr.reshape(B, T, C, H, W)  # [B*T, C, h, w]
             #print(cond_latent.shape) # [1, 31, 48, 30, 52]
             cond_latent_lr = cond_latent_lr.to(device=device, dtype=torch.float32)
   
