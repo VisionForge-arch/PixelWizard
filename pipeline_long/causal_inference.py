@@ -1,7 +1,7 @@
 from typing import List, Optional
 import torch
 
-from utils_long.wan_wrapper import WanDiffusionWrapper, WanTextEncoder, WanVAEWrapper
+from utils_long.wan2_wrapper import WanDiffusionWrapper, WanTextEncoder, WanVAEWrapper2_2
 
 from demo_utils.memory import gpu, get_cuda_free_memory_gb, DynamicSwapInstaller, move_model_to_device_with_memory_preservation
 
@@ -17,10 +17,20 @@ class CausalInferencePipeline(torch.nn.Module):
     ):
         super().__init__()
         # Step 1: Initialize all models
-        self.generator = WanDiffusionWrapper(
-            **getattr(args, "model_kwargs", {}), is_causal=True, local_attn_size=args.local_attn_size) if generator is None else generator
+        self.generator = (
+            WanDiffusionWrapper(
+                **getattr(args, "model_kwargs", {}),
+                is_causal=True,
+                local_attn_size=getattr(args, "local_attn_size", -1),
+                seq_len=getattr(args, "seq_len", 35 * 52 * 21),
+                sr=getattr(args, "sr_mode", False),
+                cross=getattr(args, "cross", False),
+            )
+            if generator is None
+            else generator
+        )
         self.text_encoder = WanTextEncoder() if text_encoder is None else text_encoder
-        self.vae = WanVAEWrapper() if vae is None else vae
+        self.vae = WanVAEWrapper2_2() if vae is None else vae
 
         # Step 2: Initialize all causal hyperparmeters
         self.scheduler = self.generator.get_scheduler()
