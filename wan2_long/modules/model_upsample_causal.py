@@ -515,10 +515,10 @@ class WanModel_Upsample_Causal(ModelMixin, ConfigMixin):
                     "crossattn_cache": crossattn_cache[block_index],
                     "current_start": current_start,
                     "current_end": current_end,
-                    "lr_latents": lr_latents,
+                    
                 }
             )
-            x = block(x, **kwargs)
+            x = block(x, lr_latents=lr_latents, **kwargs)
 
         # head
         x = self.head(x, e.unflatten(dim=0, sizes=t.shape).unsqueeze(2))
