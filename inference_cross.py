@@ -164,7 +164,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         # For text-to-video, batch is just the text prompt
         prompt = batch["prompt"]
         video_input = batch["file"].to(device=device, dtype=torch.bfloat16)
-        prompts = [prompt] * args.num_samples
+        prompts = prompt
         
         print(prompt)
         print(prompts)
