@@ -447,6 +447,7 @@ class WanModel_Upsample_Causal(ModelMixin, ConfigMixin):
         t,
         context,
         seq_len,
+        lr_latents,
         clip_fea=None,
         y=None,
         kv_cache: dict = None,
@@ -454,7 +455,6 @@ class WanModel_Upsample_Causal(ModelMixin, ConfigMixin):
         current_start: int = 0,
         current_end: int = 0,
         cache_start: int = None,
-        lr_latents=None,
     ):
         r"""
         Run the diffusion model with kv caching.
