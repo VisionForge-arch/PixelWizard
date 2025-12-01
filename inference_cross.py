@@ -228,7 +228,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
     for sample_idx in range(latents.shape[0]):
         latents_to_save.append(
             latents[sample_idx]
-            .permute(2, 0, 3, 4)  # [T, C, H, W] -> [C, T, H, W]
+            .permute(1, 0, 2, 3)  # [T, C, H, W] -> [C, T, H, W]
             .contiguous()
             .to(dtype=torch.float32, device="cpu")
         )
