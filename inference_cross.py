@@ -2,6 +2,8 @@ import argparse
 import torch
 import os
 import json
+import logging
+from datetime import datetime
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 from omegaconf import OmegaConf
 from tqdm import tqdm
@@ -143,8 +145,8 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
     elif isinstance(batch_data, list):
         batch = batch_data[0]  # First (and only) item in the batch
 
-    all_video = []
-    num_generated_frames = 0  # Number of generated (latent) frames
+    cond_latent_lr = None
+    initial_latent = None
 
     if args.i2v:
         # For image-to-video, batch contains image and caption
@@ -205,34 +207,41 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
     print("sampled_noise.shape:", sampled_noise.shape)
         
     # Generate 81 frames
-    video, latents = pipeline.inference(
+    latents = pipeline.inference(
         noise=sampled_noise,
         clean_latent_lr=cond_latent_lr,
         text_prompts=prompts,
-        return_latents=True,
+        return_latents=False,
         initial_latent=initial_latent,
         low_memory=low_memory,
         
     )
-    current_video = rearrange(video, 'b t c h w -> b t h w c').cpu()
-    all_video.append(current_video)
-    num_generated_frames += latents.shape[1]
 
-    # Final output video
-    video = 255.0 * torch.cat(all_video, dim=1)
+    # Remove any temporal padding we added for 3x blocks.
+    num_input_frames = 0 if initial_latent is None else initial_latent.shape[1]
+    target_total_frames = target_frames + num_input_frames
+    latents = latents[:, :target_total_frames].contiguous()
 
-    # Clear VAE cache
-    pipeline.vae.model.clear_cache()
-    
-    exit()
+    if local_rank == 0:
+        prompt_text = prompts[0] if isinstance(prompts, (list, tuple)) else prompts
+        formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        formatted_prompt = str(prompt_text).replace(" ", "_").replace("/", "_")[:50]
+        file_name = f"latent_{i}_{formatted_prompt}_{formatted_time}.pt"
+        output_path = os.path.join(args.output_folder, file_name)
 
-    # Save the video if the current prompt is not a dummy prompt
-    if idx < num_prompts:
-        model = "regular" if not args.use_ema else "ema"
-        for seed_idx in range(args.num_samples):
-            # All processes save their videos
-            if args.save_with_index:
-                output_path = os.path.join(args.output_folder, f'{idx}-{seed_idx}_{model}.mp4')
-            else:
-                output_path = os.path.join(args.output_folder, f'{prompt[:100]}-{seed_idx}.mp4')
-            write_video(output_path, video[seed_idx], fps=16)
+        logging.info(f"Saving latent to {output_path}")
+        torch.save(
+            {
+                "latent": latents.cpu(),
+                "prompt": prompt_text,
+                "seed": args.seed,
+                "frame_num": latents.shape[1],
+                "num_samples": args.num_samples,
+                "size": f"{config.height}x{config.width}",
+            },
+            output_path,
+        )
+        logging.info("Latent saved successfully.")
+
+    if dist.is_initialized():
+        dist.barrier()

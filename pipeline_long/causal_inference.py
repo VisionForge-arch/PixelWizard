@@ -262,22 +262,12 @@ class CausalInferencePipeline(torch.nn.Module):
             current_start_frame += current_num_frames
 
         if profile:
-            # End diffusion timing and synchronize CUDA
             diffusion_end.record()
             torch.cuda.synchronize()
             diffusion_time = diffusion_start.elapsed_time(diffusion_end)
             init_time = init_start.elapsed_time(init_end)
-            vae_start.record()
-
-        # Step 4: Decode the output
-        video = self.vae.decode_to_pixel(output, use_cache=False)
-        video = (video * 0.5 + 0.5).clamp(0, 1)
-
-        if profile:
-            # End VAE timing and synchronize CUDA
-            vae_end.record()
-            torch.cuda.synchronize()
-            vae_time = vae_start.elapsed_time(vae_end)
+            # We skip decoding here, so VAE timing is zero.
+            vae_time = 0.0
             total_time = init_time + diffusion_time + vae_time
 
             print("Profiling results:")
@@ -288,10 +278,11 @@ class CausalInferencePipeline(torch.nn.Module):
             print(f"  - VAE decoding time: {vae_time:.2f} ms ({100 * vae_time / total_time:.2f}%)")
             print(f"  - Total time: {total_time:.2f} ms")
 
+        # Return latent directly; decoding can be done externally.
         if return_latents:
-            return video, output
+            return output, output
         else:
-            return video
+            return output
 
     def _initialize_kv_cache(self, batch_size, dtype, device):
         """
