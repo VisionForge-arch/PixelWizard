@@ -27,7 +27,7 @@ parser.add_argument("--config_path", type=str, default="./configs/self_forcing_d
 parser.add_argument("--checkpoint_path", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up_2/checkpoint_model_009800/model.pt", help="Path to the checkpoint folder")
 parser.add_argument("--prompt_file", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file.json", help="JSON file with prompts/files for upsample inference")
 parser.add_argument("--output_folder", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/outputs/", help="Output folder")
-parser.add_argument("--num_output_frames", type=int, default=30, help="Number of overlap frames between sliding windows")
+parser.add_argument("--num_output_frames", type=int, default=31, help="Number of overlap frames between sliding windows")
 parser.add_argument("--i2v", action="store_true", help="Whether to perform I2V (or T2V by default)")
 parser.add_argument("--use_ema", action="store_true", default=True, help="Whether to use EMA parameters")
 parser.add_argument("--seed", type=int, default=0, help="Random seed")
@@ -187,7 +187,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
             #cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)  
             cond_latent_lr = cond_latent_lr.reshape(B*T, C, h, w)  # [B*T, C, h, w]
             cond_latent_lr = F.interpolate(cond_latent_lr, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
-            cond_latent_lr = cond_latent_lr.reshape(B, T, C, H, W)  # [B*T, C, h, w]
+            cond_latent_lr = cond_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)    # [B*T, C, h, w]
             #print(cond_latent.shape) # [1, 48, 21, 90, 160]
             #cond_latent_lr = cond_latent_lr.to(device=device, dtype=torch.bfloat16)
 
