@@ -19,8 +19,6 @@ class CausalInferencePipeline(torch.nn.Module):
         # Step 1: Initialize all models
         self.generator = WanDiffusionWrapper(
                 **getattr(args, "model_kwargs", {}),
-                is_causal=True,
-                local_attn_size=getattr(args, "local_attn_size", -1),
                 seq_len=args.seq_len,
                 sr=args.sr_mode,
                 causal=args.causal,
