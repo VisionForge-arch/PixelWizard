@@ -545,8 +545,6 @@ class WanModel_Upsample_Causal(ModelMixin, ConfigMixin):
                     "kv_cache": kv_cache[block_index],
                     "crossattn_cache": crossattn_cache[block_index],
                     "current_start": current_start,
-                    "current_end": current_end,
-                    
                 }
             )
             x = block(x, lr_latents=lr_latents, **kwargs)
