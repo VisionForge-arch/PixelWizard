@@ -220,7 +220,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
     # Remove any temporal padding we added for 3x blocks.
     num_input_frames = 0 if initial_latent is None else initial_latent.shape[1]
     target_total_frames = target_frames + num_input_frames
-    latents = latents[:, :target_total_frames].contiguous()
+    latents = latents[:, :, :target_total_frames].contiguous()
 
     prompt_text = prompts[0] if isinstance(prompts, (list, tuple)) else prompts
     formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
