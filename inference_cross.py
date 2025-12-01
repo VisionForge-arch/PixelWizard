@@ -180,7 +180,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
     else:
         # For text-to-video, batch is just the text prompt
         prompt = batch["prompt"]
-        video_input = batch["file"]
+        video_input = batch["file"].to(device=device, dtype=torch.bfloat16)
         prompts = [prompt] * args.num_samples
         initial_latent = None
 
@@ -191,7 +191,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         print(video_input.shape)
 
         with torch.no_grad():
-            cond_latent_lr = pipeline.vae.encode_to_latent(video_input).to(device=device)  # [B,T,C,h',w']
+            cond_latent_lr = pipeline.vae.encode_to_latent(video_input).to(device=device, dtype=torch.bfloat16)  # [B,T,C,h',w']
             B, C, T, h, w = cond_latent_lr.shape
             H = 90
             W = 160
