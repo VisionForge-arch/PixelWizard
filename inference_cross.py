@@ -131,23 +131,6 @@ if dist.is_initialized():
 
 
 
-def encode_to_latent(model, pixel: torch.Tensor) -> torch.Tensor:
-    # pixel: [batch_size, num_channels, num_frames, height, width]
-    
-    print("in the fx, the pixel shape is:")
-    print(pixel.shape)
-    output = [
-        model.vae.encode([u])[0].float().squeeze(0)
-        for u in pixel
-    ]
-    
-    output = torch.stack(output, dim=0)
-    # from [batch_size, num_channels, num_frames, height, width]
-    # to [batch_size, num_frames, num_channels, height, width]
-    # output = output.permute(0, 2, 1, 3, 4)
-    return output
-
-
 
 for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
     #idx = batch_data['idx'].item()
@@ -182,6 +165,10 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         prompt = batch["prompt"]
         video_input = batch["file"].to(device=device, dtype=torch.bfloat16)
         prompts = [prompt] * args.num_samples
+        
+        print(prompt)
+        print(prompts)
+        
         initial_latent = None
 
         sampled_noise = torch.randn(
@@ -224,6 +211,8 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
 
     # Clear VAE cache
     pipeline.vae.model.clear_cache()
+    
+    exit()
 
     # Save the video if the current prompt is not a dummy prompt
     if idx < num_prompts:
