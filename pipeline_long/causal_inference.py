@@ -35,7 +35,7 @@ class CausalInferencePipeline(torch.nn.Module):
             self.denoising_step_list = timesteps[1000 - self.denoising_step_list]
 
         self.num_transformer_blocks = 30
-        self.frame_seq_length = 90*160 # 30*52
+        self.frame_seq_length = 45*80 # 30*52
 
         self.kv_cache1 = None
         self.args = args
@@ -303,7 +303,7 @@ class CausalInferencePipeline(torch.nn.Module):
         #     kv_cache_size = self.local_attn_size * self.frame_seq_length
         # else:
             # Use the default KV cache size
-        kv_cache_size = 90*160*21 # 30*52*21
+        kv_cache_size = 45*80*33 # 30*52*21
 
         for _ in range(self.num_transformer_blocks):
             kv_cache1.append({
