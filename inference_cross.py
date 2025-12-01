@@ -179,7 +179,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         )
     else:
         # For text-to-video, batch is just the text prompt
-        prompt = batch["prompts"]
+        prompt = batch["prompt"]
         video_input = batch["file"]
         prompts = [prompt] * args.num_samples
         initial_latent = None
