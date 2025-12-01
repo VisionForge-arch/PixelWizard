@@ -150,7 +150,7 @@ def encode_to_latent(model, pixel: torch.Tensor) -> torch.Tensor:
 
 
 for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
-    idx = batch_data['idx'].item()
+    #idx = batch_data['idx'].item()
 
     # For DataLoader batch_size=1, the batch_data is already a single item, but in a batch container
     # Unpack the batch data for convenience
