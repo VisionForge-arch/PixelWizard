@@ -16,7 +16,7 @@ from torch.utils.data.distributed import DistributedSampler
 from pipeline_long import (
     CausalInferencePipeline,
 )
-from dataset_text import TextDataset_json
+#from dataset_text import TextDataset_json
 from utils.misc import set_seed
 
 from demo_utils.memory import gpu, get_cuda_free_memory_gb, DynamicSwapInstaller
