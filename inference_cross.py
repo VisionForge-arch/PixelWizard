@@ -17,7 +17,7 @@ from pipeline_long import (
     CausalInferencePipeline,
 )
 #from dataset_text import TextDataset_json
-from utils.misc import set_seed
+from utils_long.misc import set_seed
 
 from demo_utils.memory import gpu, get_cuda_free_memory_gb, DynamicSwapInstaller
 from dataset_upsample import UnifiedDataset
