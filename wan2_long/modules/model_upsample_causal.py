@@ -134,17 +134,47 @@ class CausalWanSelfAttention(nn.Module):
                 block_mask=block_mask,
             )[:, :, :-padded_length].transpose(2, 1)
         else:
+            frame_seqlen = math.prod(grid_sizes[0][1:]).item()
+            current_start_frame = current_start // frame_seqlen
             roped_query = causal_rope_apply(
-                q, grid_sizes, freqs, start_frame=current_start // math.prod(grid_sizes[0][1:]).item()
+                q, grid_sizes, freqs, start_frame=current_start_frame
             ).type_as(v)
             roped_key = causal_rope_apply(
-                k, grid_sizes, freqs, start_frame=current_start // math.prod(grid_sizes[0][1:]).item()
+                k, grid_sizes, freqs, start_frame=current_start_frame
             ).type_as(v)
 
-            kv_cache["k"][:, current_start:current_end] = roped_key
-            kv_cache["v"][:, current_start:current_end] = v
+            current_end = current_start + roped_query.shape[1]  # 这里补上
 
-            x = attention(roped_query, kv_cache["k"][:, :current_end], kv_cache["v"][:, :current_end])
+            sink_tokens = self.sink_size * frame_seqlen
+            kv_cache_size = kv_cache["k"].shape[1]
+            num_new_tokens = roped_query.shape[1]
+
+            # if self.local_attn_size != -1 and (current_end > kv_cache["global_end_index"].item()) and (
+            #         num_new_tokens + kv_cache["local_end_index"].item() > kv_cache_size):
+            #     num_evicted_tokens = num_new_tokens + kv_cache["local_end_index"].item() - kv_cache_size
+            #     num_rolled_tokens = kv_cache["local_end_index"].item() - num_evicted_tokens - sink_tokens
+            #     kv_cache["k"][:, sink_tokens:sink_tokens + num_rolled_tokens] = \
+            #         kv_cache["k"][:, sink_tokens + num_evicted_tokens:sink_tokens + num_evicted_tokens + num_rolled_tokens].clone()
+            #     kv_cache["v"][:, sink_tokens:sink_tokens + num_rolled_tokens] = \
+            #         kv_cache["v"][:, sink_tokens + num_evicted_tokens:sink_tokens + num_evicted_tokens + num_rolled_tokens].clone()
+            #     local_end_index = kv_cache["local_end_index"].item() + current_end - \
+            #         kv_cache["global_end_index"].item() - num_evicted_tokens
+            #     local_start_index = local_end_index - num_new_tokens
+            #     kv_cache["k"][:, local_start_index:local_end_index] = roped_key
+            #     kv_cache["v"][:, local_start_index:local_end_index] = v
+            # else:
+            local_end_index = kv_cache["local_end_index"].item() + current_end - kv_cache["global_end_index"].item()
+            local_start_index = local_end_index - num_new_tokens
+            kv_cache["k"][:, local_start_index:local_end_index] = roped_key
+            kv_cache["v"][:, local_start_index:local_end_index] = v
+
+            x = attention(
+                roped_query,
+                kv_cache["k"][:, max(0, local_end_index - self.max_attention_size):local_end_index],
+                kv_cache["v"][:, max(0, local_end_index - self.max_attention_size):local_end_index]
+            )
+            kv_cache["global_end_index"].fill_(current_end)
+            kv_cache["local_end_index"].fill_(local_end_index)
 
         # output
         x = x.flatten(2)
@@ -197,7 +227,6 @@ class CausalWanAttentionBlock(nn.Module):
         kv_cache=None,
         crossattn_cache=None,
         current_start=0,
-        current_end=0,
         lr_latents=None,  # interface parity with spatial control wrapper
     ):
         r"""
