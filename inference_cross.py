@@ -27,7 +27,7 @@ parser.add_argument("--config_path", type=str, default="./configs/self_forcing_d
 parser.add_argument("--checkpoint_path", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up_2/checkpoint_model_009800/model.pt", help="Path to the checkpoint folder")
 parser.add_argument("--prompt_file", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file.json", help="JSON file with prompts/files for upsample inference")
 parser.add_argument("--output_folder", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/outputs/", help="Output folder")
-parser.add_argument("--num_output_frames", type=int, default=42, help="Number of overlap frames between sliding windows")
+parser.add_argument("--num_output_frames", type=int, default=30, help="Number of overlap frames between sliding windows")
 parser.add_argument("--i2v", action="store_true", help="Whether to perform I2V (or T2V by default)")
 parser.add_argument("--use_ema", action="store_true", default=True, help="Whether to use EMA parameters")
 parser.add_argument("--seed", type=int, default=0, help="Random seed")
@@ -107,7 +107,7 @@ dataset = UnifiedDataset(
         width=832,
         height_division_factor=16,
         width_division_factor=16,
-        num_frames=config.num_frames,
+        num_frames=121,
         time_division_factor=4,
         time_division_remainder=1,
     ),
@@ -172,7 +172,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         initial_latent = None
 
         sampled_noise = torch.randn(
-            [args.num_samples, args.num_output_frames, 16, 60, 104], device=device, dtype=torch.bfloat16
+            [args.num_samples, args.num_output_frames, 48, 90, 160], device=device, dtype=torch.bfloat16
         )
         
         print(video_input.shape)
