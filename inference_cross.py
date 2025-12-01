@@ -68,7 +68,7 @@ config.seq_len = int(config.height // 32) * int(config.width // 32) * time_part
 # Initialize pipeline
 # Few-step inference
 pipeline = CausalInferencePipeline(config, device=device)
-
+pipeline.generator.eval()
 
 # if args.checkpoint_path:
 #     state_dict = torch.load(args.checkpoint_path, map_location="cpu")
