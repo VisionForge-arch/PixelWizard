@@ -1,6 +1,7 @@
 import argparse
 import torch
 import os
+import json
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 from omegaconf import OmegaConf
 from tqdm import tqdm
@@ -9,6 +10,7 @@ from torchvision.io import write_video
 from einops import rearrange
 import torch.distributed as dist
 from torch.utils.data import DataLoader, SequentialSampler
+import torch.nn.functional as F
 from torch.utils.data.distributed import DistributedSampler
 
 from pipeline_long import (
@@ -18,21 +20,19 @@ from dataset_text import TextDataset_json
 from utils.misc import set_seed
 
 from demo_utils.memory import gpu, get_cuda_free_memory_gb, DynamicSwapInstaller
+from dataset_upsample import UnifiedDataset
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config_path", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing/configs/self_forcing_dmd0.yaml", help="Path to the config file")
-#parser.add_argument("--checkpoint_path", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing/checkpoints/self_forcing_dmd.pt", help="Path to the checkpoint folder")
 parser.add_argument("--checkpoint_path", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/logs/self_forcing_dmd/checkpoint_model_000050/model.pt", help="Path to the checkpoint folder")
-parser.add_argument("--data_path", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/data/ultralong_32_extracted.json", help="Path to the dataset")
-parser.add_argument("--extended_prompt_path", type=str, help="Path to the extended prompt")
+parser.add_argument("--prompt_file", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file.json", help="JSON file with prompts/files for upsample inference")
 parser.add_argument("--output_folder", type=str, default="/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/outputs/", help="Output folder")
 parser.add_argument("--num_output_frames", type=int, default=42, help="Number of overlap frames between sliding windows")
 parser.add_argument("--i2v", action="store_true", help="Whether to perform I2V (or T2V by default)")
 parser.add_argument("--use_ema", action="store_true", default=True, help="Whether to use EMA parameters")
 parser.add_argument("--seed", type=int, default=0, help="Random seed")
 parser.add_argument("--num_samples", type=int, default=1, help="Number of samples to generate per prompt")
-parser.add_argument("--save_with_index", action="store_true",
-                    help="Whether to save the video using the index or prompt as the filename")
+parser.add_argument("--save_with_index", action="store_true", help="Whether to save the video using the index or prompt as the filename")
 args = parser.parse_args()
 
 # Initialize distributed inference
@@ -57,6 +57,12 @@ torch.set_grad_enabled(False)
 config = OmegaConf.load(args.config_path)
 default_config = OmegaConf.load("/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/configs/default_config0.yaml")
 config = OmegaConf.merge(default_config, config)
+# set SR/causal flags to match training
+config.sr_mode = True
+config.causal = True
+# recompute seq_len based on height/width/num_frames from config
+time_part = int((config.num_frames - 1) // config.time_division_factor) + 1
+config.seq_len = int(config.height // 32) * int(config.width // 32) * time_part
 
 # Initialize pipeline
 # Few-step inference
@@ -89,9 +95,26 @@ pipeline.vae.to(device=gpu)
 
 
 # Create dataset
-dataset = TextDataset_json(prompt_path=args.data_path)
+dataset = UnifiedDataset(
+    base_path=None,
+    metadata_path=args.prompt_file,
+    repeat=1,
+    data_file_keys=("file",),
+    main_data_operator=UnifiedDataset.default_video_operator(
+        base_path=None,
+        max_pixels=832*480,
+        height=480,
+        width=832,
+        height_division_factor=16,
+        width_division_factor=16,
+        num_frames=config.num_frames,
+        time_division_factor=4,
+        time_division_remainder=1,
+    ),
+)
+print("len(dataset):", len(dataset))
 num_prompts = len(dataset)
-print(f"Number of prompts: {num_prompts}")
+
 
 if dist.is_initialized():
     sampler = DistributedSampler(dataset, shuffle=False, drop_last=True)
@@ -107,17 +130,23 @@ if dist.is_initialized():
     dist.barrier()
 
 
-def encode(self, videos: torch.Tensor) -> torch.Tensor:
-    device, dtype = videos[0].device, videos[0].dtype
-    scale = [self.mean.to(device=device, dtype=dtype),
-             1.0 / self.std.to(device=device, dtype=dtype)]
-    output = [
-        self.model.encode(u.unsqueeze(0), scale).float().squeeze(0)
-        for u in videos
-    ]
 
+def encode_to_latent(model, pixel: torch.Tensor) -> torch.Tensor:
+    # pixel: [batch_size, num_channels, num_frames, height, width]
+    
+    print("in the fx, the pixel shape is:")
+    print(pixel.shape)
+    output = [
+        model.vae.encode([u])[0].float().squeeze(0)
+        for u in pixel
+    ]
+    
     output = torch.stack(output, dim=0)
+    # from [batch_size, num_channels, num_frames, height, width]
+    # to [batch_size, num_frames, num_channels, height, width]
+    # output = output.permute(0, 2, 1, 3, 4)
     return output
+
 
 
 for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
@@ -150,13 +179,33 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         )
     else:
         # For text-to-video, batch is just the text prompt
-        prompt = batch["prompts"]['detailed_description'][0]
+        prompt = batch["prompts"]
+        video_input = batch["file"]
         prompts = [prompt] * args.num_samples
         initial_latent = None
 
         sampled_noise = torch.randn(
             [args.num_samples, args.num_output_frames, 16, 60, 104], device=device, dtype=torch.bfloat16
         )
+        
+        print(video_input.shape)
+
+        with torch.no_grad():
+            cond_latent_lr = encode_to_latent(pipeline, video_input)  # [B,C,T,h',w']
+            B, C, T, h, w = cond_latent_lr.shape
+            H = 90
+            W = 160
+            print("cond_latent_lr.shape:", cond_latent_lr.shape)
+            cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)  
+            cond_latent_lr = cond_latent_lr.reshape(B*T, C, h, w)  # [B*C, T, h, w]
+            cond_latent_lr = F.interpolate(cond_latent_lr, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
+            cond_latent_lr = cond_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)  # [B*C, T, h, w]
+            #print(cond_latent.shape) # [1, 31, 48, 30, 52]
+            cond_latent_lr = cond_latent_lr.to(device=device, dtype=torch.float32)
+  
+    print(cond_latent_lr.shape)
+    exit()
+        
 
     # Generate 81 frames
     video, latents = pipeline.inference(

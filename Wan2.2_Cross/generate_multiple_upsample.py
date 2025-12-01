@@ -492,7 +492,7 @@ def generate(args):
             # ========== (A) 准备 cond_latent (480p 条件) ==========
             
 
-            video_input = video_input#.permute(0, 2, 1, 3, 4)
+            #video_input = video_input#.permute(0, 2, 1, 3, 4)
             
             print(video_input.shape)
 

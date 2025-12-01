@@ -22,9 +22,9 @@ class CausalInferencePipeline(torch.nn.Module):
                 **getattr(args, "model_kwargs", {}),
                 is_causal=True,
                 local_attn_size=getattr(args, "local_attn_size", -1),
-                seq_len=getattr(args, "seq_len", 35 * 52 * 21),
-                sr=getattr(args, "sr_mode", False),
-                cross=getattr(args, "cross", False),
+                seq_len=args.seq_len,
+                sr=args.sr_mode,
+                causal=args.causal,
             )
             if generator is None
             else generator
@@ -45,7 +45,7 @@ class CausalInferencePipeline(torch.nn.Module):
 
         self.kv_cache1 = None
         self.args = args
-        self.num_frame_per_block = getattr(args, "num_frame_per_block", 1)
+        self.num_frame_per_block = getattr(args, "num_frame_per_block", 3)
         self.independent_first_frame = args.independent_first_frame
         self.local_attn_size = self.generator.model.local_attn_size
 
