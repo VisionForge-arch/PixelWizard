@@ -89,6 +89,7 @@ class CausalInferencePipeline(torch.nn.Module):
         conditional_dict = self.text_encoder(
             text_prompts=text_prompts
         )
+        
         if clean_latent_lr is not None:
             assert clean_latent_lr.shape[1] >= num_frames, "clean_latent_lr must cover target frames"
 
@@ -295,12 +296,12 @@ class CausalInferencePipeline(torch.nn.Module):
         Initialize a Per-GPU KV cache for the Wan model.
         """
         kv_cache1 = []
-        if self.local_attn_size != -1:
-            # Use the local attention size to compute the KV cache size
-            kv_cache_size = self.local_attn_size * self.frame_seq_length
-        else:
+        # if self.local_attn_size != -1:
+        #     # Use the local attention size to compute the KV cache size
+        #     kv_cache_size = self.local_attn_size * self.frame_seq_length
+        # else:
             # Use the default KV cache size
-            kv_cache_size = 32760 # 30*52*21
+        kv_cache_size = 90*160*21 # 30*52*21
 
         for _ in range(self.num_transformer_blocks):
             kv_cache1.append({
