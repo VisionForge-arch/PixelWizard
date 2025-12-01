@@ -221,7 +221,17 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
     # Remove any temporal padding we added for 3x blocks.
     num_input_frames = 0 if initial_latent is None else initial_latent.shape[1]
     target_total_frames = target_frames + num_input_frames
-    latents = latents[:, :, :target_total_frames].contiguous()
+    latents = latents[:, :target_total_frames].contiguous()
+
+    # Align latent format with Wan2.2_Cross generate_multiple_upsample: list of [C, T, H, W]
+    latents_to_save = []
+    for sample_idx in range(latents.shape[0]):
+        latents_to_save.append(
+            latents[sample_idx]
+            .permute(2, 0, 3, 4)  # [T, C, H, W] -> [C, T, H, W]
+            .contiguous()
+            .to(dtype=torch.float32, device="cpu")
+        )
 
     prompt_text = prompts[0] if isinstance(prompts, (list, tuple)) else prompts
     formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -232,10 +242,10 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
     print(f"Saving latent to {output_path}")
     torch.save(
         {
-            "latent": latents.cpu(),
+            "latent": latents_to_save,
             "prompt": prompt_text,
             "seed": args.seed,
-            "frame_num": latents.shape[1],
+            "frame_num": target_total_frames,
             "num_samples": args.num_samples,
             "size": f"{config.height}x{config.width}",
         },
