@@ -80,6 +80,8 @@ class CausalWanSelfAttention(nn.Module):
         self.o = nn.Linear(dim, dim)
         self.norm_q = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
         self.norm_k = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
+        
+        self.max_attention_size = 32760 
 
     def forward(self, x, seq_lens, grid_sizes, freqs, block_mask, kv_cache=None, current_start=0):
         r"""
@@ -170,8 +172,8 @@ class CausalWanSelfAttention(nn.Module):
 
             x = attention(
                 roped_query,
-                kv_cache["k"][:, max(0, local_end_index - self.max_attention_size):local_end_index],
-                kv_cache["v"][:, max(0, local_end_index - self.max_attention_size):local_end_index]
+                kv_cache["k"][:, :local_end_index],
+                kv_cache["v"][:, :local_end_index]
             )
             kv_cache["global_end_index"].fill_(current_end)
             kv_cache["local_end_index"].fill_(local_end_index)
