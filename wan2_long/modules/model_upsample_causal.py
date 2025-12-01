@@ -475,6 +475,10 @@ class WanModel_Upsample_Causal(ModelMixin, ConfigMixin):
         grid_sizes = torch.stack([torch.tensor(u.shape[2:], dtype=torch.long) for u in x])
         x = [u.flatten(2).transpose(1, 2) for u in x]
         seq_lens = torch.tensor([u.size(1) for u in x], dtype=torch.long)
+        
+        print(f"seq_len_max:{seq_lens.max()}")
+        print(f"seq_len: {seq_len}")
+        
         assert seq_lens.max() <= seq_len
         x = torch.cat(x)
 

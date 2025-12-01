@@ -61,7 +61,8 @@ config = OmegaConf.merge(default_config, config)
 config.sr_mode = True
 config.causal = True
 # recompute seq_len based on height/width/num_frames from config
-time_part = int((config.num_frames - 1) // 4) + 1
+# time_part = int((config.num_frames - 1) // 4) + 1
+time_part = args.num_output_frames
 config.seq_len = int(config.height // 32) * int(config.width // 32) * time_part
 
 # Initialize pipeline
