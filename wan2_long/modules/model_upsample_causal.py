@@ -453,6 +453,7 @@ class WanModel_Upsample_Causal(ModelMixin, ConfigMixin):
         crossattn_cache: dict = None,
         current_start: int = 0,
         current_end: int = 0,
+        cache_start: int = None,
         lr_latents=None,
     ):
         r"""

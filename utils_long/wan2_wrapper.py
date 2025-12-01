@@ -251,8 +251,10 @@ class WanDiffusionWrapper(torch.nn.Module):
         self,
         noisy_image_or_video: torch.Tensor, conditional_dict: dict,
         timestep: torch.Tensor, 
+        kv_cache: Optional[List[dict]] = None,
         crossattn_cache: Optional[List[dict]] = None,
         current_start: Optional[int] = None,
+        cache_start: Optional[int] = None,
         lr_context: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
 
@@ -271,23 +273,34 @@ class WanDiffusionWrapper(torch.nn.Module):
         x = noisy_image_or_video.permute(0, 2, 1, 3, 4)
         # if x.shape[1] == 96:
             #x = self.proj_in(x)
-        
-        # X0 prediction
-        if lr_context is not None:
+            
+        if kv_cache is not None:
             flow_pred = self.model(
-                x,
-                t=input_timestep, 
-                context=prompt_embeds,
+                noisy_image_or_video.permute(0, 2, 1, 3, 4),
+                t=input_timestep, context=prompt_embeds,
                 seq_len=self.seq_len,
-                lr_latents=lr_context,
+                kv_cache=kv_cache,
+                crossattn_cache=crossattn_cache,
+                current_start=current_start,
+                cache_start=cache_start
             ).permute(0, 2, 1, 3, 4)
         else:
-            flow_pred = self.model(
-                x,
-                t=input_timestep, 
-                context=prompt_embeds,
-                seq_len=self.seq_len,
-            ).permute(0, 2, 1, 3, 4)
+            # X0 prediction
+            if lr_context is not None:
+                flow_pred = self.model(
+                    x,
+                    t=input_timestep, 
+                    context=prompt_embeds,
+                    seq_len=self.seq_len,
+                    lr_latents=lr_context,
+                ).permute(0, 2, 1, 3, 4)
+            else:
+                flow_pred = self.model(
+                    x,
+                    t=input_timestep, 
+                    context=prompt_embeds,
+                    seq_len=self.seq_len,
+                ).permute(0, 2, 1, 3, 4)
 
         # flow_pred: [1, 33, 16, 30, 52]
         # pred_x0 = self._convert_flow_pred_to_x0(
