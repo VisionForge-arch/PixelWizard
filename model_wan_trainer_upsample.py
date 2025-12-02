@@ -17,6 +17,7 @@ from utils_long.distributed import EMA_FSDP, fsdp_wrap, fsdp_state_dict, launch_
 import torch.distributed as dist
 from dataset import UnifiedDataset, cycle
 import torch.nn.functional as F
+import torchvision.transforms.functional as TF
 
 class WanModel_Trainer:
     def __init__(self, config):
@@ -122,6 +123,10 @@ class WanModel_Trainer:
         
 
 
+    def random_blur(frames):
+        k = random.choice([3, 5, 7])
+        sigma = random.uniform(0.1, 3.0)
+        return TF.gaussian_blur(frames, kernel_size=k, sigma=sigma)
 
     def train_one_step(self, batch):
         self.model.train()
@@ -145,6 +150,9 @@ class WanModel_Trainer:
         frames_480p = frames.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W)
         
         frames_480p = F.interpolate(frames_480p,  size=(480, 832), mode='bilinear', align_corners=False)
+        
+        frames_480p = self.random_blur(frames_480p)  # 低质引导再退化
+        
         frames_480p = frames_480p.reshape(B, T, C, 480, 832).permute(0, 2, 1, 3, 4)   # [b, C, T, h, w]
         
         
