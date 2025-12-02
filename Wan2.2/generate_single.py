@@ -2,7 +2,7 @@
 import argparse
 import logging
 import os
-#os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import sys
 import warnings
 from datetime import datetime
@@ -123,13 +123,13 @@ def _parse_args():
     parser.add_argument(
         "--frame_num",
         type=int,
-        default=73,
+        default=121,
         help="How many frames of video are generated. The number should be 4n+1"
     )
     parser.add_argument(
         "--ckpt_dir",
         type=str,
-        default="/hpc2ssd/JH_DATA/spooler/htian395/Wenxue/Weight/Wan2.2-TI2V-5B",
+        default="/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B",
         help="The path to the checkpoint directory.")
     parser.add_argument(
         "--offload_model",

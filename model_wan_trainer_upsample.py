@@ -151,6 +151,7 @@ class WanModel_Trainer:
         
         frames_480p = F.interpolate(frames_480p,  size=(480, 832), mode='bilinear', align_corners=False)
         
+        
         frames_480p = self.random_blur(frames_480p)  # 低质引导再退化
         
         frames_480p = frames_480p.reshape(B, T, C, 480, 832).permute(0, 2, 1, 3, 4)   # [b, C, T, h, w]
