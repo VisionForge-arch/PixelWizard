@@ -427,8 +427,8 @@ def register_spatial_control(model):
             
             # ==========================================================
             # ⭐⭐ 关键 1：只在前 num_control_blocks 层注入，后面的层不做任何事
-            if block_idx >= 10:
-                return args
+            # if block_idx >= 10:
+            #     return args
              # ==========================================================
 
             # 2. 获取当前层的控制特征

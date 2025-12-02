@@ -169,7 +169,7 @@ class WanModel_Trainer:
 
             clean_latent_lr = clean_latent_lr.reshape(B*T, C, h, w)  # [B*T, C, h, w]
             clean_latent_lr = F.interpolate(clean_latent_lr, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
-            clean_latent_lr = clean_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4).contiguous()
+            clean_latent_lr = clean_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4).contiguous()  # [B, C, T, H, W]
             
             
             noise_std = 0.1
