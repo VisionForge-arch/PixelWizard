@@ -123,7 +123,7 @@ class WanModel_Trainer:
         
 
 
-    def random_blur(frames):
+    def random_blur(self, frames):
         k = random.choice([3, 5, 7])
         sigma = random.uniform(0.1, 3.0)
         return TF.gaussian_blur(frames, kernel_size=k, sigma=sigma)
