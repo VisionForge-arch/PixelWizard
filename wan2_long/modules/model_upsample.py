@@ -482,7 +482,11 @@ def register_spatial_control(model):
             if not hasattr(model, '_current_spatial_ctx') or model._current_spatial_ctx is None:
                 return args # 不做任何修改
             
-            ctx = model._current_spatial_ctx
+            ctx = getattr(model, "_current_spatial_ctx", None)
+            if ctx is None:
+                ctx = getattr(model, "_spatial_ctx_cache", None)
+            if ctx is None:
+                return args
             # controls 是一个 list，长度等于 layer 数
             controls = ctx['controls'] 
             
@@ -577,17 +581,20 @@ def register_spatial_control(model):
         controls = self.spatial_adapter(lr_latents, t_freq)
         
         #self._current_spatial_ctx = {'controls': controls}
-        self._current_spatial_ctx = {'controls': controls, 'skip_masks': {}}
+        ctx = {'controls': controls, 'skip_masks': {}}
+
+        self._current_spatial_ctx = ctx
+        self._spatial_ctx_cache = ctx   # <- persists for checkpoint recompute
 
         try:
-            # 3. 调用原始 forward
-            # 注意：原始 forward 内部还会算一遍 time embedding，
-            # 虽然有点重复计算，但为了不魔改 _forward 内部代码，这是最干净的写法。
-            # 只要 t 没变，逻辑就是一致的。
             kwargs['lr_latents'] = lr_latents
-            return original_forward(x, t, context, seq_len, **kwargs)
+            out = original_forward(x, t, context, seq_len, **kwargs)
         finally:
-            self._current_spatial_ctx = None
+            # clear only when not using checkpointing; otherwise leave for replay
+            if not self.gradient_checkpointing:
+                self._current_spatial_ctx = None
+                self._spatial_ctx_cache = None
+        return out
 
     import types
     model.forward = types.MethodType(forward_with_spatial_control, model)
