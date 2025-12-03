@@ -497,6 +497,9 @@ def register_spatial_control(model):
             if block_idx % 8 != 0:
               return args
           
+            # 2. 获取当前层的控制特征
+            control_feat = controls[block_idx] # [B, L_ctrl, Dim]
+          
             # ⭐⭐ 新增：按概率跳过某些样本的 LR 控制
             skip_prob = getattr(model, "spatial_skip_prob", 0.2)  # 0.0 表示不跳过
             if skip_prob > 0:
@@ -504,8 +507,7 @@ def register_spatial_control(model):
                 control_feat = control_feat * mask
             
 
-            # 2. 获取当前层的控制特征
-            control_feat = controls[block_idx] # [B, L_ctrl, Dim]
+            
             
             x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
 
