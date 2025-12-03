@@ -491,8 +491,18 @@ def register_spatial_control(model):
             
             
             # ⭐⭐ 关键 1：只在前 num_control_blocks 层注入，后面的层不做任何事
-            if block_idx >= 10:
-                return args
+            # if block_idx >= 10:
+            #     return args
+            
+            if block_idx % 8 != 0:
+              return args
+          
+            # ⭐⭐ 新增：按概率跳过某些样本的 LR 控制
+            skip_prob = getattr(model, "spatial_skip_prob", 0.2)  # 0.0 表示不跳过
+            if skip_prob > 0:
+                mask = (torch.rand(control_feat.size(0), 1, 1, device=control_feat.device) >= skip_prob)
+                control_feat = control_feat * mask
+            
 
             # 2. 获取当前层的控制特征
             control_feat = controls[block_idx] # [B, L_ctrl, Dim]
