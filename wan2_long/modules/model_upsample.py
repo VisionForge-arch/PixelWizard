@@ -494,7 +494,7 @@ def register_spatial_control(model):
             # if block_idx >= 10:
             #     return args
             
-            if block_idx % 8 != 0:
+            if block_idx % 6 != 0:
               return args
           
             # 2. 获取当前层的控制特征
