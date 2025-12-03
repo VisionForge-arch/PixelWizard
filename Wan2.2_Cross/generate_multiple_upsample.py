@@ -163,7 +163,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/720p_upsample_first10_blur",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/720p_upsample_6layers_blur",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
@@ -301,14 +301,14 @@ def _parse_args():
     parser.add_argument(
         "--prompt_file",
         type=str,
-        #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file.json",
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/720p_i2v_matched.json",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file.json",
+        #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/720p_i2v_matched.json",
         help="The file to read the prompts from.")
     parser.add_argument(
         "--wan_ckpt",
         type=str,
         #default=None,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up_2/checkpoint_model_002400/model.pt",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up_2/checkpoint_model_000700/model.pt",
         help="The path to the Wan checkpoint.")
     args = parser.parse_args()
     _validate_args(args)
