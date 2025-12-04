@@ -507,11 +507,10 @@ def register_spatial_control(model):
             # ⭐⭐ 新增：按概率跳过某些样本的 LR 控制
             skip_prob = getattr(model, "spatial_skip_prob", 0.2)  # 0.0 表示不跳过
             if skip_prob > 0:
-                masks = ctx.setdefault("skip_masks", {})
-                mask = masks.get(block_idx)
+                mask = ctx.get("global_skip_mask")
                 if mask is None:
                     mask = (torch.rand(control_feat.size(0), 1, 1, device=control_feat.device) >= skip_prob)
-                    masks[block_idx] = mask
+                    ctx["global_skip_mask"] = mask
                 control_feat = control_feat * mask
             
 
