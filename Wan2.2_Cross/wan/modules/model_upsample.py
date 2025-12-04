@@ -429,7 +429,7 @@ def register_spatial_control(model):
             # ⭐⭐ 关键 1：只在前 num_control_blocks 层注入，后面的层不做任何事
             # if block_idx >= 10:
             #     return args
-            if block_idx % 6 != 0:
+            if  block_idx >= 10 and block_idx % 6 != 0:
                 return args
              # ==========================================================
 
@@ -465,7 +465,7 @@ def register_spatial_control(model):
             
             # 4. [关键] 特征相加 (Feature Injection)
             # print(x.shape)
-            x_new = x + 0.5 * control_feat.type_as(x)
+            x_new = x + control_feat.type_as(x)
             
             # print(x_new.shape)
             # print("add successfully!!!")
