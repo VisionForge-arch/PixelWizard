@@ -8,7 +8,7 @@ prompt_txt = "/root/ultrawan/Wan2.2/prompt.txt"                   # 每行一个
 video_dir  = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/720p_5s/decode_video0"        # 存放 .mp4 或 .pt 文件的目录
 
 
-pat = re.compile(r"^ti2v-5B_1280\*704_8_(?:\+?prompt_)?(?P<frag>.+?)_\d{8}_\d{6}\.(?:pt|mp4)$")
+pat = re.compile(r"^ti2v-5B_1280\*704_1_(?:\+?prompt_)?(?P<frag>.+?)_\d{8}_\d{6}\.(?:pt|mp4)$")
 
 def normalize(p: str) -> str:
     # 和你保存时完全一致：只做空格与斜杠替换，然后截断 50
@@ -39,11 +39,13 @@ for p in prompts:
         cand = difflib.get_close_matches(np, frags, n=1, cutoff=0.75)
         if cand:
             exact = next(fn for fn, frag in file_frag_by_name.items() if frag == cand[0])
-    mapping.append({
-        "prompt": p,
-        "normalized": np,
-        "file": os.path.join(video_dir, exact) if exact else None
-    })
+    # 只有匹配成功时才添加到 mapping
+    if exact is not None:
+        mapping.append({
+            "prompt": p,
+            "normalized": np,
+            "file": os.path.join(video_dir, exact)
+        })
 
 out_json = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file_720p.json"
 with open(out_json, "w", encoding="utf-8") as f:
