@@ -103,6 +103,10 @@ class WanModel_Trainer:
 
         
         # ===== optimizer =====
+        trainable = sum(p.numel() for p in self.model.generator.parameters() if p.requires_grad)
+        print(f"trainable params: {trainable/1e6:.2f}M")
+        
+        
         self.generator_optimizer = torch.optim.AdamW(
             [param for param in self.model.generator.parameters()
              if param.requires_grad],
