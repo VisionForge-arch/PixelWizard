@@ -465,7 +465,7 @@ def register_spatial_control(model):
             
             # 4. [关键] 特征相加 (Feature Injection)
             # print(x.shape)
-            x_new = x + 0.05 * control_feat.type_as(x)
+            x_new = x + 0.1 * control_feat.type_as(x)
             
             # print(x_new.shape)
             # print("add successfully!!!")
