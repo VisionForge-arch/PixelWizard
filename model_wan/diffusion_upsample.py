@@ -72,6 +72,11 @@ class SelfForcingWan_Upsample(nn.Module):
         self.seq_len = args.seq_len
         self.generator = WanDiffusionWrapper(**getattr(args, "model_kwargs", {}), seq_len=self.seq_len, sr=self.sr_mode)
         self.generator.model.requires_grad_(True)
+        
+        # 追加：冻结主干、仅保留 adapter
+        for name, p in self.generator.model.named_parameters():
+            if not name.startswith("spatial_adapter"):
+                p.requires_grad_(False)
 
         self.text_encoder = WanTextEncoder()
         self.text_encoder.requires_grad_(False)
