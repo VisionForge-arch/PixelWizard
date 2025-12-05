@@ -406,11 +406,11 @@ class WanSpatialControlAdapter(nn.Module):
         self.feature_norm = nn.LayerNorm(model_dim, eps=1e-6)
 
         # 3. Guidance Timestep Embedding (控制强度的开关)
-        # self.adapter_time_proj = nn.Sequential(
-        #     nn.Linear(freq_dim, model_dim * 2),
-        #     nn.SiLU(),
-        #     nn.Linear(model_dim * 2, model_dim * 2),
-        # )
+        self.adapter_time_proj = nn.Sequential(
+            nn.Linear(freq_dim, model_dim * 2),
+            nn.SiLU(),
+            nn.Linear(model_dim * 2, model_dim * 2),
+        )
         
         # 4. [核心] Per-Block Zero Layers
         # 为主干网络的每一层 block 准备一个独立的 Zero Linear
@@ -436,8 +436,8 @@ class WanSpatialControlAdapter(nn.Module):
         x = self.backbone(lr_latents)  # [B, C, T, H, ]
         x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
         
-        # w = self.adapter_time_proj(guidance_t_emb)           # [B, 2*D]
-        # scale, shift = w.chunk(2, dim=-1)                    # [B, D], [B, D]
+        w = self.adapter_time_proj(guidance_t_emb)           # [B, 2*D]
+        scale, shift = w.chunk(2, dim=-1)                    # [B, D], [B, D]
 
         
         x = self.feature_norm(x)
@@ -446,7 +446,7 @@ class WanSpatialControlAdapter(nn.Module):
         # 类似于把 guidance 加到 feature 上
         # guidance_t_emb: [B, Dim]
         #print(guidance_t_emb.shape)
-        #x = x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1) # Scale 调制，或者 add 也可以
+        x = x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1) # Scale 调制，或者 add 也可以
             
         # C. 生成每一层的控制特征
         # 5. Generate Per-Layer Controls
@@ -498,22 +498,20 @@ def register_spatial_control(model):
             # if block_idx >= 10:
             #     return args
             
-            # if block_idx % 6 != 0:
-            #   return args
-            if block_idx != 0:  # only inject on the first block
-                return args
+            if block_idx % 6 != 0:
+              return args
           
             # 2. 获取当前层的控制特征
             control_feat = controls[block_idx] # [B, L_ctrl, Dim]
           
             # ⭐⭐ 新增：按概率跳过某些样本的 LR 控制
-            # skip_prob = getattr(model, "spatial_skip_prob", 0.2)  # 0.0 表示不跳过
-            # if skip_prob > 0:
-            #     mask = ctx.get("global_skip_mask")
-            #     if mask is None:
-            #         mask = (torch.rand(control_feat.size(0), 1, 1, device=control_feat.device) >= skip_prob)
-            #         ctx["global_skip_mask"] = mask
-            #     control_feat = control_feat * mask
+            skip_prob = getattr(model, "spatial_skip_prob", 0.2)  # 0.0 表示不跳过
+            if skip_prob > 0:
+                mask = ctx.get("global_skip_mask")
+                if mask is None:
+                    mask = (torch.rand(control_feat.size(0), 1, 1, device=control_feat.device) >= skip_prob)
+                    ctx["global_skip_mask"] = mask
+                control_feat = control_feat * mask
             
 
             
