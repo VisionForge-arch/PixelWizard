@@ -30,6 +30,7 @@ def main():
     parser.add_argument("--logdir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up_2")
     #parser.add_argument("--logdir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_latent_upsample_lora")
     parser.add_argument("--generator_ckpt", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up_2/checkpoint_model_001300/model.pt")
+    parser.add_argument("--load_generator_ckpt", type=bool, default=True)
     args = parser.parse_args()
     
     
@@ -56,6 +57,7 @@ def main():
     config.config_path = args.config_path
     config.logdir = args.logdir
     config.generator_ckpt = args.generator_ckpt
+    config.load_generator_ckpt = args.load_generator_ckpt
     
     time_part = int((config.num_frames - 1) // config.time_division_factor) + 1
     config.seq_len = int(config.height // 32) * int(config.width // 32) * time_part
