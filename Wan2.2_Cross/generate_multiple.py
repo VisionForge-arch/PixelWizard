@@ -210,7 +210,7 @@ def _parse_args():
     parser.add_argument(
         "--sample_shift",
         type=float,
-        default=None,
+        default=3.0,
         help="Sampling shift factor for flow matching schedulers.")
     parser.add_argument(
         "--sample_guide_scale",
@@ -364,7 +364,7 @@ def generate(args):
     
     # 定义要使用的分辨率
     #resolutions = ['1920*1056', '2560*1440', '3840*2144'，'1280*704']
-    resolutions = ['2560*1440']
+    resolutions = [args.size]
     
     # 创建保存文件夹
     output_dir = args.save_file 
