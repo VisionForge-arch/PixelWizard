@@ -127,7 +127,7 @@ class WanModel_Trainer:
         
 
 
-    def random_degrade(self, hr_frames_2k):
+    def random_degrade(self, hr_frames_2k, target_size=(480, 832)):
         
         
         # ========== 瓶颈缩放 =============
@@ -142,8 +142,7 @@ class WanModel_Trainer:
         tiny_frames = F.interpolate(hr_frames_2k, size=(bottleneck_h, bottleneck_w), mode='area')
         
         # 2. 拉回 480p (使用 bilinear 保持模糊感，bicubic 会尝试锐化，不好)
-        target_h, target_w = 480, 854
-        guidance = F.interpolate(tiny_frames, size=(target_h, target_w), mode='bilinear', align_corners=False)
+        guidance = F.interpolate(tiny_frames, size=target_size, mode='bilinear', align_corners=False)
         
         # ======= 高斯模糊 =============
         k = random.choice([7, 9, 11])
