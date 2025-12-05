@@ -127,10 +127,41 @@ class WanModel_Trainer:
         
 
 
-    def random_blur(self, frames):
-        k = random.choice([3, 5, 7])
-        sigma = random.uniform(0.1, 3.0)
-        return TF.gaussian_blur(frames, kernel_size=k, sigma=sigma)
+    def random_degrade(self, hr_frames_2k):
+        
+        
+        # ========== 瓶颈缩放 =============
+        down_factor = random.uniform(8, 32)  # 2K (2048) / 32 = 64 pixel，非常糊
+        
+        # 计算瓶颈尺寸
+        h, w = hr_frames_2k.shape[-2:]
+        bottleneck_h = int(h / down_factor)
+        bottleneck_w = int(w / down_factor)
+        
+        # 1. 缩下去 (使用 area 或 bilinear 保证平滑，不要由 bicubic 产生伪影)
+        tiny_frames = F.interpolate(hr_frames_2k, size=(bottleneck_h, bottleneck_w), mode='area')
+        
+        # 2. 拉回 480p (使用 bilinear 保持模糊感，bicubic 会尝试锐化，不好)
+        target_h, target_w = 480, 854
+        guidance = F.interpolate(tiny_frames, size=(target_h, target_w), mode='bilinear', align_corners=False)
+        
+        # ======= 高斯模糊 =============
+        k = random.choice([7, 9, 11])
+        sigma = random.uniform(3.0, 5.0)
+        guidance = TF.gaussian_blur(guidance, kernel_size=k, sigma=sigma)
+        
+        
+        # ======= 噪声破坏 =============
+        aug_level = 0.0
+        if random.random() < 0.5:
+            # 这里的噪声是为了破坏“像素级对应关系”，强迫模型关注语义
+            aug_level = random.uniform(0.0, 0.1) # 0.1 已经很大了
+            noise = torch.randn_like(guidance) * aug_level
+            guidance = guidance + noise
+    
+        return guidance
+    
+    
 
     def train_one_step(self, batch):
         self.model.train()
@@ -151,9 +182,11 @@ class WanModel_Trainer:
         
         # 处理frames为480p，作为lr guidance。
         B, C, T, H, W = frames.shape
-        frames_480p = frames.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W)
+        frames_lr = frames.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W)   # [B*T, C, H, W]
         
-        frames_480p = F.interpolate(frames_480p,  size=(480, 832), mode='bilinear', align_corners=False)
+        
+        
+        #frames_480p = F.interpolate(frames_480p,  size=(480, 832), mode='bilinear', align_corners=False)
         
         
         frames_480p = self.random_blur(frames_480p)  # 低质引导再退化
