@@ -130,15 +130,10 @@ class WanTI2V_Upsample:
             print(f"Found {len(adapter_keys)} adapter keys in checkpoint")
         
             # 加载主模型权重
-            missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict)
-            if missing_keys:
-                print(f"Missing keys (ignored): {len(missing_keys)} keys")
-            if unexpected_keys:
-                print(f"Unexpected keys (ignored): {len(unexpected_keys)} keys")
-        
-            
-        
-        #==============================================================
+            # missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict)
+            # print(f"Missing keys: {len(missing_keys)}, unexpected: {len(unexpected_keys)}")
+
+        # ==============================================================
 
         
         self.model = self._configure_model(
@@ -148,11 +143,9 @@ class WanTI2V_Upsample:
             shard_fn=shard_fn,
             convert_model_dtype=convert_model_dtype)
         
-    
         
         
-        
-        #============
+        # ======================================================================
         self.model, _ = register_spatial_control(self.model)
         
         try:
@@ -160,7 +153,7 @@ class WanTI2V_Upsample:
             print("Successfully loaded spatial_adapter weights")
         except Exception as e:
             print(f"Warning: Failed to load spatial_adapter weights: {e}")
-        # ============
+        # ======================================================================
          
          
         if use_sp:
