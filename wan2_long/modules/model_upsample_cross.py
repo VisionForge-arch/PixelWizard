@@ -960,7 +960,7 @@ if __name__ == "__main__":
     
     
     model = WanModel_Upsample.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
-    model, lr_layers = register_spatial_control(model)
+    model, lr_layers = register_spatial_control(model, inject_blocks=[0])
     
     model.eval()
     model.to("cuda", dtype=torch.bfloat16)
