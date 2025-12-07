@@ -5,6 +5,7 @@ from torch import nn
 
 from utils_long.scheduler import SchedulerInterface, FlowMatchScheduler
 from wan2_long.modules.model_upsample import WanModel_Upsample
+from wan2_long.modules.model_upsample_cross import WanModel_Upsample_Cross
 from wan2_long.modules.model_upsample_causal import WanModel_Upsample_Causal
 from wan2_long.modules.tokenizers import HuggingfaceTokenizer
 from wan2_long.modules.model import WanModel, RegisterTokens, GanAttentionBlock
