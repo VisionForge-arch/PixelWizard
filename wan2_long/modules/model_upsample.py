@@ -499,7 +499,7 @@ def register_spatial_control(model):
             #     return args
             # if block_idx % 6 != 0:
             #   return args
-            if block_idx != 0:  # only inject on the first block
+            if block_idx != 1:  # only inject on the first block
                 return args
           
             # 2. 获取当前层的控制特征
