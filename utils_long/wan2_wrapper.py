@@ -154,7 +154,7 @@ class WanDiffusionWrapper(torch.nn.Module):
             from wan2_long.modules.model_upsample_cross import register_spatial_control
             self.model = WanModel_Upsample_Cross.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
             self.model, _ = register_spatial_control(self.model, inject_blocks=[0])
-            s
+            
         elif sr is True and causal is True:
             print("=======Causal Model Init=======")
             from wan2_long.modules.model_upsample import register_spatial_control
