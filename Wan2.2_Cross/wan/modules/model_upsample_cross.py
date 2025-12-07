@@ -197,6 +197,43 @@ class WanCrossAttention(WanSelfAttention):
         return x
 
 
+class LRCrossAttention(nn.Module):
+    """Cross attention used for injecting low-res features."""
+
+    def __init__(self, dim, num_heads, qk_norm=True, eps=1e-6):
+        super().__init__()
+        assert dim % num_heads == 0
+        self.dim = dim
+        self.num_heads = num_heads
+        self.head_dim = dim // num_heads
+        self.q = nn.Linear(dim, dim)
+        self.k = nn.Linear(dim, dim)
+        self.v = nn.Linear(dim, dim)
+        self.o = nn.Linear(dim, dim)
+        self.norm_q = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
+        self.norm_k = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
+
+    def forward(self, x, context, context_lens, rope_infos=None):
+        """
+        x: [B, L_q, C], context: [B, L_kv, C]
+        """
+        b, n, d = x.size(0), self.num_heads, self.head_dim
+        q = self.norm_q(self.q(x)).view(b, -1, n, d)
+        k = self.norm_k(self.k(context)).view(b, -1, n, d)
+        v = self.v(context).view(b, -1, n, d)
+
+        if rope_infos is not None:
+            grid_sizes = rope_infos.get("grid_sizes", None)
+            freqs = rope_infos.get("freqs", None)
+            if grid_sizes is not None and freqs is not None:
+                k = rope_apply(k, grid_sizes, freqs)
+
+        out = flash_attention(q, k, v, k_lens=context_lens)
+        out = out.flatten(2)
+        out = self.o(out)
+        return out
+
+
 class WanAttentionBlock(nn.Module):
 
     def __init__(self,
@@ -310,21 +347,23 @@ class Head(nn.Module):
         return x
 
 
-# [新增] Scale Adapter 模块
+# [新增] Scale Adapter 模块（使用 cross-attn 注入）
 class WanSpatialControlAdapter(nn.Module):
-    def __init__(self, 
+    def __init__(self,
                  in_dim,          # LR Latent Channels (e.g., 16)
                  model_dim,       # Transformer Hidden Dim (e.g., 1536)
                  patch_size,      # (1, 2, 2)
                  num_blocks,      # 主干网络的层数，我们需要为每一层准备一个 ZeroLayer
-                 freq_dim=256 # 你的 guidance timestep 维度
-                 ):
+                 freq_dim=256,    # guidance timestep 维度
+                 num_heads=16,
+                 inject_blocks=None):
         super().__init__()
         self.model_dim = model_dim
         self.num_blocks = num_blocks
         self.freq_dim = freq_dim
-        
-        # 1. 特征提取器 (简单的 3D CNN 提取结构)
+        self.num_heads = num_heads
+        self.inject_blocks = set(range(num_blocks)) if inject_blocks is None else set(inject_blocks)
+
         mid_dim = model_dim // 4
         self.backbone = nn.Sequential(
             nn.Conv3d(in_dim, mid_dim, kernel_size=patch_size, stride=patch_size),
@@ -332,209 +371,138 @@ class WanSpatialControlAdapter(nn.Module):
             nn.SiLU(),
             nn.Conv3d(mid_dim, model_dim, kernel_size=3, padding=1),
             nn.SiLU(),
-            # 这里可以加深网络，或者用 ResNet Block
-            
         )
-        # --- 2. Feature Normalization (关键) ---
-        # 在 Flatten 之后、进入 ZeroLinear 之前，做一个 LayerNorm
-        # 确保输入给 ZeroLayers 的特征是标准分布的
         self.feature_norm = nn.LayerNorm(model_dim, eps=1e-6)
 
-        # 3. Guidance Timestep Embedding (控制强度的开关)
-        self.adapter_time_proj = nn.Sequential(
-            nn.Linear(freq_dim, model_dim * 2),
-            nn.SiLU(),
-            nn.Linear(model_dim * 2, model_dim * 2),
-        )
-        
-        # 4. [核心] Per-Block Zero Layers
-        # 为主干网络的每一层 block 准备一个独立的 Zero Linear
-        # 作用：将 Adapter 的通用特征，转化为适应第 i 层特征空间的 Condition
         self.zero_layers = nn.ModuleList([
             nn.Linear(model_dim, model_dim) for _ in range(num_blocks)
         ])
-        
-        # 5. Zero Initialization (零初始化)
-        # 保证刚开始训练时，注入的特征全是 0，不影响主干
+        self.cross_attn_layers = nn.ModuleList([
+            LRCrossAttention(model_dim, num_heads, qk_norm=True, eps=1e-6)
+            for _ in range(num_blocks)
+        ])
+        self.cross_gates = nn.Parameter(torch.zeros(num_blocks))
+
         for layer in self.zero_layers:
             nn.init.zeros_(layer.weight)
             nn.init.zeros_(layer.bias)
+        for layer in self.cross_attn_layers:
+            nn.init.zeros_(layer.o.weight)
+            nn.init.zeros_(layer.o.bias)
 
     def forward(self, lr_latents, guidance_t_emb):
-        """
-        lr_latents: [B, C, F, H, W]
-        t_sinusoidal_emb: [B, freq_dim] <- 这是原始的正弦位置编码
-        """
-        # A. 提取特征
-        #print(lr_latents.shape)
-        
-        x = self.backbone(lr_latents)  # [B, C, T, H, ]
-        x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
-        
-        #w = self.adapter_time_proj(guidance_t_emb)
-        #scale, shift = w.chunk(2, dim=-1)                    # [B, D], [B, D]
-        
+        if lr_latents is None:
+            return {"controls": None, "context_lens": None, "lr_grid": None}
+
+        if lr_latents.dim() == 5:
+            feats = self.backbone(lr_latents)
+            lr_grid = torch.tensor(
+                [[feats.shape[2], feats.shape[3], feats.shape[4]]],
+                device=feats.device,
+                dtype=torch.long,
+            ).expand(feats.size(0), -1)
+            x = feats.flatten(2).transpose(1, 2)
+        elif lr_latents.dim() == 3:
+            lr_grid = None
+            x = lr_latents
+        else:
+            raise ValueError(f"Unsupported lr_latents shape: {lr_latents.shape}")
+
         x = self.feature_norm(x)
-        
-        # B. 注入 Guidance Timestep (控制强度)
-        # 类似于把 guidance 加到 feature 上
-        # guidance_t_emb: [B, Dim]
-        # print(guidance_t_emb.shape)
-        
-        
-        #x = x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1) # Scale 调制，或者 add 也可以
-            
-        # C. 生成每一层的控制特征
-        # 5. Generate Per-Layer Controls
         controls = [layer(x) for layer in self.zero_layers]
-                
-        return controls
-    
-def register_spatial_control(model):
-    # 1. 实例化 Adapter
+        context_lens = torch.full((x.size(0),), x.size(1), device=x.device, dtype=torch.long)
+
+        return {"controls": controls, "context_lens": context_lens, "lr_grid": lr_grid}
+
+
+def register_spatial_control(model, inject_blocks=None):
+    inject_blocks = [0] if inject_blocks is None else inject_blocks
     adapter = WanSpatialControlAdapter(
         in_dim=model.in_dim,
         model_dim=model.dim,
         patch_size=model.patch_size,
         num_blocks=len(model.blocks),
-        freq_dim=model.freq_dim
-    ).to(model.patch_embedding.weight.device)
-    
+        freq_dim=model.freq_dim,
+        num_heads=model.num_heads,
+        inject_blocks=inject_blocks,
+    ).to(device=model.patch_embedding.weight.device,
+         dtype=model.patch_embedding.weight.dtype)
+
     model.spatial_adapter = adapter
-    
-    # 存储 Hook 的 handle，方便后续清理
+
     model._spatial_hooks = []
+    model._spatial_inject_blocks = set(inject_blocks)
 
-    # =======================================================
-    # 定义 Hook 函数工厂
-    # =======================================================
     def create_block_hook(block_idx):
-        def pre_forward_hook(module, args):
-            """
-            args 是一个 tuple: (x, e, seq_lens, ...)
-            我们需要修改其中的 x (args[0])
-            """
-            # 1. 检查是否有 Control 上下文
-            if not hasattr(model, '_current_spatial_ctx') or model._current_spatial_ctx is None:
-                return args # 不做任何修改
-            
-            ctx = model._current_spatial_ctx
-            # controls 是一个 list，长度等于 layer 数
-            controls = ctx['controls'] 
-            
-            if controls is None:
-                return args
-            
-            # ==========================================================
-            # ⭐⭐ 关键 1：只在前 num_control_blocks 层注入，后面的层不做任何事
-            # if block_idx >= 10:
-            #     return args
-            # if  block_idx % 6 != 0:
-            if block_idx != 0:  # only inject on the first block
-                return args
-             # ==========================================================
+        def forward_hook(module, args, output):
+            ctx = getattr(model, '_current_spatial_ctx', None)
+            if ctx is None:
+                return output
 
-            # 2. 获取当前层的控制特征
-            control_feat = controls[block_idx] # [B, L_ctrl, Dim]
-            
-            x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
+            controls = ctx.get('controls', None)
+            context_lens = ctx.get('context_lens', None)
+            lr_grid = ctx.get('lr_grid', None)
 
-            # L_x = x.shape[1]
-            # L_c = control_feat.shape[1]
-             # 对齐长度：pad 或截断到和 x 一样长
-            # if L_c < L_x:
-            #     pad = control_feat.new_zeros(control_feat.shape[0], L_x - L_c, control_feat.shape[2])
-            #     control_feat = torch.cat([control_feat, pad], dim=1)
-            # elif L_c > L_x:
-            #     control_feat = control_feat[:, :L_x, :]
-            
-            # --- FIX STARTS HERE: Handle Sequence Parallelism Slicing ---
-            # If input x is smaller than control, we assume SP is active and slice control
-            if x.shape[1] != control_feat.shape[1]:
-                if torch.distributed.is_initialized():
-                    rank = torch.distributed.get_rank()
-                    # Calculate the slice for this rank
-                    # We assume the sequence is split evenly across the SP group (world_size)
-                    local_len = x.shape[1]
-                    start_idx = rank * local_len
-                    end_idx = start_idx + local_len
-                    
-                    # Slice the global control feature to match local x
-                    control_feat = control_feat[:, start_idx:end_idx, :]
-            # -----------------------------------------------------------
-            
-            
-            # 4. [关键] 特征相加 (Feature Injection)
-            # print(x.shape)
-            x_new = x + control_feat.type_as(x)
-            
-            # print(x_new.shape)
-            # print("add successfully!!!")
-            
-            # 5. 重新打包 args
-            # Tuple 是不可变的，所以要新建一个
-            new_args = (x_new,) + args[1:]
-            return new_args
-            
-        return pre_forward_hook
+            if controls is None or block_idx not in model._spatial_inject_blocks:
+                return output
+            if block_idx >= len(controls):
+                return output
 
-    # =======================================================
-    # 注册到每一层 Block
-    # =======================================================
-    # 先清理旧 hook
+            control_feat = controls[block_idx]
+            if control_feat is None:
+                return output
+
+            if output.shape[1] != control_feat.shape[1] and torch.distributed.is_initialized():
+                rank = torch.distributed.get_rank()
+                local_len = output.shape[1]
+                start_idx = rank * local_len
+                end_idx = start_idx + local_len
+                control_feat = control_feat[:, start_idx:end_idx, :]
+                if context_lens is not None:
+                    context_lens = context_lens.clamp(max=control_feat.shape[1])
+                lr_grid = None
+
+            rope_infos = None
+            if lr_grid is not None and lr_grid.shape[0] == control_feat.shape[0]:
+                rope_infos = {"grid_sizes": lr_grid, "freqs": model.freqs}
+
+            ca = model.spatial_adapter.cross_attn_layers[block_idx]
+            attn_delta = ca(output, control_feat, context_lens, rope_infos=rope_infos)
+            gate = torch.tanh(model.spatial_adapter.cross_gates[block_idx]).to(output.dtype)
+            return output + gate * attn_delta.to(output.dtype)
+
+        return forward_hook
+
     if hasattr(model, '_spatial_hooks'):
-        for h in model._spatial_hooks: h.remove()
+        for h in model._spatial_hooks:
+            h.remove()
     model._spatial_hooks = []
 
     for i, block in enumerate(model.blocks):
-        # 为第 i 层注册 hook
-        h = block.register_forward_pre_hook(create_block_hook(i))
+        h = block.register_forward_hook(create_block_hook(i))
         model._spatial_hooks.append(h)
 
-    # =======================================================
-    # 封装 Forward
-    # =======================================================
     original_forward = model.forward
 
     def forward_with_spatial_control(self, x, t, context, seq_len, lr_latents=None, **kwargs):
-        # 处理 I2V 的拼接逻辑 (如果原模型有)
         x_in = x
         if kwargs.get('y') is not None:
-             x_in = [torch.cat([u, v], dim=0) for u, v in zip(x, kwargs['y'])]
-        
-        # 1. 计算基础的 Sinusoidal Embedding (公用)
-        # 这段逻辑是从原模型里提取出来的，为了让 Adapter 复用
-        print(t)
+            x_in = [torch.cat([u, v], dim=0) for u, v in zip(x, kwargs['y'])]
+
+        if lr_latents is None:
+            return original_forward(x, t, context, seq_len, **kwargs)
+
         if t.dim() == 1:
-            # 这里的 t 是 [Batch]
-            # 扩展到 sequence 维度虽然是 WanModel 内部做的，
-            # 但为了 Adapter，我们只需要 [Batch, FreqDim] 的 embedding 即可
-            t_freq = sinusoidal_embedding_1d(self.freq_dim, t).type_as(x_in[0]) # [B, freq_dim]
+            t_freq = sinusoidal_embedding_1d(self.freq_dim, t).type_as(x_in[0])
         elif t.dim() == 2 and t.shape[1] != self.freq_dim:
-            # 识别出这是被 pipeline 扩展过的 [1, SeqLen] 大张量
-            # 我们只需要取第一个值作为全局时间步
-            t_input = t[:, 0] 
-            # 重新生成正确的 [1, 256] Embedding
-            t_freq = sinusoidal_embedding_1d(self.freq_dim, t_input).type_as(x_in[0])
-        
+            t_freq = sinusoidal_embedding_1d(self.freq_dim, t[:, 0]).type_as(x_in[0])
         else:
-            # 如果 t 已经是 embedding (极少情况)
             t_freq = t
 
-        # 2. 运行 Adapter 
-        # 将 LR 和 公用的 Time Freq 传入 Adapter
-        # Adapter 内部会用自己的 MLP 处理这个 t_freq
-        controls = self.spatial_adapter(lr_latents, t_freq)
-        print(f'control_shape{controls[0].shape}')
-        
-        self._current_spatial_ctx = {'controls': controls}
-
+        control_pack = self.spatial_adapter(lr_latents, t_freq)
+        self._current_spatial_ctx = control_pack
 
         try:
-            # 3. 调用原始 forward
-            # 注意：原始 forward 内部还会算一遍 time embedding，
-            # 虽然有点重复计算，但为了不魔改 _forward 内部代码，这是最干净的写法。
-            # 只要 t 没变，逻辑就是一致的。
             kwargs['lr_latents'] = lr_latents
             return original_forward(x, t, context, seq_len, **kwargs)
         finally:
@@ -542,7 +510,7 @@ def register_spatial_control(model):
 
     import types
     model.forward = types.MethodType(forward_with_spatial_control, model)
-    
+
     return model, model.spatial_adapter
 
 
