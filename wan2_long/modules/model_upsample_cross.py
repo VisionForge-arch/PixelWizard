@@ -251,12 +251,9 @@ class LRCrossAttention(nn.Module):
         self.norm_k = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
 
     def _safe_linear(self, x, layer, norm=None, target_dtype=None):
-        w = layer.weight
-        if w.dim() == 1:
-            w = w.view(layer.out_features, layer.in_features)
         if target_dtype is not None and x.dtype != target_dtype:
             x = x.to(target_dtype)
-        out = F.linear(x, w, layer.bias)
+        out = layer(x)
         return norm(out) if norm is not None else out
 
     def forward(self, x, context, context_lens, rope_infos=None):
