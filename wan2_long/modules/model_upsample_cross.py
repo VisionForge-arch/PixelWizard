@@ -1,4 +1,5 @@
 # Copyright 2024-2025 The Alibaba Wan Team Authors. All rights reserved.
+from fcntl import F_GETOWN
 import math
 
 import torch
@@ -1028,8 +1029,8 @@ if __name__ == "__main__":
         input_timestep = torch.randint(0, 1000, (1,)).to("cuda").to(dtype=torch.bfloat16)
         prompt_embeds = torch.randn(1, 512, 4096).to("cuda").to(dtype=torch.bfloat16)
         
-        B, F, C, H, W = noisy_image_or_video.shape
-        seq_len = F * (H // 2) * (W // 2)
+        B, F_n, C, H, W = noisy_image_or_video.shape
+        seq_len = F_n * (H // 2) * (W // 2)
         
         flow_pred = model(
                     noisy_image_or_video.permute(0, 2, 1, 3, 4),  # [b, c, t, h, w]
