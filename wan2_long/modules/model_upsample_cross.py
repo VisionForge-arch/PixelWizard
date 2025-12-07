@@ -251,9 +251,28 @@ class LRCrossAttention(nn.Module):
         self.norm_k = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
 
     def _safe_linear(self, x, layer, norm=None, target_dtype=None):
-        if target_dtype is not None and x.dtype != target_dtype:
-            x = x.to(target_dtype)
-        out = layer(x)
+        w, b = layer.weight, layer.bias
+
+        # FSDP 可能把参数展平成 1D/空 shard，先还原成 [out, in]
+        if w.dim() == 1:
+            numel = w.numel()
+            expected = layer.out_features * layer.in_features
+            if numel == expected and expected > 0:
+                w = w.view(layer.out_features, layer.in_features)
+            elif numel == 0:
+                w = w.new_zeros(layer.out_features, layer.in_features)
+            else:
+                # 兜底：按 out_features 展开，剩余自动推导
+                w = w.view(layer.out_features, -1)
+
+        if target_dtype is not None:
+            if x.dtype != target_dtype:
+                x = x.to(target_dtype)
+            w = w.to(target_dtype)
+            if b is not None and b.dtype != target_dtype:
+                b = b.to(target_dtype)
+
+        out = torch.nn.functional.linear(x, w, b)
         return norm(out) if norm is not None else out
 
     def forward(self, x, context, context_lens, rope_infos=None):
