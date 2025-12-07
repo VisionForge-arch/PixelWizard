@@ -233,6 +233,53 @@ class WanCrossAttention(WanSelfAttention):
         return x
 
 
+class LRCrossAttention(nn.Module):
+    """Standalone cross attention for LR injection; keeps original blocks untouched."""
+
+    def __init__(self, dim, num_heads, qk_norm=True, eps=1e-6):
+        super().__init__()
+        assert dim % num_heads == 0
+        self.dim = dim
+        self.num_heads = num_heads
+        self.head_dim = dim // num_heads
+        self.q = nn.Linear(dim, dim)
+        self.k = nn.Linear(dim, dim)
+        self.v = nn.Linear(dim, dim)
+        self.o = nn.Linear(dim, dim)
+        self.norm_q = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
+        self.norm_k = WanRMSNorm(dim, eps=eps) if qk_norm else nn.Identity()
+
+    def _safe_linear(self, x, layer, norm=None, target_dtype=None):
+        w = layer.weight
+        if w.dim() == 1:
+            w = w.view(layer.out_features, layer.in_features)
+        if target_dtype is not None and x.dtype != target_dtype:
+            x = x.to(target_dtype)
+        out = F.linear(x, w, layer.bias)
+        return norm(out) if norm is not None else out
+
+    def forward(self, x, context, context_lens, rope_infos=None):
+        """
+        x: [B, L_q, C], context: [B, L_kv, C]
+        """
+        b, n, d = x.size(0), self.num_heads, self.head_dim
+        target_dtype = self.q.weight.dtype
+
+        q = self._safe_linear(x, self.q, norm=self.norm_q, target_dtype=target_dtype).view(b, -1, n, d)
+        k = self._safe_linear(context, self.k, norm=self.norm_k, target_dtype=target_dtype).view(b, -1, n, d)
+        v = self._safe_linear(context, self.v, target_dtype=target_dtype).view(b, -1, n, d)
+
+        if rope_infos is not None:
+            grid_sizes = rope_infos.get("grid_sizes", None)
+            freqs = rope_infos.get("freqs", None)
+            if grid_sizes is not None and freqs is not None:
+                k = rope_apply(k, grid_sizes, freqs)
+
+        out = flash_attention(q, k, v, k_lens=context_lens)
+        out = out.flatten(2)
+        out = self.o(out)
+        return out
+
 
 
 WAN_CROSSATTENTION_CLASSES = {
@@ -409,7 +456,7 @@ class WanSpatialControlAdapter(nn.Module):
 
         # 5. 针对每个 block 的 Cross-Attn (HR作Q, LR作K/V)，输出头零初始化，配合 gate 保持初始等效原模型
         self.cross_attn_layers = nn.ModuleList([
-            WanCrossAttention(model_dim, num_heads, (-1, -1), qk_norm=True, eps=1e-6)
+            LRCrossAttention(model_dim, num_heads, qk_norm=True, eps=1e-6)
             for _ in range(num_blocks)
         ])
         self.cross_gates = nn.Parameter(torch.zeros(num_blocks))
