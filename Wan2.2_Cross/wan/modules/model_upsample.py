@@ -371,8 +371,8 @@ class WanSpatialControlAdapter(nn.Module):
         x = self.backbone(lr_latents)  # [B, C, T, H, ]
         x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
         
-        w = self.adapter_time_proj(guidance_t_emb)
-        scale, shift = w.chunk(2, dim=-1)                    # [B, D], [B, D]
+        #w = self.adapter_time_proj(guidance_t_emb)
+        #scale, shift = w.chunk(2, dim=-1)                    # [B, D], [B, D]
         
         x = self.feature_norm(x)
         
@@ -382,7 +382,7 @@ class WanSpatialControlAdapter(nn.Module):
         # print(guidance_t_emb.shape)
         
         
-        x = x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1) # Scale 调制，或者 add 也可以
+        #x = x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1) # Scale 调制，或者 add 也可以
             
         # C. 生成每一层的控制特征
         # 5. Generate Per-Layer Controls
