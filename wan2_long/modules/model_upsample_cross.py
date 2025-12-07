@@ -461,7 +461,11 @@ def register_spatial_control(model, inject_blocks=None):
         freq_dim=model.freq_dim,
         num_heads=model.num_heads,
         inject_blocks=inject_blocks,
-    ).to(model.patch_embedding.weight.device)
+    )
+    adapter = adapter.to(
+        device=model.patch_embedding.weight.device,
+        dtype=model.patch_embedding.weight.dtype,
+    )
     
     model.spatial_adapter = adapter
     
