@@ -506,8 +506,12 @@ def register_spatial_control(model, inject_blocks=None):
             if lr_grid is not None and lr_grid.shape[0] == lr_context.shape[0]:
                 rope_infos = {"grid_sizes": lr_grid, "freqs": model.freqs}
 
-            attn_delta = model.spatial_adapter.cross_attn_layers[block_idx](
-                output, lr_context, context_lens, rope_infos=rope_infos)
+            ca = model.spatial_adapter.cross_attn_layers[block_idx]
+            if ca.q.weight.dtype != output.dtype or ca.q.weight.device != output.device:
+                ca = ca.to(device=output.device, dtype=output.dtype)
+                model.spatial_adapter.cross_attn_layers[block_idx] = ca
+
+            attn_delta = ca(output, lr_context, context_lens, rope_infos=rope_infos)
             gate = torch.tanh(model.spatial_adapter.cross_gates[block_idx])
             return output + gate * attn_delta
 
