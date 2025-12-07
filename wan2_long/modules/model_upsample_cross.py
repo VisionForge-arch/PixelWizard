@@ -189,13 +189,14 @@ class WanSelfAttention(nn.Module):
 
 class WanCrossAttention(WanSelfAttention):
 
-    def forward(self, x, context, context_lens, crossattn_cache=None):
+    def forward(self, x, context, context_lens, crossattn_cache=None, rope_infos=None):
         r"""
         Args:
             x(Tensor): Shape [B, L1, C]
             context(Tensor): Shape [B, L2, C]
             context_lens(Tensor): Shape [B]
             crossattn_cache (List[dict], *optional*): Contains the cached key and value tensors for context embedding.
+            rope_infos (dict, *optional*): { "grid_sizes": Tensor[B,3], "freqs": Tensor } for K rope.
         
         """
         b, n, d = x.size(0), self.num_heads, self.head_dim
@@ -216,6 +217,12 @@ class WanCrossAttention(WanSelfAttention):
         else:
             k = self.norm_k(self.k(context)).view(b, -1, n, d)
             v = self.v(context).view(b, -1, n, d)
+
+        if rope_infos is not None:
+            grid_sizes = rope_infos.get("grid_sizes", None)
+            freqs = rope_infos.get("freqs", None)
+            if grid_sizes is not None and freqs is not None:
+                k = rope_apply(k, grid_sizes, freqs)
 
         # compute attention
         x = flash_attention(q, k, v, k_lens=context_lens)
@@ -361,48 +368,29 @@ class MLPProj(torch.nn.Module):
         return clip_extra_context_tokens
 
 
-class RegisterTokens(nn.Module):
-    def __init__(self, num_registers: int, dim: int):
-        super().__init__()
-        self.register_tokens = nn.Parameter(torch.randn(num_registers, dim) * 0.02)
-        self.rms_norm = WanRMSNorm(dim, eps=1e-6)
 
-    def forward(self):
-        return self.rms_norm(self.register_tokens)
-
-    def reset_parameters(self):
-        nn.init.normal_(self.register_tokens, std=0.02)
-        
-        
 
 # [新增] Scale Adapter 模块
 class WanSpatialControlAdapter(nn.Module):
     def __init__(self, 
                  in_dim,          # LR Latent Channels (e.g., 16)
                  model_dim,       # Transformer Hidden Dim (e.g., 1536)
-                 patch_size,      # (1, 2, 2)
+                 patch_size,      # (1, 2, 2) 仅用于保持接口一致，不再做 3D 卷积
                  num_blocks,      # 主干网络的层数，我们需要为每一层准备一个 ZeroLayer
-                 freq_dim=256 # 你的 guidance timestep 维度
+                 freq_dim=256, # 你的 guidance timestep 维度
+                 num_heads=16,
+                 inject_blocks=None,
                  ):
         super().__init__()
         self.model_dim = model_dim
         self.num_blocks = num_blocks
         self.freq_dim = freq_dim
-        
-        # 1. 特征提取器 (简单的 3D CNN 提取结构)
-        mid_dim = model_dim // 4
-        self.backbone = nn.Sequential(
-            nn.Conv3d(in_dim, mid_dim, kernel_size=patch_size, stride=patch_size),
-            nn.GroupNorm(16, mid_dim),
-            nn.SiLU(),
-            nn.Conv3d(mid_dim, model_dim, kernel_size=3, padding=1),
-            nn.SiLU(),
-            # 这里可以加深网络，或者用 ResNet Block
-            
-        )
-        # --- 2. Feature Normalization (关键) ---
-        # 在 Flatten 之后、进入 ZeroLinear 之前，做一个 LayerNorm
-        # 确保输入给 ZeroLayers 的特征是标准分布的
+        self.num_heads = num_heads
+        self.head_dim = model_dim // num_heads
+        self.inject_blocks = set(range(num_blocks)) if inject_blocks is None else set(inject_blocks)
+        # 1. 直接 KV 投影：不再做 3D 卷积特征提取，直接把 LR tokens 映射到 model_dim
+        self.kv_proj = nn.Linear(in_dim, model_dim)
+        # 2. Feature Normalization
         self.feature_norm = nn.LayerNorm(model_dim, eps=1e-6)
 
         # 3. Guidance Timestep Embedding (控制强度的开关)
@@ -414,131 +402,112 @@ class WanSpatialControlAdapter(nn.Module):
         
         # 4. [核心] Per-Block Zero Layers
         # 为主干网络的每一层 block 准备一个独立的 Zero Linear
-        # 作用：将 Adapter 的通用特征，转化为适应第 i 层特征空间的 Condition
+        # 作用：将 Adapter 的通用特征，转化为适应第 i 层特征空间的 Condition (KV)
         self.zero_layers = nn.ModuleList([
             nn.Linear(model_dim, model_dim) for _ in range(num_blocks)
         ])
-        
-        # 5. Zero Initialization (零初始化)
-        # 保证刚开始训练时，注入的特征全是 0，不影响主干
+
+        # 5. 针对每个 block 的 Cross-Attn (HR作Q, LR作K/V)，输出头零初始化，配合 gate 保持初始等效原模型
+        self.cross_attn_layers = nn.ModuleList([
+            WanCrossAttention(model_dim, num_heads, (-1, -1), qk_norm=True, eps=1e-6)
+            for _ in range(num_blocks)
+        ])
+        self.cross_gates = nn.Parameter(torch.zeros(num_blocks))
+
+        # 6. Zero Initialization (零初始化)
         for layer in self.zero_layers:
             nn.init.zeros_(layer.weight)
             nn.init.zeros_(layer.bias)
+        for layer in self.cross_attn_layers:
+            nn.init.zeros_(layer.o.weight)
+            nn.init.zeros_(layer.o.bias)
 
     def forward(self, lr_latents, guidance_t_emb):
         """
-        lr_latents: [B, C, F, H, W]
+        lr_latents: [B, C, F, H, W] 或 [B, L, C]，直接投影为 KV tokens
         t_sinusoidal_emb: [B, freq_dim] <- 这是原始的正弦位置编码
         """
-        # A. 提取特征
-        #print(lr_latents.shape)
-        
-        x = self.backbone(lr_latents)  # [B, C, T, H, ]
-        x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
-        
-        # w = self.adapter_time_proj(guidance_t_emb)           # [B, 2*D]
-        # scale, shift = w.chunk(2, dim=-1)                    # [B, D], [B, D]
+        if lr_latents.dim() == 5:
+            # [B, C, F, H, W] -> [B, L, C]
+            x = lr_latents.flatten(2).transpose(1, 2)
+            lr_grid = torch.tensor(
+                [[lr_latents.shape[2], lr_latents.shape[3], lr_latents.shape[4]]],
+                device=lr_latents.device,
+                dtype=torch.long,
+            ).expand(lr_latents.size(0), -1)
+        elif lr_latents.dim() == 3:
+            # 已经是 [B, L, C]
+            x = lr_latents
+            lr_grid = None
+        else:
+            raise ValueError(f"Unsupported lr_latents shape: {lr_latents.shape}")
 
-        
+        x = self.kv_proj(x)
         x = self.feature_norm(x)
-        
-        # B. 注入 Guidance Timestep (控制强度)
-        # 类似于把 guidance 加到 feature 上
-        # guidance_t_emb: [B, Dim]
-        #print(guidance_t_emb.shape)
-        #x = x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1) # Scale 调制，或者 add 也可以
-            
-        # C. 生成每一层的控制特征
-        # 5. Generate Per-Layer Controls
+
+        # 生成每一层的控制特征
         controls = [layer(x) for layer in self.zero_layers]
+        context_lens = torch.full((x.size(0),), x.size(1), device=x.device, dtype=torch.long)
                 
-        return controls
+        return {"controls": controls, "context_lens": context_lens, "lr_grid": lr_grid}
     
-def register_spatial_control(model):
+def register_spatial_control(model, inject_blocks=None):
     # 1. 实例化 Adapter
     adapter = WanSpatialControlAdapter(
         in_dim=model.in_dim,
         model_dim=model.dim,
         patch_size=model.patch_size,
         num_blocks=len(model.blocks),
-        freq_dim=model.freq_dim
+        freq_dim=model.freq_dim,
+        num_heads=model.num_heads,
+        inject_blocks=inject_blocks,
     ).to(model.patch_embedding.weight.device)
     
     model.spatial_adapter = adapter
     
     # 存储 Hook 的 handle，方便后续清理
     model._spatial_hooks = []
-
+    model._spatial_inject_blocks = set(range(len(model.blocks))) if inject_blocks is None else set(inject_blocks)
     # =======================================================
-    # 定义 Hook 函数工厂
+    # 定义 Hook 函数工厂：block 输出后再做一次 HR-Q / LR-KV cross-attn
     # =======================================================
     def create_block_hook(block_idx):
-        def pre_forward_hook(module, args):
-            """
-            args 是一个 tuple: (x, e, seq_lens, ...)
-            我们需要修改其中的 x (args[0])
-            """
-            # 1. 检查是否有 Control 上下文
-            if not hasattr(model, '_current_spatial_ctx') or model._current_spatial_ctx is None:
-                return args # 不做任何修改
-            
+        def forward_hook(module, args, output):
             ctx = getattr(model, "_current_spatial_ctx", None)
             if ctx is None:
                 ctx = getattr(model, "_spatial_ctx_cache", None)
-            if ctx is None:
-                return args
-            # controls 是一个 list，长度等于 layer 数
-            controls = ctx['controls'] 
-            
-            if controls is None:
-                return args
-            
-            
-            # ⭐⭐ 关键 1：只在前 num_control_blocks 层注入，后面的层不做任何事
-            # if block_idx >= 10:
-            #     return args
-            # if block_idx % 6 != 0:
-            #   return args
-            if block_idx != 0:  # only inject on the first block
-                return args
-          
-            # 2. 获取当前层的控制特征
-            control_feat = controls[block_idx] # [B, L_ctrl, Dim]
-          
-            # ⭐⭐ 新增：按概率跳过某些样本的 LR 控制
-            # skip_prob = getattr(model, "spatial_skip_prob", 0.2)  # 0.0 表示不跳过
-            # if skip_prob > 0:
-            #     mask = ctx.get("global_skip_mask")
-            #     if mask is None:
-            #         mask = (torch.rand(control_feat.size(0), 1, 1, device=control_feat.device) >= skip_prob)
-            #         ctx["global_skip_mask"] = mask
-            #     control_feat = control_feat * mask
-            
+            if ctx is None or block_idx not in model._spatial_inject_blocks:
+                return output
 
-            x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
+            controls = ctx.get("controls")
+            context_lens = ctx.get("context_lens")
+            if controls is None or context_lens is None or block_idx >= len(controls):
+                return output
 
-            L_x = x.shape[1]
-            L_c = control_feat.shape[1]
-             # 对齐长度：pad 或截断到和 x 一样长
-            if L_c < L_x:
-                pad = control_feat.new_zeros(control_feat.shape[0], L_x - L_c, control_feat.shape[2])
-                control_feat = torch.cat([control_feat, pad], dim=1)
-            elif L_c > L_x:
-                control_feat = control_feat[:, :L_x, :]
-            
-            
-            # 4. [关键] 特征相加 (Feature Injection)
-            #print(x.shape)
-            x_new = x + control_feat.type_as(x)
-            # print(x_new.shape)
-            # print("add successfully!!!")
-            
-            # 5. 重新打包 args
-            # Tuple 是不可变的，所以要新建一个
-            new_args = (x_new,) + args[1:]
-            return new_args
-            
-        return pre_forward_hook
+            lr_context = controls[block_idx]  # [B, L_ctrl, Dim]
+            lr_grid = ctx.get("lr_grid", None)
+
+            # 处理 sequence parallel 的切片（仅在分布式时对齐长度）
+            if output.shape[1] != lr_context.shape[1] and torch.distributed.is_initialized():
+                rank = torch.distributed.get_rank()
+                local_len = output.shape[1]
+                start_idx = rank * local_len
+                end_idx = start_idx + local_len
+                lr_context = lr_context[:, start_idx:end_idx, :]
+                context_lens = context_lens.clamp(max=lr_context.shape[1])
+                # SP 下的 rope 不处理，避免对齐复杂度
+                lr_grid = None
+
+            rope_infos = None
+            if lr_grid is not None and lr_grid.shape[0] == lr_context.shape[0]:
+                rope_infos = {"grid_sizes": lr_grid, "freqs": model.freqs}
+
+            attn_delta = model.spatial_adapter.cross_attn_layers[block_idx](
+                output, lr_context, context_lens, rope_infos=rope_infos)
+            gate = torch.tanh(model.spatial_adapter.cross_gates[block_idx])
+            return output + gate * attn_delta
+
+        return forward_hook
 
     # =======================================================
     # 注册到每一层 Block
@@ -549,8 +518,8 @@ def register_spatial_control(model):
     model._spatial_hooks = []
 
     for i, block in enumerate(model.blocks):
-        # 为第 i 层注册 hook
-        h = block.register_forward_pre_hook(create_block_hook(i))
+        # 为第 i 层注册 hook（block 输出后插入 cross-attn）
+        h = block.register_forward_hook(create_block_hook(i))
         model._spatial_hooks.append(h)
 
     # =======================================================
@@ -573,13 +542,14 @@ def register_spatial_control(model):
             # t: [B, F] (per-frame); 取首帧代表，避免传入 [B, F] 形状破坏 adapter 的线性层
             t_freq = sinusoidal_embedding_1d(self.freq_dim, t[:, 0]).type_as(x_in[0])  # [B, freq_dim]
 
-        # 2. 运行 Adapter 
-        # 将 LR 和 公用的 Time Freq 传入 Adapter
-        # Adapter 内部会用自己的 MLP 处理这个 t_freq
-        controls = self.spatial_adapter(lr_latents, t_freq)
-        
-        #self._current_spatial_ctx = {'controls': controls}
-        ctx = {'controls': controls, 'skip_masks': {}}
+        # 2. 运行 Adapter ，得到每层的 LR 侧 KV
+        control_pack = self.spatial_adapter(lr_latents, t_freq)
+        ctx = {
+            'controls': control_pack["controls"],
+            'context_lens': control_pack["context_lens"],
+            'lr_grid': control_pack.get("lr_grid", None),
+            'skip_masks': {}
+        }
 
         self._current_spatial_ctx = ctx
         self._spatial_ctx_cache = ctx   # <- persists for checkpoint recompute
@@ -998,7 +968,7 @@ if __name__ == "__main__":
         lr_x = torch.randn(1, 48, 13, 16, 26, device="cuda", dtype=torch.bfloat16) # [B, F, C, H, W]
         
         
-        noisy_image_or_video = torch.randn(1, 13, 48, 16, 26).to("cuda").to(dtype=torch.bfloat16)
+        noisy_image_or_video = torch.randn(1, 13, 48, 16*3, 26*3).to("cuda").to(dtype=torch.bfloat16)
         input_timestep = torch.randint(0, 1000, (1,)).to("cuda").to(dtype=torch.bfloat16)
         prompt_embeds = torch.randn(1, 512, 4096).to("cuda").to(dtype=torch.bfloat16)
         seq_len = 13*8*13
