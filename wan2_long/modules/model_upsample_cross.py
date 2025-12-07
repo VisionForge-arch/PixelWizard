@@ -569,7 +569,7 @@ def register_spatial_control(model, inject_blocks=None):
     
     return model, model.spatial_adapter
 
-class WanModel_Upsample(ModelMixin, ConfigMixin):
+class WanModel_Upsample_Cross(ModelMixin, ConfigMixin):
     r"""
     Wan diffusion backbone supporting both text-to-video and image-to-video.
     """
@@ -959,7 +959,7 @@ if __name__ == "__main__":
     
     
     
-    model = WanModel_Upsample.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
+    model = WanModel_Upsample_Cross.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
     model, lr_layers = register_spatial_control(model, inject_blocks=[0])
     
     model.eval()
@@ -971,7 +971,9 @@ if __name__ == "__main__":
         noisy_image_or_video = torch.randn(1, 13, 48, 16*3, 26*3).to("cuda").to(dtype=torch.bfloat16)
         input_timestep = torch.randint(0, 1000, (1,)).to("cuda").to(dtype=torch.bfloat16)
         prompt_embeds = torch.randn(1, 512, 4096).to("cuda").to(dtype=torch.bfloat16)
-        seq_len = 13*8*13*9
+        
+        F, H, W = noisy_image_or_video.shape[1:]
+        seq_len = F * (H // 2) * (W // 2)
         
         flow_pred = model(
                     noisy_image_or_video.permute(0, 2, 1, 3, 4),  # [b, c, t, h, w]
