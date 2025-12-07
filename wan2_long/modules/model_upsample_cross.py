@@ -971,7 +971,7 @@ if __name__ == "__main__":
         noisy_image_or_video = torch.randn(1, 13, 48, 16*3, 26*3).to("cuda").to(dtype=torch.bfloat16)
         input_timestep = torch.randint(0, 1000, (1,)).to("cuda").to(dtype=torch.bfloat16)
         prompt_embeds = torch.randn(1, 512, 4096).to("cuda").to(dtype=torch.bfloat16)
-        seq_len = 13*8*13
+        seq_len = 13*8*13*9
         
         flow_pred = model(
                     noisy_image_or_video.permute(0, 2, 1, 3, 4),  # [b, c, t, h, w]
