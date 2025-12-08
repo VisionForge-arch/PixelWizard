@@ -503,8 +503,10 @@ def generate(args):
             with torch.no_grad():
                 cond_latent_lr = encode_to_latent(wan_ti2v, video_input)  # [B,C,T,h',w']
                 B, C, T, h, w = cond_latent_lr.shape
-                H = 90
-                W = 160
+                generate_resolution = SIZE_CONFIGS[resolution]
+                generate_resolution_H, generate_resolution_W = generate_resolution
+                H = int(generate_resolution_H // 16)
+                W = int(generate_resolution_W // 16)
                 print("cond_latent_lr.shape:", cond_latent_lr.shape)
                 cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)  
                 cond_latent_lr = cond_latent_lr.reshape(B*T, C, h, w)  # [B*C, T, h, w]
@@ -518,7 +520,7 @@ def generate(args):
                     current_prompt,
                     cond_latent=cond_latent_lr,
                     img=img,
-                    size=SIZE_CONFIGS[resolution],
+                    size=generate_resolution,
                     max_area=MAX_AREA_CONFIGS[resolution],
                     frame_num=args.frame_num,
                     shift=args.sample_shift,
