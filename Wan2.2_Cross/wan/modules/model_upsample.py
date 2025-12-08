@@ -371,8 +371,8 @@ class WanSpatialControlAdapter(nn.Module):
         x = self.backbone(lr_latents)  # [B, C, T, H, ]
         x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
         
-        #w = self.adapter_time_proj(guidance_t_emb)
-        #scale, shift = w.chunk(2, dim=-1)                    # [B, D], [B, D]
+        w = self.adapter_time_proj(guidance_t_emb)
+        scale, shift = w.chunk(2, dim=-1)                    # [B, D], [B, D]
         
         x = self.feature_norm(x)
         

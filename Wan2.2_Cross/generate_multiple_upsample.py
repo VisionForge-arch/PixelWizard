@@ -493,7 +493,10 @@ def generate(args):
             
 
             #video_input = video_input#.permute(0, 2, 1, 3, 4)
-            
+            B, C, T, H, W = video_input.shape
+            video_input = video_input.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W)
+            target_size = (240, 416)
+            video_input = F.interpolate(video_input, size=target_size, mode='bilinear', align_corners=False)
             print(video_input.shape)
 
             with torch.no_grad():
