@@ -460,7 +460,7 @@ class WanTI2V_Upsample:
                 noise_pred_uncond = self.model(latent_model_input, t=timestep, **arg_null)[0]
 
                 noise_pred = noise_pred_uncond + guide_scale * (noise_pred_cond - noise_pred_uncond)
-                noise_pred = noise_pred_cond
+                #noise_pred = noise_pred_cond
                 
                 temp_x0 = sample_scheduler.step(
                     noise_pred.unsqueeze(0),
