@@ -430,7 +430,7 @@ def register_spatial_control(model):
             # if block_idx >= 10:
             #     return args
             # if  block_idx % 6 != 0:
-            if block_idx != 0:  # only inject on the first block
+            if block_idx != 1:  # only inject on the first block
                 return args
              # ==========================================================
 
