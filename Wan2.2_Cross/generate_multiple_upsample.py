@@ -504,12 +504,10 @@ def generate(args):
                 cond_latent_lr = encode_to_latent(wan_ti2v, video_input)  # [B,C,T,h',w']
                 B, C, T, h, w = cond_latent_lr.shape
                 generate_resolution = SIZE_CONFIGS[resolution]
-                generate_resolution_H, generate_resolution_W = generate_resolution
+                generate_resolution_W, generate_resolution_H = generate_resolution
                 H = int(generate_resolution_H // 16)
                 W = int(generate_resolution_W // 16)
-                print(H)
-                print(W)
-                exit()
+
                 print("cond_latent_lr.shape:", cond_latent_lr.shape)
                 cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)  
                 cond_latent_lr = cond_latent_lr.reshape(B*T, C, h, w)  # [B*C, T, h, w]
