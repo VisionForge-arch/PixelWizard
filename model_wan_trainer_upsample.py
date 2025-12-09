@@ -79,6 +79,12 @@ class WanModel_Trainer:
         # Step 2: Initialize the model and optimizer
         self.model = SelfForcingWan_Upsample(config, device=self.device)
         
+        raw_trainable = sum(p.numel() for p in self.model.generator.parameters() if p.requires_grad)
+        if self.is_main_process:
+            print(f"[pre-FSDP] generator trainable params: {raw_trainable/1e6:.2f}M "
+                  f"(~{raw_trainable/1e9:.4f}B)")
+        
+        
         self.model.generator = fsdp_wrap(
             self.model.generator,
             sharding_strategy=config.sharding_strategy,
@@ -103,8 +109,8 @@ class WanModel_Trainer:
 
         
         # ===== optimizer =====
-        trainable = sum(p.numel() for p in self.model.generator.parameters() if p.requires_grad)
-        print(f"trainable params: {trainable/1e6:.2f}M")
+        shard_trainable = sum(p.numel() for p in self.model.generator.parameters() if p.requires_grad)
+        print(f"[post-FSDP] local shard params: {shard_trainable/1e6:.2f}M")
         
         
         self.generator_optimizer = torch.optim.AdamW(
