@@ -130,8 +130,8 @@ class WanTI2V_Upsample:
             print(f"Found {len(adapter_keys)} adapter keys in checkpoint")
         
             # 加载主模型权重
-            #missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict)
-            #print(f"Missing keys: {len(missing_keys)}, unexpected: {len(unexpected_keys)}")
+            missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict)
+            print(f"Missing keys: {len(missing_keys)}, unexpected: {len(unexpected_keys)}")
 
         # ==============================================================
 
