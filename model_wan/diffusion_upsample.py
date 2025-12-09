@@ -75,6 +75,7 @@ class SelfForcingWan_Upsample(nn.Module):
         
         # 追加：冻结主干、仅保留 adapter
         if args.trainable_backbone is False:
+            
             for name, p in self.generator.model.named_parameters():
                 if not name.startswith("spatial_adapter"):
                     p.requires_grad_(False)
@@ -127,7 +128,7 @@ class SelfForcingWan_Upsample(nn.Module):
             
 
         # Randomly drop conditions so the model learns the unconditional branch for CFG.
-        uncond_proba = getattr(self.args, "uncond_proba", 0.0)
+        uncond_proba = getattr(self.args, "uncond_proba", 0.1)
         if uncond_proba > 0:
             mask = torch.bernoulli(
                 torch.full((batch_size,), uncond_proba, device=self.device)
@@ -135,14 +136,14 @@ class SelfForcingWan_Upsample(nn.Module):
             if mask.any():
                 conditional_dict = dict(conditional_dict)
                 prompt_cond = conditional_dict["prompt_embeds"].clone()
-                prompt_cond[mask] = 0
+                prompt_uncond = unconditional_dict["prompt_embeds"]
+                prompt_cond[mask] = prompt_uncond[mask]
                 conditional_dict["prompt_embeds"] = prompt_cond
+                
+                
                 if clean_latent_lr is not None:
                     clean_latent_lr = clean_latent_lr.clone()
                     clean_latent_lr[mask] = 0
-                if cond_latent is not None:
-                    cond_latent = cond_latent.clone()
-                    cond_latent[mask] = 0
 
         # Step 2: Randomly sample a timestep and add noise to denoiser inputs (Flow Matching)
         # 从[0, 1000)中随机采样timestep index
