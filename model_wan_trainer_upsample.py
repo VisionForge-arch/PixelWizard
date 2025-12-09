@@ -114,6 +114,29 @@ class WanModel_Trainer:
             betas=(config.beta1, config.beta2),
             weight_decay=config.weight_decay
         )
+        
+        # ======== EMA =============
+        rename_param = (
+            lambda name: name.replace("_fsdp_wrapped_module.", "")
+            .replace("_checkpoint_wrapped_module.", "")
+            .replace("_orig_mod.", "")
+        )
+        self.name_to_trainable_params = {}
+        for n, p in self.model.generator.named_parameters():
+            if not p.requires_grad:
+                continue
+
+            renamed_n = rename_param(n)
+            self.name_to_trainable_params[renamed_n] = p
+        ema_weight = config.ema_weight
+        self.generator_ema = None
+        if config.use_ema and (ema_weight > 0.0):
+            print(f"Setting up EMA with weight {ema_weight}")
+            self.generator_ema = EMA_FSDP(self.model.generator, decay=ema_weight)
+        
+        # Let's delete EMA params for early steps to save some computes at training and inference
+        if self.step < config.ema_start_step:
+            self.generator_ema = None
 
         # ========= save ==========
         self.output_path = config.logdir
