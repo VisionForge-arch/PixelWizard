@@ -74,9 +74,10 @@ class SelfForcingWan_Upsample(nn.Module):
         self.generator.model.requires_grad_(True)
         
         # 追加：冻结主干、仅保留 adapter
-        for name, p in self.generator.model.named_parameters():
-            if not name.startswith("spatial_adapter"):
-                p.requires_grad_(False)
+        if args.trainable_backbone is False:
+            for name, p in self.generator.model.named_parameters():
+                if not name.startswith("spatial_adapter"):
+                    p.requires_grad_(False)
 
         self.text_encoder = WanTextEncoder()
         self.text_encoder.requires_grad_(False)

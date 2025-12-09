@@ -35,18 +35,20 @@ def decode_latent_gpu_chunked(
     print(f"Prompt: {prompt}")
     print(f"Latent shape: {latent[0].shape}")
     
-    C, T, H, W = latent[0].shape
+    # latent 空间尺寸
+    C_lat, T_lat, H_lat, W_lat = latent[0].shape
 
-    # 准备全尺寸输出和权重（在 CPU 上累加，节省显存）
-    final_video = torch.zeros((C, T, H, W), dtype=torch.float32)
-    weight = torch.zeros((1, 1, H, W), dtype=torch.float32)
+    # 输出视频和权重在第一次解码后再初始化，以适配 VAE 上采样倍率
+    final_video = None
+    weight = None
+    scale_h = None
+    scale_w = None
     
-    
-    # 每块的“基础尺寸”（不含重叠）
+    # 每块的“基础尺寸”（不含重叠），基于 latent 尺寸
     if patch_dim == 'h':
-        base_size = H // num_patches
+        base_size = H_lat // num_patches
     else:
-        base_size = W // num_patches
+        base_size = W_lat // num_patches
 
     print(f"分成 {num_patches} 个patch进行decode，overlap={overlap} 像素...")
 
@@ -56,11 +58,11 @@ def decode_latent_gpu_chunked(
         # ------------ 计算当前 patch 的起止位置（含 overlap）------------
         if patch_dim == 'h':
             h_start_base = base_size * i
-            h_end_base = H if i == num_patches - 1 else base_size * (i + 1)
+            h_end_base = H_lat if i == num_patches - 1 else base_size * (i + 1)
 
             # 向前 / 向后扩一点，做 overlap
             h_start = max(0, h_start_base - (overlap if i > 0 else 0))
-            h_end   = min(H, h_end_base + (overlap if i < num_patches - 1 else 0))
+            h_end   = min(H_lat, h_end_base + (overlap if i < num_patches - 1 else 0))
 
             # 切 latent
             patch_latents = []
@@ -68,10 +70,10 @@ def decode_latent_gpu_chunked(
                 patch_latents.append(l[:, :, h_start:h_end, :].to(device))
         else:  # patch_dim == 'w'
             w_start_base = base_size * i
-            w_end_base = W if i == num_patches - 1 else base_size * (i + 1)
+            w_end_base = W_lat if i == num_patches - 1 else base_size * (i + 1)
 
             w_start = max(0, w_start_base - (overlap if i > 0 else 0))
-            w_end   = min(W, w_end_base + (overlap if i < num_patches - 1 else 0))
+            w_end   = min(W_lat, w_end_base + (overlap if i < num_patches - 1 else 0))
 
             patch_latents = []
             for l in latent:
@@ -84,17 +86,40 @@ def decode_latent_gpu_chunked(
         # patch_decoded: [C, T, patch_H, patch_W]
         patch_decoded = patch_decoded.detach().cpu()
 
+        # 第一次解码时，根据 patch 尺寸推断放大倍率，并分配输出 tensor
+        if final_video is None:
+            C_dec, T_dec, H_dec, W_dec = patch_decoded.shape
+
+            if patch_dim == 'h':
+                patch_lat_h = h_end - h_start
+                scale_h = H_dec // patch_lat_h
+                scale_w = W_dec // W_lat
+            else:  # patch_dim == 'w'
+                patch_lat_w = w_end - w_start
+                scale_w = W_dec // patch_lat_w
+                scale_h = H_dec // H_lat
+
+            H_out = H_lat * scale_h
+            W_out = W_lat * scale_w
+
+            final_video = torch.zeros((C_dec, T_dec, H_out, W_out), dtype=torch.float32)
+            weight = torch.zeros((1, 1, H_out, W_out), dtype=torch.float32)
+
         # ------------ 累加到 final_video + weight ------------
         if patch_dim == 'h':
+            out_h_start = h_start * scale_h
+            out_h_end   = h_end * scale_h
             ph = patch_decoded.shape[2]
-            assert ph == (h_end - h_start), "patch height mismatch"
-            final_video[:, :, h_start:h_end, :] += patch_decoded
-            weight[:, :, h_start:h_end, :] += 1.0
+            assert ph == (out_h_end - out_h_start), "patch height mismatch"
+            final_video[:, :, out_h_start:out_h_end, :] += patch_decoded
+            weight[:, :, out_h_start:out_h_end, :] += 1.0
         else:  # w
+            out_w_start = w_start * scale_w
+            out_w_end   = w_end * scale_w
             pw = patch_decoded.shape[3]
-            assert pw == (w_end - w_start), "patch width mismatch"
-            final_video[:, :, :, w_start:w_end] += patch_decoded
-            weight[:, :, :, w_start:w_end] += 1.0
+            assert pw == (out_w_end - out_w_start), "patch width mismatch"
+            final_video[:, :, :, out_w_start:out_w_end] += patch_decoded
+            weight[:, :, :, out_w_start:out_w_end] += 1.0
 
         # 清理显存
         del patch_latents, patch_decoded
