@@ -92,8 +92,8 @@ class SelfForcingWan_Upsample(nn.Module):
         self,
         image_or_video_shape,
         conditional_dict: dict,
-        unconditional_dict: dict,
         clean_latent: torch.Tensor,
+        unconditional_dict: dict = None,
         clean_latent_lr: torch.Tensor = None,
         initial_latent: torch.Tensor = None
     ) -> Tuple[torch.Tensor, dict]:
@@ -105,7 +105,7 @@ class SelfForcingWan_Upsample(nn.Module):
         Input:
             - image_or_video_shape: a list containing the shape of the image or video [B, F, C, H, W].
             - conditional_dict: a dictionary containing the conditional information (e.g. text embeddings, image embeddings).
-            - unconditional_dict: a dictionary containing the unconditional information (e.g. null/negative text embeddings, null/negative image embeddings).
+            - unconditional_dict: a dictionary containing the unconditional information (e.g. null/negative text embeddings).
             - clean_latent: a tensor containing the clean latents [B, F, C, H, W]. Need to be passed when no backward simulation is used.
         Output:
             - loss: a scalar tensor representing the generator loss.
@@ -123,6 +123,25 @@ class SelfForcingWan_Upsample(nn.Module):
             cond_latent = cond_latent.to(device=self.device, dtype=self.dtype)
             cond_frames = cond_latent.shape[1]
             noise[:, :cond_frames] = 0
+            
+
+        # Randomly drop conditions so the model learns the unconditional branch for CFG.
+        uncond_proba = getattr(self.args, "uncond_proba", 0.0)
+        if uncond_proba > 0:
+            mask = torch.bernoulli(
+                torch.full((batch_size,), uncond_proba, device=self.device)
+            ).bool()
+            if mask.any():
+                conditional_dict = dict(conditional_dict)
+                prompt_cond = conditional_dict["prompt_embeds"].clone()
+                prompt_cond[mask] = 0
+                conditional_dict["prompt_embeds"] = prompt_cond
+                if clean_latent_lr is not None:
+                    clean_latent_lr = clean_latent_lr.clone()
+                    clean_latent_lr[mask] = 0
+                if cond_latent is not None:
+                    cond_latent = cond_latent.clone()
+                    cond_latent[mask] = 0
 
         # Step 2: Randomly sample a timestep and add noise to denoiser inputs (Flow Matching)
         # 从[0, 1000)中随机采样timestep index

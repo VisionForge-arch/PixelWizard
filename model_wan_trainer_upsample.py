@@ -127,19 +127,19 @@ class WanModel_Trainer:
         
 
 
-    def random_degrade(self, hr_frames_2k, target_size=(480, 832)):
+    def random_degrade(self, hr_frames, target_size=(480, 832)):
         
         
         # ========== 瓶颈缩放 =============
         down_factor = random.uniform(8, 32)  # 2K (2048) / 32 = 64 pixel，非常糊
         
         # 计算瓶颈尺寸
-        h, w = hr_frames_2k.shape[-2:]
+        h, w = hr_frames.shape[-2:]
         bottleneck_h = int(h / down_factor)
         bottleneck_w = int(w / down_factor)
         
         # 1. 缩下去 (使用 area 或 bilinear 保证平滑，不要由 bicubic 产生伪影)
-        tiny_frames = F.interpolate(hr_frames_2k, size=(bottleneck_h, bottleneck_w), mode='area')
+        tiny_frames = F.interpolate(hr_frames, size=(bottleneck_h, bottleneck_w), mode='area')
         
         # 2. 拉回 480p (使用 bilinear 保持模糊感，bicubic 会尝试锐化，不好)
         guidance = F.interpolate(tiny_frames, size=target_size, mode='bilinear', align_corners=False)
@@ -224,13 +224,19 @@ class WanModel_Trainer:
         with torch.no_grad():
             # 'promot_embeds': [B, 512, 4096]
             conditional_dict = self.model.text_encoder(text_prompts=text_prompts)
-            if not getattr(self, "unconditional_dict", None):
-                unconditional_dict = self.model.text_encoder(
-                    text_prompts=[self.config.negative_prompt] * batch_size)
-                unconditional_dict = {k: v.detach() for k, v in unconditional_dict.items()}
-                self.unconditional_dict = unconditional_dict  # cache the unconditional_dict
+            
+            
+            uncond_proba = getattr(self.config, "uncond_proba", 0.1)
+            if uncond_proba > 0:
+                if not getattr(self, "unconditional_dict", None):
+                    unconditional_dict = self.model.text_encoder(
+                        text_prompts=[""] * batch_size)
+                    unconditional_dict = {k: v.detach() for k, v in unconditional_dict.items()}
+                    self.unconditional_dict = unconditional_dict  # cache
+                else:
+                    unconditional_dict = self.unconditional_dict
             else:
-                unconditional_dict = self.unconditional_dict
+                unconditional_dict = None
                 
                 
         generator_loss, generator_log_dict = self.model.generator_loss(
@@ -246,10 +252,6 @@ class WanModel_Trainer:
         
         generator_grad_norm = self.model.generator.clip_grad_norm_(self.max_grad_norm_generator)
         
-        # generator_grad_norm = torch.nn.utils.clip_grad_norm_(
-        #     self.model.generator.parameters(), 
-        #     self.max_grad_norm_generator
-        # )  # 单卡用
         
         generator_log_dict.update({"generator_loss": generator_loss,
                                    "generator_grad_norm": generator_grad_norm})
