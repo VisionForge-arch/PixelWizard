@@ -2,6 +2,14 @@
 import argparse
 import os
 
+import os
+
+os.environ.setdefault("RANK", "0")
+os.environ.setdefault("WORLD_SIZE", "1")
+os.environ.setdefault("LOCAL_RANK", "0")
+os.environ.setdefault("MASTER_ADDR", "localhost")
+os.environ.setdefault("MASTER_PORT", "29500")
+
 import torch
 from omegaconf import OmegaConf
 
