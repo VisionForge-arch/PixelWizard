@@ -119,6 +119,19 @@ class WanTI2V_Upsample:
                 print("------- Using None EMA Weight ------")
                 generator_state_dict = state_dict['generator']
             
+            
+            # 先去掉 FSDP 产生的中间前缀
+            def clean_fsdp_keys(d):
+                new = {}
+                for k, v in d.items():
+                    k2 = (k.replace("_fsdp_wrapped_module.", "")
+                            .replace("_checkpoint_wrapped_module.", "")
+                            .replace("_orig_mod.", ""))
+                    new[k2] = v
+                return new
+            if use_ema:
+                generator_state_dict = clean_fsdp_keys(generator_state_dict)
+            
             def strip_prefix(d, prefix="model."):
                 new_dict = {}
                 for k, v in d.items():
