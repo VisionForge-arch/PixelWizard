@@ -199,7 +199,6 @@ class WanModel_Trainer:
             torch.cuda.empty_cache()
             
         # Step 1: Get the next batch of text prompts
-        # DataLoader会将字符串打包成列表，直接使用
         options = ['detailed_description', 'brief_description', 'summarized_description']
         text_prompts = batch[random.choice(options)]
         

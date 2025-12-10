@@ -46,6 +46,7 @@ class WanTI2V_Upsample:
         init_on_cpu=True,
         convert_model_dtype=False,
         wan_ckpt=None,
+        use_ema=False,
     ):
         r"""
         Initializes the Wan text-to-video generation model components.
@@ -111,7 +112,10 @@ class WanTI2V_Upsample:
         if wan_ckpt is not None:
             print(f"Loading Wan model from {wan_ckpt}")
             state_dict = torch.load(wan_ckpt, map_location="cpu")
-            generator_state_dict = state_dict['generator']
+            if use_ema:
+                generator_state_dict = state_dict['generator_ema']
+            else:
+                generator_state_dict = state_dict['generator']
             
             def strip_prefix(d, prefix="model."):
                 new_dict = {}
