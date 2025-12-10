@@ -108,7 +108,7 @@ class WanModel_Trainer:
         self.max_grad_norm_generator = getattr(config, "max_grad_norm_generator", 1.0)
 
         
-        # ===== optimizer =====
+        # =========== OPTIMIZER =====
         shard_trainable = sum(p.numel() for p in self.model.generator.parameters() if p.requires_grad)
         print(f"[post-FSDP] local shard params: {shard_trainable/1e6:.2f}M")
         
@@ -121,7 +121,7 @@ class WanModel_Trainer:
             weight_decay=config.weight_decay
         )
         
-        # ======== EMA =============
+        # ============ EMA =============
         rename_param = (
             lambda name: name.replace("_fsdp_wrapped_module.", "")
             .replace("_checkpoint_wrapped_module.", "")
@@ -134,17 +134,18 @@ class WanModel_Trainer:
 
             renamed_n = rename_param(n)
             self.name_to_trainable_params[renamed_n] = p
-        ema_weight = config.ema_weight
+            
+
         self.generator_ema = None
-        if config.use_ema and (ema_weight > 0.0):
-            print(f"Setting up EMA with weight {ema_weight}")
-            self.generator_ema = EMA_FSDP(self.model.generator, decay=ema_weight)
+        if config.use_ema and (config.ema_weight > 0.0):
+            print(f"Setting up EMA with weight {config.ema_weight}")
+            self.generator_ema = EMA_FSDP(self.model.generator, decay=config.ema_weight)
         
         # Let's delete EMA params for early steps to save some computes at training and inference
         if self.step < config.ema_start_step:
             self.generator_ema = None
 
-        # ========= save ==========
+        # ============ SAVE ============
         self.output_path = config.logdir
         if self.is_main_process:
             wandb.init(
@@ -302,10 +303,19 @@ class WanModel_Trainer:
             extras_list.append(extra)
             generator_log_dict = merge_dict_list(extras_list)
             self.generator_optimizer.step()
+            
+            if self.generator_ema is not None:
+                self.generator_ema.update(self.model.generator)
+            
         
             self.step += 1
+            
+            
+            # =========== Create EMA params ==============
+            if self.config.use_ema and (self.step >= self.config.ema_start_step) and (self.generator_ema is None) and (self.config.ema_weight > 0):
+                self.generator_ema = EMA_FSDP(self.model.generator, decay=self.config.ema_weight)
         
-            # Save the model
+            # =========== Save the model ================
             if (self.step - start_step) > 0 and self.step % self.config.log_iters == 0:
                 torch.cuda.empty_cache()
                 self.save()
@@ -344,10 +354,15 @@ class WanModel_Trainer:
         print("Start gathering distributed model states...")
         generator_state_dict = fsdp_state_dict(self.model.generator)
 
-
-        state_dict = {
-            "generator": generator_state_dict,
-        }
+        if self.config.use_ema and (self.config.ema_start_step < self.step):
+            state_dict = {
+                "generator": generator_state_dict,
+                "generator_ema": self.generator_ema.state_dict(),
+            }    
+        else:
+            state_dict = {
+                "generator": generator_state_dict,
+            }
         if self.is_main_process:
             os.makedirs(os.path.join(self.output_path,
                         f"checkpoint_model_{self.step:06d}"), exist_ok=True)
