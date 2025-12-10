@@ -39,7 +39,7 @@ class SelfForcingWan_Upsample(nn.Module):
         self.min_step = int(0.02 * self.num_train_timestep)
         self.max_step = int(0.98 * self.num_train_timestep)
         self.guidance_scale = args.guidance_scale
-        self.timestep_shift = getattr(args, "timestep_shift", 1.0)
+        self.timestep_shift = getattr(args, "timestep_shift", 5.0)
         self.teacher_forcing = getattr(args, "teacher_forcing", False)
         
         self.min_score_timestep = getattr(args, "min_score_timestep", 0)
