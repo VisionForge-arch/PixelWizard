@@ -113,8 +113,10 @@ class WanTI2V_Upsample:
             print(f"Loading Wan model from {wan_ckpt}")
             state_dict = torch.load(wan_ckpt, map_location="cpu")
             if use_ema:
+                print("------- Using EMA Weight ------")
                 generator_state_dict = state_dict['generator_ema']
             else:
+                print("------- Using None EMA Weight ------")
                 generator_state_dict = state_dict['generator']
             
             def strip_prefix(d, prefix="model."):
