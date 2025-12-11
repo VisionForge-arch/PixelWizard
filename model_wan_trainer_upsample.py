@@ -140,6 +140,22 @@ class WanModel_Trainer:
         if config.use_ema and (config.ema_weight > 0.0):
             print(f"Setting up EMA with weight {config.ema_weight}")
             self.generator_ema = EMA_FSDP(self.model.generator, decay=config.ema_weight)
+            
+            
+        ##############################################################################################################
+        # 7. (If resuming) Load the model and optimizer, lr_scheduler, ema's statedicts
+        if getattr(config, "load_generator_ckpt", False):
+            print(f"Loading pretrained generator from {config.generator_ckpt}")
+            state_dict = torch.load(config.generator_ckpt, map_location="cpu")
+            if "generator" in state_dict:
+                state_dict = state_dict["generator"]
+            elif "model" in state_dict:
+                state_dict = state_dict["model"]
+            self.model.generator.load_state_dict(state_dict, strict=True)
+            
+
+        ##############################################################################################################
+
         
         # Let's delete EMA params for early steps to save some computes at training and inference
         if self.step < config.ema_start_step:
