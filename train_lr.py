@@ -23,7 +23,7 @@ def main():
     parser.add_argument("--time_division_factor", type=int, default=4)
     parser.add_argument("--time_division_remainder", type=int, default=1)
     parser.add_argument("--use_gpu", type=bool, default=True)
-    parser.add_argument("--config_path", type=str, default="/root/ultrawan/configs/self_forcing_dmd.yaml")
+    parser.add_argument("--config_path", type=str, default="/root/ultrawan/configs/self_forcing_dmd_lr.yaml")
     parser.add_argument("--logdir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_360p")
     parser.add_argument("--generator_ckpt", type=str, default=None)
     parser.add_argument("--load_generator_ckpt", action="store_true")
