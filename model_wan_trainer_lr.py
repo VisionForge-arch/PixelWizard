@@ -15,7 +15,7 @@ import random
 import wandb
 from utils_long.distributed import EMA_FSDP, fsdp_wrap, fsdp_state_dict, launch_distributed_job
 import torch.distributed as dist
-from dataset import UnifiedDataset, cycle
+from dataset_lr import UnifiedDataset, cycle
 import torch.nn.functional as F
 import torchvision.transforms.functional as TF
 
