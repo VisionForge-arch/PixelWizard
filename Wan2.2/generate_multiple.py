@@ -116,7 +116,7 @@ def _parse_args():
     parser.add_argument(
         "--size",
         type=str,
-        default="1280*704",
+        default="640*360",
         choices=list(SIZE_CONFIGS.keys()),
         help="The area (width*height) of the generated video. For the I2V task, the aspect ratio of the output video will follow that of the input image."
     )
@@ -160,7 +160,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/720p_5s",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/360p_5s",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
@@ -298,7 +298,7 @@ def _parse_args():
     parser.add_argument(
         "--prompt_file",
         type=str,
-        default="/root/ultrawan/Wan2.2/prompt3.txt",
+        default="/root/ultrawan/Wan2.2/prompt_old.txt",
         help="The file to read the prompts from.")
     parser.add_argument(
         "--wan_ckpt",
