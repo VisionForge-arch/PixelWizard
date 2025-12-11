@@ -182,6 +182,8 @@ class WanModel_Trainer:
     
         # 转换PIL图像列表为tensor格式
         frames = batch['video_path'].to(device=self.device, dtype=self.dtype)
+        print(frames.shape)
+        exit()
         
         # vae编码
         with torch.no_grad():
