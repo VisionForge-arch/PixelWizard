@@ -3,7 +3,7 @@ import json
 import math
 from collections import Counter
 from statistics import mean, median
-from typing import Iterable
+from typing import Iterable, List
 
 
 def load_records(path: str) -> Iterable[dict]:
@@ -23,7 +23,7 @@ def load_records(path: str) -> Iterable[dict]:
                     yield item
 
 
-def extract_fps(records: Iterable[dict]) -> list[float]:
+def extract_fps(records: Iterable[dict]) -> List[float]:
     fps_values = []
     for item in records:
         try:
@@ -35,7 +35,7 @@ def extract_fps(records: Iterable[dict]) -> list[float]:
     return fps_values
 
 
-def describe_fps(fps_values: list[float], round_digits: int, topk: int):
+def describe_fps(fps_values: List[float], round_digits: int, topk: int):
     if not fps_values:
         print("No fps values found.")
         return
