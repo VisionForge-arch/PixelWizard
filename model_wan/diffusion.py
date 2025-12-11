@@ -179,6 +179,13 @@ class SelfForcingWan(nn.Module):
             timestep=timestep,
         )
         
+        # Align spatial sizes if off-by-one from stride issues
+        if flow_pred.shape[-2:] != training_target.shape[-2:]:
+            h = min(flow_pred.shape[-2], training_target.shape[-2])
+            w = min(flow_pred.shape[-1], training_target.shape[-1])
+            flow_pred = flow_pred[..., :h, :w]
+            training_target = training_target[..., :h, :w]
+
 
         
         # loss = torch.nn.functional.mse_loss(flow_pred.float(), training_target.float())
