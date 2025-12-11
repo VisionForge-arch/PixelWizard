@@ -89,7 +89,6 @@ class SelfForcingWan(nn.Module):
         conditional_dict: dict,
         unconditional_dict: dict,
         clean_latent: torch.Tensor,
-        clean_latent_lr: torch.Tensor = None,
         initial_latent: torch.Tensor = None
     ) -> Tuple[torch.Tensor, dict]:
         """
@@ -118,6 +117,21 @@ class SelfForcingWan(nn.Module):
             cond_latent = cond_latent.to(device=self.device, dtype=self.dtype)
             cond_frames = cond_latent.shape[1]
             noise[:, :cond_frames] = 0
+            
+            
+        # Randomly drop conditions so the model learns the unconditional branch for CFG.
+        uncond_proba = getattr(self.args, "uncond_proba", 0.1)
+        if uncond_proba > 0:
+            mask = torch.bernoulli(
+                torch.full((batch_size,), uncond_proba, device=self.device)
+            ).bool()
+            if mask.any():
+                conditional_dict = dict(conditional_dict)
+                prompt_cond = conditional_dict["prompt_embeds"].clone()
+                prompt_uncond = unconditional_dict["prompt_embeds"]
+                prompt_cond[mask] = prompt_uncond[mask]
+                conditional_dict["prompt_embeds"] = prompt_cond
+        
 
         # Step 2: Randomly sample a timestep and add noise to denoiser inputs (Flow Matching)
         # 从[0, 1000)中随机采样timestep index
@@ -133,9 +147,6 @@ class SelfForcingWan(nn.Module):
         # if cond_frames > 0:
         #     timestep[:, :cond_frames] = 0
         # Flow Matching: x_t = (1-sigma) * x0 + sigma * noise
-        
-        if clean_latent_lr is not None:
-            clean_latent_fused = torch.cat([clean_latent, clean_latent_lr], dim=2)
         
         
         noisy_latents = self.scheduler.add_noise(
