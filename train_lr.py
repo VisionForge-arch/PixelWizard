@@ -25,9 +25,8 @@ def main():
     parser.add_argument("--use_gpu", type=bool, default=True)
     parser.add_argument("--config_path", type=str, default="/root/ultrawan/configs/self_forcing_dmd_lr.yaml")
     parser.add_argument("--logdir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_360p")
-    parser.add_argument("--generator_ckpt", type=str, default=None)
+    parser.add_argument("--generator_ckpt", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_360p/checkpoint_model_004200/model.pt")
     parser.add_argument("--load_generator_ckpt", action="store_true")
-    parser.add_argument("--trainable_backbone", action="store_true")
     parser.add_argument("--use_ema", action="store_true")
     
     args = parser.parse_args()
@@ -56,7 +55,6 @@ def main():
     config.config_path = args.config_path
     config.logdir = args.logdir
     config.generator_ckpt = args.generator_ckpt
-    config.trainable_backbone = args.trainable_backbone
     config.load_generator_ckpt = args.load_generator_ckpt
     config.use_ema = args.use_ema
     
