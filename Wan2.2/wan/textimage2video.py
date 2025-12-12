@@ -119,6 +119,7 @@ class WanTI2V:
                     print("------- Using EMA Weight ------")
                     generator_state_dict = state_dict['generator_ema']
                 else:
+                    print("------- Using None EMA Weight ------")
                     generator_state_dict = state_dict['generator']
                     
                 # 先去掉 FSDP 产生的中间前缀
@@ -160,6 +161,7 @@ class WanTI2V:
                     print("------- Using EMA Weight ------")
                     generator_state_dict = state_dict['generator_ema']
                 else:
+                    print("------- Using None EMA Weight ------")
                     generator_state_dict = state_dict['generator']
                     
                 # 先去掉 FSDP 产生的中间前缀
