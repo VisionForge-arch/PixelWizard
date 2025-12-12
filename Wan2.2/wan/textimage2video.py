@@ -46,6 +46,7 @@ class WanTI2V:
         init_on_cpu=True,
         convert_model_dtype=False,
         wan_ckpt=None,
+        use_ema=False,
     ):
         r"""
         Initializes the Wan text-to-video generation model components.
@@ -114,7 +115,11 @@ class WanTI2V:
             if use_sp is False:
                 print(f"Loading Wan model from {wan_ckpt}")
                 state_dict = torch.load(wan_ckpt, map_location="cpu")
-                generator_state_dict = state_dict['generator']
+                if use_ema:
+                    print("------- Using EMA Weight ------")
+                    generator_state_dict = state_dict['generator_ema']
+                else:
+                    generator_state_dict = state_dict['generator']
             
                 def strip_prefix(d, prefix="model."):
                     if all(k.startswith(prefix) for k in d.keys()):
@@ -122,7 +127,8 @@ class WanTI2V:
                     return d
                 generator_state_dict = strip_prefix(generator_state_dict)
                 
-                self.model.load_state_dict(generator_state_dict)
+                missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict)
+                print(f"Missing keys: {len(missing_keys)}, unexpected: {len(unexpected_keys)}")
             #generator_state_dict = {k.replace("base_attn.", ""): v for k, v in generator_state_dict.items()}
             
             else:
@@ -138,14 +144,19 @@ class WanTI2V:
                     dist.broadcast_object_list(obj_list, src=0)
                     state_dict = obj_list[0]  # 其它 rank 拿到同一个 state_dict
 
-                generator_state_dict = state_dict['generator']
+                if use_ema:
+                    print("------- Using EMA Weight ------")
+                    generator_state_dict = state_dict['generator_ema']
+                else:
+                    generator_state_dict = state_dict['generator']
                 
                 def strip_prefix(d, prefix="model."):
                     if all(k.startswith(prefix) for k in d.keys()):
                         return {k[len(prefix):]: v for k, v in d.items()}
                     return d
                 generator_state_dict = strip_prefix(generator_state_dict)
-                self.model.load_state_dict(generator_state_dict)
+                missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict)
+                print(f"Missing keys: {len(missing_keys)}, unexpected: {len(unexpected_keys)}")
         # ==============================================================
         
         if use_sp:

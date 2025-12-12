@@ -116,7 +116,7 @@ def _parse_args():
     parser.add_argument(
         "--size",
         type=str,
-        default="640*360",
+        default="640*352",
         choices=list(SIZE_CONFIGS.keys()),
         help="The area (width*height) of the generated video. For the I2V task, the aspect ratio of the output video will follow that of the input image."
     )
@@ -303,9 +303,10 @@ def _parse_args():
     parser.add_argument(
         "--wan_ckpt",
         type=str,
-        default=None,
-        #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_yarn/checkpoint_model_000050/model.pt",
+        #default=None,
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_360p/checkpoint_model_003500/model.pt",
         help="The path to the Wan checkpoint.")
+    parser.add_argument("--use_ema", action="store_true", help="Whether to use EMA parameters")
     args = parser.parse_args()
     _validate_args(args)
 
