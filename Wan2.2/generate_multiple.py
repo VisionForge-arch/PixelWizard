@@ -304,7 +304,7 @@ def _parse_args():
         "--wan_ckpt",
         type=str,
         #default=None,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_360p/checkpoint_model_003500/model.pt",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_360p/checkpoint_model_003900/model.pt",
         help="The path to the Wan checkpoint.")
     parser.add_argument("--use_ema", action="store_true", help="Whether to use EMA parameters")
     args = parser.parse_args()
@@ -397,6 +397,7 @@ def generate(args):
         t5_cpu=args.t5_cpu,
         convert_model_dtype=args.convert_model_dtype,
         wan_ckpt=args.wan_ckpt,
+        use_ema=args.use_ema,
     )
     
     logging.info(f"Generating video ...")
