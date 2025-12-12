@@ -4,7 +4,7 @@ import difflib
 import json
 
 # === 配置路径 ===
-prompt_txt = "/root/ultrawan/Wan2.2/prompt.txt"                   # 每行一个 prompt
+prompt_txt = "/root/ultrawan/Wan2.2/prompt_old.txt"                   # 每行一个 prompt
 video_dir  = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/360p_5s/decoded_video_3900"        # 存放 .mp4 或 .pt 文件的目录
 
 
