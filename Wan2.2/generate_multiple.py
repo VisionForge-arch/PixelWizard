@@ -210,7 +210,7 @@ def _parse_args():
     parser.add_argument(
         "--sample_shift",
         type=float,
-        default=3.0,
+        default=4.0,
         help="Sampling shift factor for flow matching schedulers.")
     parser.add_argument(
         "--sample_guide_scale",
