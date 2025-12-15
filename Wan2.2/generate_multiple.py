@@ -192,7 +192,7 @@ def _parse_args():
     parser.add_argument(
         "--base_seed",
         type=int,
-        default=1,
+        default=0,
         help="The seed to use for generating the video.")
     parser.add_argument(
         "--image",
