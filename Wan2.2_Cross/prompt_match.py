@@ -8,7 +8,7 @@ prompt_txt = "/root/ultrawan/Wan2.2/prompt.txt"                   # 每行一个
 video_dir  = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/480p_5s/decode_video"        # 存放 .mp4 或 .pt 文件的目录
 
 
-pat = re.compile(r"^ti2v-5B_832\*480_8_(?:\+?prompt_)?(?P<frag>.+?)_\d{8}_\d{6}\.(?:pt|mp4)$")
+pat = re.compile(r"^ti2v-5B_448\*256_4_(?:\+?prompt_)?(?P<frag>.+?)_\d{8}_\d{6}\.(?:pt|mp4)$")
 
 def normalize(p: str) -> str:
     # 和你保存时完全一致：只做空格与斜杠替换，然后截断 50
