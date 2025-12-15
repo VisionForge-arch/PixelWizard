@@ -3,7 +3,6 @@ export WANDB_MODE=offline
 export MASTER_ADDR=10.44.140.186  # 主节点 IP
 export MASTER_PORT=29500            # 通讯端口
 export NNODES=2                          # 总节点数
-export NODE_RANK=0                      # 当前节点序号，主节点0，从节点1,2,...
 
 
 torchrun \
