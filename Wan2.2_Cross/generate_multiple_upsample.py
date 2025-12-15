@@ -425,9 +425,9 @@ def generate(args):
             data_file_keys=("file",),
             main_data_operator=UnifiedDataset.default_video_operator(
                 base_path=None,
-                max_pixels=832*480,
-                height=480,
-                width=832,
+                max_pixels=448*256,
+                height=256,
+                width=448,
                 height_division_factor=16,
                 width_division_factor=16,
                 num_frames=args.frame_num,
