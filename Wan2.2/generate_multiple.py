@@ -160,7 +160,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_5s",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_5s/pt",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
