@@ -20,7 +20,7 @@ wandb_host: WANDB_HOST
 wandb_key: WANDB_KEY
 wandb_entity: WANDB_ENTITY
 wandb_project: WANDB_PROJECT
-sharding_strategy: full
+sharding_strategy: hybrid_zero2
 lr: 1.0e-05
 lr_critic: 4.0e-07
 beta1: 0.0
