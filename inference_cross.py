@@ -109,7 +109,7 @@ adapter_keys = [k for k in generator_state_dict.keys() if k.startswith('spatial_
 adapter_state_dict = {}
 for k in adapter_keys:
     raw_key = k[len('model.spatial_adapter.'):] if k.startswith('model.spatial_adapter.') else k[len('spatial_adapter.'):]
-    adapter_state_dict[raw_key] = generator_state_dict.pop(k)
+    adapter_state_dict[raw_key] = generator_state_dict[k]
 print(f"Found {len(adapter_keys)} adapter keys in checkpoint")
 
 # 加载主模型权重
@@ -117,9 +117,8 @@ missing_keys, unexpected_keys = pipeline.generator.load_state_dict(generator_sta
 print(f"Missing keys: {len(missing_keys)}, unexpected: {len(unexpected_keys)}")
 
 # 单独加载 adapter 权重，避免缺失
-if hasattr(pipeline.generator, "model") and hasattr(pipeline.generator.model, "spatial_adapter"):
-    adapter_missing, adapter_unexpected = pipeline.generator.model.spatial_adapter.load_state_dict(adapter_state_dict, strict=True)
-    print(f"Adapter missing: {len(adapter_missing)}, unexpected: {len(adapter_unexpected)}")
+adapter_missing, adapter_unexpected = pipeline.generator.model.spatial_adapter.load_state_dict(adapter_state_dict, strict=True)
+print(f"Adapter missing: {len(adapter_missing)}, unexpected: {len(adapter_unexpected)}")
 
 
 
