@@ -4,7 +4,7 @@ import os
 import json
 import logging
 from datetime import datetime
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 from omegaconf import OmegaConf
 from tqdm import tqdm
 from torchvision import transforms
@@ -25,7 +25,7 @@ from demo_utils.memory import gpu, get_cuda_free_memory_gb, DynamicSwapInstaller
 from dataset_upsample import UnifiedDataset
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--config_path", type=str, default="./configs/self_forcing_dmd.yaml", help="Path to the config file")
+parser.add_argument("--config_path", type=str, default="./configs/self_forcing_dmd_causal.yaml", help="Path to the config file")
 parser.add_argument("--checkpoint_path", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up/checkpoint_model_004100/model.pt", help="Path to the checkpoint folder")
 parser.add_argument("--prompt_file", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file.json", help="JSON file with prompts/files for upsample inference")
 parser.add_argument("--output_folder", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/ar_upsample", help="Output folder")
@@ -175,9 +175,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         
         initial_latent = None
 
-        sampled_noise = torch.randn(
-            [args.num_samples, args.num_output_frames, 48, 90, 160], device=device, dtype=torch.bfloat16
-        )
+        sampled_noise = torch.randn([args.num_samples, args.num_output_frames, 48, 90, 160], device=device, dtype=torch.bfloat16)
         
         print(video_input.shape)
 
@@ -198,7 +196,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
     
     # 扩散需要 3 的倍数
     target_frames = args.num_output_frames       # 想要生成的总帧数
-    pad3 = (-target_frames) % 3                  # 0/1/2
+    pad3 = (-target_frames) % args.num_frame_per_block                 # 0/1/2
     total_frames = target_frames + pad3
 
     # cond_latent_lr 时间维补 pad3，末帧复制即可
