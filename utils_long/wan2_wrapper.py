@@ -310,16 +310,17 @@ class WanDiffusionWrapper(torch.nn.Module):
                 ).permute(0, 2, 1, 3, 4)
 
         # Convert flow prediction (noise - x0) to x0 so callers can use denoised latents directly.
-        if self.training is False:
-            pred_x0 = self._convert_flow_pred_to_x0(
-                flow_pred=flow_pred.flatten(0, 1),
-                xt=noisy_image_or_video.flatten(0, 1),
-                timestep=timestep.flatten(0, 1)
-            ).unflatten(0, flow_pred.shape[:2])
+        # if self.training is False:
+        #     pred_x0 = self._convert_flow_pred_to_x0(
+        #         flow_pred=flow_pred.flatten(0, 1),
+        #         xt=noisy_image_or_video.flatten(0, 1),
+        #         timestep=timestep.flatten(0, 1)
+        #     ).unflatten(0, flow_pred.shape[:2])
 
-            return flow_pred, pred_x0
-        else:
-            return flow_pred
+        #     return flow_pred, pred_x0
+        # else:
+        #     return flow_pred
+        return flow_pred
 
     def get_scheduler(self) -> SchedulerInterface:
         """

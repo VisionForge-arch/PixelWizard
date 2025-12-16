@@ -161,44 +161,6 @@ class CausalInferencePipeline(torch.nn.Module):
         # Step 2: Cache context feature
         current_start_frame = 0
         cache_start_frame = 0
-        if initial_latent is not None:
-            timestep = torch.ones([batch_size, 1], device=noise.device, dtype=torch.int64) * 0
-            if self.independent_first_frame:
-                # Assume num_input_frames is 1 + self.num_frame_per_block * num_input_blocks
-                assert (num_input_frames - 1) % self.num_frame_per_block == 0
-                num_input_blocks = (num_input_frames - 1) // self.num_frame_per_block
-                output[:, :1] = initial_latent[:, :1]
-                lr_ctx = None if clean_latent_lr is None else clean_latent_lr[:, :, :1]
-                self.generator(
-                    noisy_image_or_video=initial_latent[:, :1],
-                    conditional_dict=conditional_dict,
-                    timestep=timestep * 0,
-                    kv_cache=self.kv_cache1,
-                    crossattn_cache=self.crossattn_cache,
-                    current_start=current_start_frame * self.frame_seq_length,
-                    lr_context=lr_ctx,
-                )
-                current_start_frame += 1
-            else:
-                # Assume num_input_frames is self.num_frame_per_block * num_input_blocks
-                assert num_input_frames % self.num_frame_per_block == 0
-                num_input_blocks = num_input_frames // self.num_frame_per_block
-
-            for _ in range(num_input_blocks):
-                current_ref_latents = \
-                    initial_latent[:, current_start_frame:current_start_frame + self.num_frame_per_block]
-                output[:, current_start_frame:current_start_frame + self.num_frame_per_block] = current_ref_latents
-                lr_ctx = None if clean_latent_lr is None else clean_latent_lr[:, current_start_frame:current_start_frame + self.num_frame_per_block]
-                self.generator(
-                    noisy_image_or_video=current_ref_latents,
-                    conditional_dict=conditional_dict,
-                    timestep=timestep * 0,
-                    kv_cache=self.kv_cache1,
-                    crossattn_cache=self.crossattn_cache,
-                    current_start=current_start_frame * self.frame_seq_length,
-                    lr_context=lr_ctx,
-                )
-                current_start_frame += self.num_frame_per_block
 
         if profile:
             init_end.record()
@@ -213,8 +175,7 @@ class CausalInferencePipeline(torch.nn.Module):
             if profile:
                 block_start.record()
 
-            noisy_input = noise[
-                :, current_start_frame - num_input_frames:current_start_frame + current_num_frames - num_input_frames]
+            noisy_input = noise[:, current_start_frame:current_start_frame + current_num_frames]
             latents = noisy_input
             lr_chunk = None if clean_latent_lr is None else clean_latent_lr[:, :, current_start_frame:current_start_frame + current_num_frames]
 
