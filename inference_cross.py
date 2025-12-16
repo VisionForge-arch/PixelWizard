@@ -82,9 +82,9 @@ pipeline.generator.eval()
 #     }
 #     pipeline.generator.load_state_dict(corrected_state_dict)
 
-state_dict = torch.load(args.checkpoint_path, map_location="cpu")
-generator_state_dict = state_dict['generator']
-pipeline.generator.load_state_dict(generator_state_dict)
+# state_dict = torch.load(args.checkpoint_path, map_location="cpu")
+# generator_state_dict = state_dict['generator']
+# pipeline.generator.load_state_dict(generator_state_dict)
 
 
 
