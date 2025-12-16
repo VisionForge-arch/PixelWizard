@@ -113,8 +113,13 @@ for k in adapter_keys:
 print(f"Found {len(adapter_keys)} adapter keys in checkpoint")
 
 # 加载主模型权重
-missing_keys, unexpected_keys = pipeline.generator.load_state_dict(generator_state_dict)
+missing_keys, unexpected_keys = pipeline.generator.load_state_dict(generator_state_dict, strict=False)
 print(f"Missing keys: {len(missing_keys)}, unexpected: {len(unexpected_keys)}")
+
+# 单独加载 adapter 权重，避免缺失
+if hasattr(pipeline.generator, "model") and hasattr(pipeline.generator.model, "spatial_adapter"):
+    adapter_missing, adapter_unexpected = pipeline.generator.model.spatial_adapter.load_state_dict(adapter_state_dict, strict=False)
+    print(f"Adapter missing: {len(adapter_missing)}, unexpected: {len(adapter_unexpected)}")
 
 
 
