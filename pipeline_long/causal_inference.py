@@ -230,8 +230,8 @@ class CausalInferencePipeline(torch.nn.Module):
                     noisy_image_or_video=noisy_input,
                     conditional_dict=conditional_dict,
                     timestep=timestep,
-                    kv_cache=self.kv_cache1,
-                    crossattn_cache=self.crossattn_cache,
+                    kv_cache=self.kv_cache_pos,
+                    crossattn_cache=self.crossattn_cache_pos,
                     current_start=current_start_frame * self.frame_seq_length,
                     lr_context=lr_chunk,
                 )
@@ -239,8 +239,8 @@ class CausalInferencePipeline(torch.nn.Module):
                     noisy_image_or_video=noisy_input,
                     conditional_dict=unconditional_dict,
                     timestep=timestep,
-                    kv_cache=self.kv_cache1,
-                    crossattn_cache=self.crossattn_cache,
+                    kv_cache=self.kv_cache_neg,
+                    crossattn_cache=self.crossattn_cache_neg,
                     current_start=current_start_frame * self.frame_seq_length,
                     lr_context=lr_chunk,
                 )
