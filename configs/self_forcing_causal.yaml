@@ -44,7 +44,7 @@ image_or_video_shape:
 distribution_loss: dmd
 trainer: score_distillation
 gradient_checkpointing: true
-num_frame_per_block: 5
+num_frame_per_block: 4
 load_raw_video: false
 model_kwargs:
   timestep_shift: 5.5
