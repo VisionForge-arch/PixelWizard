@@ -215,11 +215,13 @@ class CausalInferencePipeline(torch.nn.Module):
 
             noisy_input = noise[
                 :, current_start_frame - num_input_frames:current_start_frame + current_num_frames - num_input_frames]
+            latents = noisy_input
             lr_chunk = None if clean_latent_lr is None else clean_latent_lr[:, :, current_start_frame:current_start_frame + current_num_frames]
 
             # Step 3.1: Spatial denoising loop
             sample_scheduler = self._initialize_sample_scheduler(noise)
             for _, t in enumerate(tqdm(sample_scheduler.timesteps)):
+                latent_model_input = latents
                 timestep = t * torch.ones(
                     [batch_size, current_num_frames], device=noise.device, dtype=torch.float32
                 )
@@ -227,7 +229,7 @@ class CausalInferencePipeline(torch.nn.Module):
                 
 
                 flow_pred_cond, denoised_pred_cond = self.generator(
-                    noisy_image_or_video=noisy_input,
+                    noisy_image_or_video=latent_model_input,
                     conditional_dict=conditional_dict,
                     timestep=timestep,
                     kv_cache=self.kv_cache_pos,
@@ -236,7 +238,7 @@ class CausalInferencePipeline(torch.nn.Module):
                     lr_context=lr_chunk,
                 )
                 flow_pred_uncond, denoised_pred_uncond = self.generator(
-                    noisy_image_or_video=noisy_input,
+                    noisy_image_or_video=latent_model_input,
                     conditional_dict=unconditional_dict,
                     timestep=timestep,
                     kv_cache=self.kv_cache_neg,
