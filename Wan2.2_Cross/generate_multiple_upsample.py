@@ -163,7 +163,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/720p_upsample_6layers_blur",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_upsample_2k/pt",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
@@ -213,7 +213,7 @@ def _parse_args():
     parser.add_argument(
         "--sample_shift",
         type=float,
-        default=None,
+        default=5.5,
         help="Sampling shift factor for flow matching schedulers.")
     parser.add_argument(
         "--sample_guide_scale",
@@ -301,7 +301,7 @@ def _parse_args():
     parser.add_argument(
         "--prompt_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file.json",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file_240p.json",
         #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file_720p.json",
         #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/720p_i2v_matched.json",
         help="The file to read the prompts from.")
@@ -309,7 +309,7 @@ def _parse_args():
         "--wan_ckpt",
         type=str,
         #default=None,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up_2/checkpoint_model_000100/model.pt",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up_2/checkpoint_model_000800/model.pt",
         help="The path to the Wan checkpoint.")
     parser.add_argument("--use_ema", action="store_true", help="Whether to use EMA parameters")
     args = parser.parse_args()
