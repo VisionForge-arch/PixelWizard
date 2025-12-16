@@ -85,7 +85,7 @@ pipeline.generator.eval()
 #     }
 #     pipeline.generator.load_state_dict(corrected_state_dict)
 
-state_dict = torch.load(args.checkpoint_path, map_location="cpu")
+state_dict = torch.load(args.checkpoint_path, map_location="cpu"， )
 if args.use_ema:
     print("------- Using EMA Weight ------")
     generator_state_dict = state_dict['generator_ema']
@@ -93,18 +93,27 @@ else:
     print("------- Using None EMA Weight ------")
     generator_state_dict = state_dict['generator']
     
-# # 先去掉 FSDP 产生的中间前缀
-# def clean_fsdp_keys(d):
-#     new = {}
-#     for k, v in d.items():
-#         k2 = (k.replace("_fsdp_wrapped_module.", "")
-#                 .replace("_checkpoint_wrapped_module.", "")
-#                 .replace("_orig_mod.", ""))
-#         new[k2] = v
-#     return new
-# if args.use_ema:
-#     generator_state_dict = clean_fsdp_keys(generator_state_dict)
-pipeline.generator.load_state_dict(generator_state_dict)
+# 先去掉 FSDP 产生的中间前缀
+def clean_fsdp_keys(d):
+    new = {}
+    for k, v in d.items():
+        k2 = (k.replace("_fsdp_wrapped_module.", "")
+                .replace("_checkpoint_wrapped_module.", "")
+                .replace("_orig_mod.", ""))
+        new[k2] = v
+    return new
+if args.use_ema:
+    generator_state_dict = clean_fsdp_keys(generator_state_dict)
+    
+# 分离 adapter 的权重
+adapter_keys = [k for k in generator_state_dict.keys() if k.startswith('spatial_adapter.')]
+adapter_state_dict = {k[len('spatial_adapter.'):]: generator_state_dict.pop(k) for k in adapter_keys}
+print(f"Found {len(adapter_keys)} adapter keys in checkpoint")
+
+# 加载主模型权重
+missing_keys, unexpected_keys = pipeline.generator.load_state_dict(generator_state_dict)
+print(f"Missing keys: {len(missing_keys)}, unexpected: {len(unexpected_keys)}")
+
 
 
 
