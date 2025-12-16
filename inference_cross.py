@@ -105,6 +105,24 @@ def clean_fsdp_keys(d):
 if args.use_ema:
     generator_state_dict = clean_fsdp_keys(generator_state_dict)
     
+# Clean FSDP / wrapper prefixes so keys match the module, then split adapter weights.
+def clean_fsdp_keys(d):
+    out = {}
+    for k, v in d.items():
+        k2 = (k.replace("_fsdp_wrapped_module.", "")
+                .replace("_checkpoint_wrapped_module.", "")
+                .replace("_orig_mod.", ""))
+        out[k2] = v
+    return out
+
+def strip_prefix(d, prefix="model."):
+    if all(k.startswith(prefix) for k in d.keys()):
+        return {k[len(prefix):]: v for k, v in d.items()}
+    return d
+
+generator_state_dict = clean_fsdp_keys(generator_state_dict)
+generator_state_dict = strip_prefix(generator_state_dict)
+
 # 分离 adapter 的权重
 adapter_keys = [k for k in generator_state_dict.keys() if k.startswith('spatial_adapter.')]
 adapter_state_dict = {k[len('spatial_adapter.'):]: generator_state_dict.pop(k) for k in adapter_keys}
