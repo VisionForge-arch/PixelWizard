@@ -118,7 +118,7 @@ print(f"Missing keys: {len(missing_keys)}, unexpected: {len(unexpected_keys)}")
 
 # 单独加载 adapter 权重，避免缺失
 if hasattr(pipeline.generator, "model") and hasattr(pipeline.generator.model, "spatial_adapter"):
-    adapter_missing, adapter_unexpected = pipeline.generator.model.spatial_adapter.load_state_dict(adapter_state_dict, strict=False)
+    adapter_missing, adapter_unexpected = pipeline.generator.model.spatial_adapter.load_state_dict(adapter_state_dict, strict=True)
     print(f"Adapter missing: {len(adapter_missing)}, unexpected: {len(adapter_unexpected)}")
 
 
