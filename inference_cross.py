@@ -85,9 +85,26 @@ pipeline.generator.eval()
 #     }
 #     pipeline.generator.load_state_dict(corrected_state_dict)
 
-# state_dict = torch.load(args.checkpoint_path, map_location="cpu")
-# generator_state_dict = state_dict['generator']
-# pipeline.generator.load_state_dict(generator_state_dict)
+state_dict = torch.load(args.checkpoint_path, map_location="cpu")
+if args.use_ema:
+    print("------- Using EMA Weight ------")
+    generator_state_dict = state_dict['generator_ema']
+else:
+    print("------- Using None EMA Weight ------")
+    generator_state_dict = state_dict['generator']
+    
+# # 先去掉 FSDP 产生的中间前缀
+# def clean_fsdp_keys(d):
+#     new = {}
+#     for k, v in d.items():
+#         k2 = (k.replace("_fsdp_wrapped_module.", "")
+#                 .replace("_checkpoint_wrapped_module.", "")
+#                 .replace("_orig_mod.", ""))
+#         new[k2] = v
+#     return new
+# if args.use_ema:
+#     generator_state_dict = clean_fsdp_keys(generator_state_dict)
+pipeline.generator.load_state_dict(generator_state_dict)
 
 
 
