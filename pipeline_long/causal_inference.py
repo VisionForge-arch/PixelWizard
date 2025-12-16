@@ -132,6 +132,9 @@ class CausalInferencePipeline(torch.nn.Module):
 
         # Step 1: Initialize KV cache to all zeros
         if self.kv_cache_pos is None:
+            mem_before = None
+            if torch.cuda.is_available():
+                mem_before = torch.cuda.memory_allocated()
             self._initialize_kv_cache(
                 batch_size=batch_size,
                 dtype=noise.dtype,
@@ -142,6 +145,9 @@ class CausalInferencePipeline(torch.nn.Module):
                 dtype=noise.dtype,
                 device=noise.device
             )
+            if mem_before is not None:
+                mem_after = torch.cuda.memory_allocated()
+                print(f"CUDA mem before cache init: {mem_before/1024**2:.1f} MB; after: {mem_after/1024**2:.1f} MB")
         else:
             # reset cross attn cache
             for block_index in range(self.num_transformer_blocks):
