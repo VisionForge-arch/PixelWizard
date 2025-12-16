@@ -182,8 +182,8 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         with torch.no_grad():
             cond_latent_lr = pipeline.vae.encode_to_latent(video_input).to(device=device, dtype=torch.bfloat16)  # [B,T,C,h',w']
             B, T, C, h, w = cond_latent_lr.shape
-            H = 90
-            W = 160
+            H = int(config.height // 16)
+            W = int(config.width // 16)
             print("cond_latent_lr.shape:", cond_latent_lr.shape)
             
             #cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)  
@@ -204,7 +204,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         cond_latent_lr = F.pad(cond_latent_lr, (0,0,0,0,0,pad3), mode="replicate")
 
     # 噪声也用 total_frames
-    sampled_noise = torch.randn([args.num_samples, total_frames, 48, 90, 160], device=device, dtype=torch.bfloat16)
+    sampled_noise = torch.randn([args.num_samples, total_frames, 48, H, W], device=device, dtype=torch.bfloat16)
     print("sampled_noise.shape:", sampled_noise.shape)
         
     # Generate 81 frames
