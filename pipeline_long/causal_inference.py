@@ -86,12 +86,16 @@ class CausalInferencePipeline(torch.nn.Module):
             num_blocks = (num_frames - 1) // self.num_frame_per_block
         num_input_frames = initial_latent.shape[1] if initial_latent is not None else 0
         num_output_frames = num_frames + num_input_frames  # add the initial latent frames
+        
         conditional_dict = self.text_encoder(
             text_prompts=text_prompts
         )
+        unconditional_dict = self.text_encoder(
+            text_prompts=self.args.negative_prompt
+        )
         
-        print(f"clean latent' shape {clean_latent_lr.shape}")
-        print(f"noise' shape {noise.shape}")
+        # print(f"clean latent' shape {clean_latent_lr.shape}")
+        # print(f"noise' shape {noise.shape}")
         
         #assert clean_latent_lr.shape[1] >= num_frames, "clean_latent_lr must cover target frames"
 
