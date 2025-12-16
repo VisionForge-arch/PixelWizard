@@ -25,7 +25,7 @@ from demo_utils.memory import gpu, get_cuda_free_memory_gb, DynamicSwapInstaller
 from dataset_upsample import UnifiedDataset
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--config_path", type=str, default="./configs/self_forcing_dmd_causal.yaml", help="Path to the config file")
+parser.add_argument("--config_path", type=str, default="./configs/self_forcing_causal.yaml", help="Path to the config file")
 parser.add_argument("--checkpoint_path", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up/checkpoint_model_004100/model.pt", help="Path to the checkpoint folder")
 parser.add_argument("--prompt_file", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file.json", help="JSON file with prompts/files for upsample inference")
 parser.add_argument("--output_folder", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/ar_upsample", help="Output folder")
