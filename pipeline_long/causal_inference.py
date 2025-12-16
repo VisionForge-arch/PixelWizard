@@ -29,12 +29,17 @@ class CausalInferencePipeline(torch.nn.Module):
         self.vae = WanVAEWrapper2_2() if vae is None else vae
 
         # Step 2: Initialize all causal hyperparmeters
-        self.scheduler = self.generator.get_scheduler()
-        self.denoising_step_list = torch.tensor(
-            args.denoising_step_list, dtype=torch.long)
-        if args.warp_denoising_step:
-            timesteps = torch.cat((self.scheduler.timesteps.cpu(), torch.tensor([0], dtype=torch.float32)))
-            self.denoising_step_list = timesteps[1000 - self.denoising_step_list]
+        # self.scheduler = self.generator.get_scheduler()
+        # self.denoising_step_list = torch.tensor(
+        #     args.denoising_step_list, dtype=torch.long)
+        # if args.warp_denoising_step:
+        #     timesteps = torch.cat((self.scheduler.timesteps.cpu(), torch.tensor([0], dtype=torch.float32)))
+        #     self.denoising_step_list = timesteps[1000 - self.denoising_step_list]
+        # Step 2: Initialize scheduler
+        self.num_train_timesteps = args.num_train_timestep
+        self.sampling_steps = 50
+        self.sample_solver = 'unipc'
+        self.shift = args.timestep_shift
 
         self.num_transformer_blocks = 30
         self.frame_seq_length = 45*80 # 30*52
