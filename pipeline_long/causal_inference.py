@@ -37,7 +37,7 @@ class CausalInferencePipeline(torch.nn.Module):
         #     self.denoising_step_list = timesteps[1000 - self.denoising_step_list]
         # Step 2: Initialize scheduler
         self.num_train_timesteps = args.num_train_timestep
-        self.sampling_steps = 50
+        self.sampling_steps = args.sampling_steps
         self.sample_solver = 'unipc'
         self.shift = args.timestep_shift
 

@@ -52,7 +52,4 @@ use_lora: False
 lora_r: 64
 lora_alpha: 64
 lora_dropout: 0.1
-# Random crop for loss computation (to save memory)
-use_random_crop: true
-crop_height: 30
-crop_width: 52
+sampling_steps: 5
