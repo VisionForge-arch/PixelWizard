@@ -64,7 +64,7 @@ config.sr_mode = True
 config.causal = True
 config.kv_cache_height = int(config.height // 32)
 config.kv_cache_width = int(config.width // 32)
-config.kv_cache_time = args.num_output_frames + 2 
+config.kv_cache_time = args.num_output_frames + 5
 # recompute seq_len based on height/width/num_frames from config
 # time_part = int((config.num_frames - 1) // 4) + 1
 time_part = args.num_output_frames
