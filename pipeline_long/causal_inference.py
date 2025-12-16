@@ -189,7 +189,7 @@ class CausalInferencePipeline(torch.nn.Module):
                 print(f"current_timestep: {t}")
                 
 
-                flow_pred_cond, denoised_pred_cond = self.generator(
+                flow_pred_cond = self.generator(
                     noisy_image_or_video=latent_model_input,
                     conditional_dict=conditional_dict,
                     timestep=timestep,
@@ -198,7 +198,7 @@ class CausalInferencePipeline(torch.nn.Module):
                     current_start=current_start_frame * self.frame_seq_length,
                     lr_context=lr_chunk,
                 )
-                flow_pred_uncond, denoised_pred_uncond = self.generator(
+                flow_pred_uncond = self.generator(
                     noisy_image_or_video=latent_model_input,
                     conditional_dict=unconditional_dict,
                     timestep=timestep,
