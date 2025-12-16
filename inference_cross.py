@@ -85,7 +85,7 @@ pipeline.generator.eval()
 #     }
 #     pipeline.generator.load_state_dict(corrected_state_dict)
 
-state_dict = torch.load(args.checkpoint_path, map_location="cpu"， )
+state_dict = torch.load(args.checkpoint_path, map_location="cpu")
 if args.use_ema:
     print("------- Using EMA Weight ------")
     generator_state_dict = state_dict['generator_ema']
