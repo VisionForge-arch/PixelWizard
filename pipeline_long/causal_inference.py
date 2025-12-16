@@ -289,12 +289,12 @@ class CausalInferencePipeline(torch.nn.Module):
         Initialize a Per-GPU KV cache for the Wan model.
         """
         kv_cache1 = []
-        # if self.local_attn_size != -1:
-        #     # Use the local attention size to compute the KV cache size
-        #     kv_cache_size = self.local_attn_size * self.frame_seq_length
-        # else:
-            # Use the default KV cache size
-        kv_cache_size = 45*80*33 # 30*52*21
+        # Compute KV cache size from args for easier tuning instead of a hard-coded constant.
+        # Defaults match previous 45*80*33 when args.kv_cache_height/width/time are unset.
+        height_chunks = getattr(self.args, "kv_cache_height", 45)
+        width_chunks = getattr(self.args, "kv_cache_width", 80)
+        time_chunks = getattr(self.args, "kv_cache_time", 33)
+        kv_cache_size = height_chunks * width_chunks * time_chunks
 
         for _ in range(self.num_transformer_blocks):
             kv_cache1.append({
