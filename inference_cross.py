@@ -196,7 +196,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
     
     # 扩散需要 3 的倍数
     target_frames = args.num_output_frames       # 想要生成的总帧数
-    pad3 = (-target_frames) % args.num_frame_per_block                 # 0/1/2
+    pad3 = (-target_frames) % config.num_frame_per_block                 # 0/1/2
     total_frames = target_frames + pad3
 
     # cond_latent_lr 时间维补 pad3，末帧复制即可
