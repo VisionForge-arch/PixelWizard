@@ -83,7 +83,7 @@ class CausalWanSelfAttention(nn.Module):
         
         self.max_attention_size = 32760 
 
-    def forward(self, x, seq_lens, grid_sizes, freqs, block_mask, kv_cache=None, current_start=0):
+    def forward(self, x, seq_lens, grid_sizes, freqs, block_mask, kv_cache=None, current_start=0, cache_start=None):
         r"""
         Args:
             x(Tensor): Shape [B, L, num_heads, C / num_heads]
@@ -93,6 +93,9 @@ class CausalWanSelfAttention(nn.Module):
             block_mask (BlockMask)
         """
         b, s, n, d = *x.shape[:2], self.num_heads, self.head_dim
+        if cache_start is None:
+            cache_start = current_start
+
 
         # query, key, value function
         def qkv_fn(x_):
@@ -229,6 +232,7 @@ class CausalWanAttentionBlock(nn.Module):
         kv_cache=None,
         crossattn_cache=None,
         current_start=0,
+        cache_start=None,
         lr_latents=None,  # interface parity with spatial control wrapper
     ):
         r"""
@@ -251,6 +255,7 @@ class CausalWanAttentionBlock(nn.Module):
             block_mask,
             kv_cache,
             current_start,
+            cache_start
         )
 
         x = x + (y.unflatten(dim=1, sizes=(num_frames, frame_seqlen)) * e[2]).flatten(1, 2)
@@ -523,11 +528,6 @@ class WanModel_Upsample_Causal(ModelMixin, ConfigMixin):
         context = self.text_embedding(
             torch.stack([torch.cat([u, u.new_zeros(self.text_len - u.size(0), u.size(1))]) for u in context])
         )
-
-        if clip_fea is not None:
-            context_clip = self.img_emb(clip_fea)  # bs x 257 x dim
-            context = torch.concat([context_clip, context], dim=1)
-
         # arguments
         kwargs = dict(
             e=e0,
@@ -547,6 +547,7 @@ class WanModel_Upsample_Causal(ModelMixin, ConfigMixin):
                     "kv_cache": kv_cache[block_index],
                     "crossattn_cache": crossattn_cache[block_index],
                     "current_start": current_start,
+                    "cache_start": cache_start
                 }
             )
             x = block(x, lr_latents=lr_latents, **kwargs)

@@ -255,7 +255,8 @@ class WanDiffusionWrapper(torch.nn.Module):
 
     def forward(
         self,
-        noisy_image_or_video: torch.Tensor, conditional_dict: dict,
+        noisy_image_or_video: torch.Tensor, 
+        conditional_dict: dict,
         timestep: torch.Tensor, 
         kv_cache: Optional[List[dict]] = None,
         crossattn_cache: Optional[List[dict]] = None,

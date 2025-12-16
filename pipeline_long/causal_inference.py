@@ -1,10 +1,12 @@
 from typing import List, Optional
 import torch
+from tqdm import tqdm
 
 from utils_long.wan2_wrapper import WanDiffusionWrapper, WanTextEncoder, WanVAEWrapper2_2
 
 from demo_utils.memory import gpu, get_cuda_free_memory_gb, DynamicSwapInstaller, move_model_to_device_with_memory_preservation
-
+from wan2_long.utils.fm_solvers import FlowDPMSolverMultistepScheduler, get_sampling_sigmas, retrieve_timesteps
+from wan2_long.utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
 
 class CausalInferencePipeline(torch.nn.Module):
     def __init__(
@@ -37,7 +39,8 @@ class CausalInferencePipeline(torch.nn.Module):
         self.num_transformer_blocks = 30
         self.frame_seq_length = 45*80 # 30*52
 
-        self.kv_cache1 = None
+        self.kv_cache_pos = None
+        self.kv_cache_neg = None
         self.args = args
         self.num_frame_per_block = getattr(args, "num_frame_per_block", 3)
         self.independent_first_frame = args.independent_first_frame
@@ -91,7 +94,7 @@ class CausalInferencePipeline(torch.nn.Module):
             text_prompts=text_prompts
         )
         unconditional_dict = self.text_encoder(
-            text_prompts=self.args.negative_prompt
+            text_prompts=[self.args.negative_prompt] * len(text_prompts)
         )
         
         # print(f"clean latent' shape {clean_latent_lr.shape}")
@@ -123,7 +126,7 @@ class CausalInferencePipeline(torch.nn.Module):
             init_start.record()
 
         # Step 1: Initialize KV cache to all zeros
-        if self.kv_cache1 is None:
+        if self.kv_cache_pos is None:
             self._initialize_kv_cache(
                 batch_size=batch_size,
                 dtype=noise.dtype,
@@ -137,16 +140,22 @@ class CausalInferencePipeline(torch.nn.Module):
         else:
             # reset cross attn cache
             for block_index in range(self.num_transformer_blocks):
-                self.crossattn_cache[block_index]["is_init"] = False
+                self.crossattn_cache_pos[block_index]["is_init"] = False
+                self.crossattn_cache_neg[block_index]["is_init"] = False
             # reset kv cache
-            for block_index in range(len(self.kv_cache1)):
-                self.kv_cache1[block_index]["global_end_index"] = torch.tensor(
+            for block_index in range(len(self.kv_cache_pos)):
+                self.kv_cache_pos[block_index]["global_end_index"] = torch.tensor(
                     [0], dtype=torch.long, device=noise.device)
-                self.kv_cache1[block_index]["local_end_index"] = torch.tensor(
+                self.kv_cache_pos[block_index]["local_end_index"] = torch.tensor(
+                    [0], dtype=torch.long, device=noise.device)
+                self.kv_cache_neg[block_index]["global_end_index"] = torch.tensor(
+                    [0], dtype=torch.long, device=noise.device)
+                self.kv_cache_neg[block_index]["local_end_index"] = torch.tensor(
                     [0], dtype=torch.long, device=noise.device)
 
         # Step 2: Cache context feature
         current_start_frame = 0
+        cache_start_frame = 0
         if initial_latent is not None:
             timestep = torch.ones([batch_size, 1], device=noise.device, dtype=torch.int64) * 0
             if self.independent_first_frame:
@@ -204,55 +213,67 @@ class CausalInferencePipeline(torch.nn.Module):
             lr_chunk = None if clean_latent_lr is None else clean_latent_lr[:, :, current_start_frame:current_start_frame + current_num_frames]
 
             # Step 3.1: Spatial denoising loop
-            for index, current_timestep in enumerate(self.denoising_step_list):
-                print(f"current_timestep: {current_timestep}")
-                # set current timestep
-                timestep = torch.ones(
-                    [batch_size, current_num_frames],
-                    device=noise.device,
-                    dtype=torch.int64) * current_timestep
+            sample_scheduler = self._initialize_sample_scheduler(noise)
+            for _, t in enumerate(tqdm(sample_scheduler.timesteps)):
+                timestep = t * torch.ones(
+                    [batch_size, current_num_frames], device=noise.device, dtype=torch.float32
+                )
+                print(f"current_timestep: {t}")
+                
 
-                if index < len(self.denoising_step_list) - 1:
-                    flow_pred, denoised_pred = self.generator(
-                        noisy_image_or_video=noisy_input,
-                        conditional_dict=conditional_dict,
-                        timestep=timestep,
-                        kv_cache=self.kv_cache1,
-                        crossattn_cache=self.crossattn_cache,
-                        current_start=current_start_frame * self.frame_seq_length,
-                        lr_context=lr_chunk,
-                    )
-                    next_timestep = self.denoising_step_list[index + 1]
-                    noisy_input = self.scheduler.add_noise(
-                        denoised_pred.flatten(0, 1),
-                        torch.randn_like(denoised_pred.flatten(0, 1)),
-                        next_timestep * torch.ones(
-                            [batch_size * current_num_frames], device=noise.device, dtype=torch.long)
-                    ).unflatten(0, denoised_pred.shape[:2])
-                else:
-                    # for getting real output
-                    flow_pred, denoised_pred = self.generator(
-                        noisy_image_or_video=noisy_input,
-                        conditional_dict=conditional_dict,
-                        timestep=timestep,
-                        kv_cache=self.kv_cache1,
-                        crossattn_cache=self.crossattn_cache,
-                        current_start=current_start_frame * self.frame_seq_length,
-                        lr_context=lr_chunk,
-                    )
+                flow_pred_cond, denoised_pred_cond = self.generator(
+                    noisy_image_or_video=noisy_input,
+                    conditional_dict=conditional_dict,
+                    timestep=timestep,
+                    kv_cache=self.kv_cache1,
+                    crossattn_cache=self.crossattn_cache,
+                    current_start=current_start_frame * self.frame_seq_length,
+                    lr_context=lr_chunk,
+                )
+                flow_pred_uncond, denoised_pred_uncond = self.generator(
+                    noisy_image_or_video=noisy_input,
+                    conditional_dict=unconditional_dict,
+                    timestep=timestep,
+                    kv_cache=self.kv_cache1,
+                    crossattn_cache=self.crossattn_cache,
+                    current_start=current_start_frame * self.frame_seq_length,
+                    lr_context=lr_chunk,
+                )
+                flow_pred = flow_pred_uncond + self.args.guidance_scale * (flow_pred_cond - flow_pred_uncond)
+                
+                temp_x0 = sample_scheduler.step(
+                    flow_pred,
+                    t,
+                    latents,
+                    return_dict=False)[0]
+                
+                latents = temp_x0
+                print(f"kv_cache['local_end_index']: {self.kv_cache_pos[0]['local_end_index']}")
+                print(f"kv_cache['global_end_index']: {self.kv_cache_pos[0]['global_end_index']}")
 
+                
             # Step 3.2: record the model's output
-            output[:, current_start_frame:current_start_frame + current_num_frames] = denoised_pred
+            output[:, cache_start_frame:cache_start_frame + current_num_frames] = latents
 
             # Step 3.3: rerun with timestep zero to update KV cache using clean context
-            context_timestep = torch.ones_like(timestep) * self.args.context_noise
             self.generator(
-                noisy_image_or_video=denoised_pred,
+                noisy_image_or_video=latents,
                 conditional_dict=conditional_dict,
-                timestep=context_timestep,
-                kv_cache=self.kv_cache1,
-                crossattn_cache=self.crossattn_cache,
+                timestep=timestep * 0,
+                kv_cache=self.kv_cache_pos,
+                crossattn_cache=self.crossattn_cache_pos,
                 current_start=current_start_frame * self.frame_seq_length,
+                cache_start=cache_start_frame * self.frame_seq_length,
+                lr_context=lr_chunk,
+            )
+            self.generator(
+                noisy_image_or_video=latents,
+                conditional_dict=unconditional_dict,
+                timestep=timestep * 0,
+                kv_cache=self.kv_cache_neg,
+                crossattn_cache=self.crossattn_cache_neg,
+                current_start=current_start_frame * self.frame_seq_length,
+                cache_start=cache_start_frame * self.frame_seq_length,
                 lr_context=lr_chunk,
             )
 
@@ -292,7 +313,8 @@ class CausalInferencePipeline(torch.nn.Module):
         """
         Initialize a Per-GPU KV cache for the Wan model.
         """
-        kv_cache1 = []
+        kv_cache_pos = []
+        kv_cache_neg = []
         # Compute KV cache size from args for easier tuning instead of a hard-coded constant.
         # Defaults match previous 45*80*33 when args.kv_cache_height/width/time are unset.
         height_chunks = getattr(self.args, "kv_cache_height", 45)
@@ -301,25 +323,63 @@ class CausalInferencePipeline(torch.nn.Module):
         kv_cache_size = height_chunks * width_chunks * time_chunks
 
         for _ in range(self.num_transformer_blocks):
-            kv_cache1.append({
+            kv_cache_pos.append({
+                "k": torch.zeros([batch_size, kv_cache_size, 24, 128], dtype=dtype, device=device),
+                "v": torch.zeros([batch_size, kv_cache_size, 24, 128], dtype=dtype, device=device),
+                "global_end_index": torch.tensor([0], dtype=torch.long, device=device),
+                "local_end_index": torch.tensor([0], dtype=torch.long, device=device)
+            })
+            kv_cache_neg.append({
                 "k": torch.zeros([batch_size, kv_cache_size, 24, 128], dtype=dtype, device=device),
                 "v": torch.zeros([batch_size, kv_cache_size, 24, 128], dtype=dtype, device=device),
                 "global_end_index": torch.tensor([0], dtype=torch.long, device=device),
                 "local_end_index": torch.tensor([0], dtype=torch.long, device=device)
             })
 
-        self.kv_cache1 = kv_cache1  # always store the clean cache
+        self.kv_cache_pos = kv_cache_pos  # always store the clean cache
+        self.kv_cache_neg = kv_cache_neg  # always store the clean cache
 
     def _initialize_crossattn_cache(self, batch_size, dtype, device):
         """
         Initialize a Per-GPU cross-attention cache for the Wan model.
         """
-        crossattn_cache = []
+        crossattn_cache_pos = []
+        crossattn_cache_neg = []
 
         for _ in range(self.num_transformer_blocks):
-            crossattn_cache.append({
+            crossattn_cache_pos.append({
                 "k": torch.zeros([batch_size, 512, 24, 128], dtype=dtype, device=device),
                 "v": torch.zeros([batch_size, 512, 24, 128], dtype=dtype, device=device),
                 "is_init": False
             })
-        self.crossattn_cache = crossattn_cache
+            crossattn_cache_neg.append({
+                "k": torch.zeros([batch_size, 512, 12, 128], dtype=dtype, device=device),
+                "v": torch.zeros([batch_size, 512, 12, 128], dtype=dtype, device=device),
+                "is_init": False
+            })
+
+        self.crossattn_cache_pos = crossattn_cache_pos
+        self.crossattn_cache_neg = crossattn_cache_neg
+
+    def _initialize_sample_scheduler(self, noise):
+        if self.sample_solver == 'unipc':
+            sample_scheduler = FlowUniPCMultistepScheduler(
+                num_train_timesteps=self.num_train_timesteps,
+                shift=1,
+                use_dynamic_shifting=False)
+            sample_scheduler.set_timesteps(
+                self.sampling_steps, device=noise.device, shift=self.shift)
+            self.timesteps = sample_scheduler.timesteps
+        elif self.sample_solver == 'dpm++':
+            sample_scheduler = FlowDPMSolverMultistepScheduler(
+                num_train_timesteps=self.num_train_timesteps,
+                shift=1,
+                use_dynamic_shifting=False)
+            sampling_sigmas = get_sampling_sigmas(self.sampling_steps, self.shift)
+            self.timesteps, _ = retrieve_timesteps(
+                sample_scheduler,
+                device=noise.device,
+                sigmas=sampling_sigmas)
+        else:
+            raise NotImplementedError("Unsupported solver.")
+        return sample_scheduler
