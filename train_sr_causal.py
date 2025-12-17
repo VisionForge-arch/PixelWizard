@@ -22,14 +22,18 @@ def main():
     parser.add_argument("--max_pixels", type=int, default=2560*1440)
     parser.add_argument("--height", type=int, default=1440)
     parser.add_argument("--width", type=int, default=2560)
-    parser.add_argument("--num_frames", type=int, default=49)
+    parser.add_argument("--num_frames", type=int, default=121)
     parser.add_argument("--time_division_factor", type=int, default=4)
     parser.add_argument("--time_division_remainder", type=int, default=1)
     parser.add_argument("--use_gpu", type=bool, default=True)
     parser.add_argument("--config_path", type=str, default="/root/ultrawan/configs/self_forcing_dmd.yaml")
-    parser.add_argument("--logdir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up")
+    parser.add_argument("--logdir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_causal")
     #parser.add_argument("--logdir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_latent_upsample_lora")
-    parser.add_argument("--generator_ckpt", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_2k_10000/checkpoint_model_001000/model.pt")
+    parser.add_argument("--generator_ckpt", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up_2_time_modulation2/checkpoint_model_000800/model.pt")
+    parser.add_argument("--load_generator_ckpt", action="store_true")
+    parser.add_argument("--trainable_backbone", action="store_true")
+    parser.add_argument("--use_ema", action="store_true")
+    
     args = parser.parse_args()
     
     
@@ -62,7 +66,7 @@ def main():
     config.sr_mode = True
     config.causal = True
     
-    # =========init dataset=========
+    # =========Init Trainer=========
     
     
     model_trainer = WanModel_Trainer(config)

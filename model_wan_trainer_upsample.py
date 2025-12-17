@@ -112,7 +112,6 @@ class WanModel_Trainer:
         shard_trainable = sum(p.numel() for p in self.model.generator.parameters() if p.requires_grad)
         print(f"[post-FSDP] local shard params: {shard_trainable/1e6:.2f}M")
         
-        
         self.generator_optimizer = torch.optim.AdamW(
             [param for param in self.model.generator.parameters()
              if param.requires_grad],

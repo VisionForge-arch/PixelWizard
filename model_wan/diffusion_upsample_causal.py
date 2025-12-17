@@ -119,6 +119,24 @@ class SelfForcingWan_Upsample_Causal(nn.Module):
             cond_latent = cond_latent.to(device=self.device, dtype=self.dtype)
             cond_frames = cond_latent.shape[1]
             noise[:, :cond_frames] = 0
+            
+        # Randomly drop conditions so the model learns the unconditional branch for CFG.
+        uncond_proba = getattr(self.args, "uncond_proba", 0.1)
+        if uncond_proba > 0:
+            mask = torch.bernoulli(
+                torch.full((batch_size,), uncond_proba, device=self.device)
+            ).bool()
+            if mask.any():
+                conditional_dict = dict(conditional_dict)
+                prompt_cond = conditional_dict["prompt_embeds"].clone()
+                prompt_uncond = unconditional_dict["prompt_embeds"]
+                prompt_cond[mask] = prompt_uncond[mask]
+                conditional_dict["prompt_embeds"] = prompt_cond
+                
+                
+                if clean_latent_lr is not None:
+                    clean_latent_lr = clean_latent_lr.clone()
+                    clean_latent_lr[mask] = 0
 
         # Step 2: Randomly sample a timestep and add noise to denoiser inputs (Flow Matching)
         # 从[0, 1000)中随机采样timestep index
