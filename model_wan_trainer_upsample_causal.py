@@ -238,7 +238,7 @@ class WanModel_Trainer:
             
                     
             # print(f"frames.shape: {frames.shape}, clean_latent.shape: {clean_latent.shape}")
-            # print(f"frames_480p.shape: {frames_480p.shape}, clean_latent_lr.shape: {clean_latent_lr.shape}")
+            print(f"clean_latent.shape: {clean_latent.shape}, clean_latent_lr.shape: {clean_latent_lr.shape}")
                 
         # VAE编码完成后立即释放frames显存
         del frames

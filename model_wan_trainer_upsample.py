@@ -231,9 +231,6 @@ class WanModel_Trainer:
         degrade_size = (240, 416)
         h_d, w_d = degrade_size
         frames_480p = self.random_degrade(frames_lr, target_size=degrade_size)  # 低质引导再退化
-        
-        
-        
         frames_480p = frames_480p.reshape(B, T, C, h_d, w_d).permute(0, 2, 1, 3, 4)   # [b, C, T, h, w]
         
         
