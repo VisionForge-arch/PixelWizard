@@ -626,6 +626,9 @@ class WanModel_Upsample_Causal(ModelMixin, ConfigMixin):
             context_lens=context_lens,
             block_mask=self.block_mask,
         )
+        
+        print(f"LR's shape {lr_latents.shape}:")
+        print(f"x's shape {x.shape}:")
 
         def create_custom_forward(module, **module_kwargs):
             def custom_forward(*inputs):

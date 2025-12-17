@@ -831,10 +831,6 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
                 for u in context
             ]))
 
-        if clip_fea is not None:
-            context_clip = self.img_emb(clip_fea)  # bs x 257 x dim
-            context = torch.concat([context_clip, context], dim=1)
-
         # arguments
         common_kwargs = dict(
             e=e0,
