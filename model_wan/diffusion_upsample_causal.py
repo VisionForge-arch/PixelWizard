@@ -192,7 +192,11 @@ class SelfForcingWan_Upsample_Causal(nn.Module):
         # --- truncate to fit block schedule ---
         num_frames = clean_latent.shape[1]
         target_frames = (num_frames // self.generator.model.num_frame_per_block) * self.generator.model.num_frame_per_block
+        
+        print(f"timestep's shape: {timestep.shape}")
+        
         clean_latent = clean_latent[:, :target_frames]
+        noisy_latents = noisy_latents[:, :target_frames]
         if clean_latent_lr is not None:
             clean_latent_lr = clean_latent_lr[:, :, :target_frames]
 
