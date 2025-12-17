@@ -195,10 +195,19 @@ class SelfForcingWan_Upsample_Causal(nn.Module):
         
         print(f"timestep's shape: {timestep.shape}")
         
+        
         clean_latent = clean_latent[:, :target_frames]
         noisy_latents = noisy_latents[:, :target_frames]
+        
+        print(f"clean_latent's shape: {clean_latent.shape}")
+        
+        print(f"noisy_latents's shape: {noisy_latents.shape}")
+        
         if clean_latent_lr is not None:
             clean_latent_lr = clean_latent_lr[:, :, :target_frames]
+            
+        print(f"clean_latent_lr's shape: {clean_latent_lr.shape}")
+        exit()
 
         # --- recompute seq_len/block_mask for new length ---
         patch_t, ph, pw = self.generator.model.patch_size
