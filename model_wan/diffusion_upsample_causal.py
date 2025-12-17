@@ -39,7 +39,7 @@ class SelfForcingWan_Upsample_Causal(nn.Module):
         self.min_step = int(0.02 * self.num_train_timestep)
         self.max_step = int(0.98 * self.num_train_timestep)
         self.guidance_scale = args.guidance_scale
-        self.timestep_shift = getattr(args, "timestep_shift", 1.0)
+        self.timestep_shift = getattr(args, "timestep_shift", 5.0)
         self.teacher_forcing = getattr(args, "teacher_forcing", False)
         
         self.min_score_timestep = getattr(args, "min_score_timestep", 0)
@@ -189,6 +189,25 @@ class SelfForcingWan_Upsample_Causal(nn.Module):
         
         if cond_frames > 0 and cond_latent.shape[2:] == noisy_latents.shape[2:]:
             noisy_latents[:, :cond_frames] = cond_latent
+            
+            
+        # --- truncate to fit block schedule ---
+        num_frames = clean_latent.shape[1]
+        if self.generator.model.independent_first_frame:
+            target_frames = 1 + (num_frames - 1) // self.generator.model.num_frame_per_block * self.generator.model.num_frame_per_block
+        else:
+            target_frames = (num_frames // self.generator.model.num_frame_per_block) * self.generator.model.num_frame_per_block
+        clean_latent = clean_latent[:, :target_frames]
+        if clean_latent_lr is not None:
+            clean_latent_lr = clean_latent_lr[:, :target_frames]
+
+        # --- recompute seq_len/block_mask for new length ---
+        patch_t, ph, pw = self.generator.model.patch_size
+        frame_tokens = (clean_latent.shape[-2] // ph) * (clean_latent.shape[-1] // pw)
+        seq_len_dyn = target_frames * frame_tokens
+        self.generator.seq_len = seq_len_dyn
+        self.generator.model.seq_len = seq_len_dyn
+        self.generator.model.block_mask = None  # force rebuild with new frames
 
 
         flow_pred = self.generator(
