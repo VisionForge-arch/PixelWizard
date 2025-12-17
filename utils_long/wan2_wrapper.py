@@ -281,6 +281,9 @@ class WanDiffusionWrapper(torch.nn.Module):
         # if x.shape[1] == 96:
             #x = self.proj_in(x)
             
+        print(f"LR's shape {lr_context.shape}:")
+        print(f"x's shape {x.shape}:")
+            
         if kv_cache is not None:
             flow_pred = self.model(
                 noisy_image_or_video.permute(0, 2, 1, 3, 4),
