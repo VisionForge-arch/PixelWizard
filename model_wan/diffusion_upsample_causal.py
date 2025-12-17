@@ -102,10 +102,8 @@ class SelfForcingWan_Upsample_Causal(nn.Module):
             - image_or_video_shape: a list containing the shape of the image or video [B, F, C, H, W].
             - conditional_dict: a dictionary containing the conditional information (e.g. text embeddings, image embeddings).
             - unconditional_dict: a dictionary containing the unconditional information (e.g. null/negative text embeddings, null/negative image embeddings).
-            - clean_latent: a tensor containing the clean latents [B, F, C, H, W]. Need to be passed when no backward simulation is used.
-        Output:
-            - loss: a scalar tensor representing the generator loss.
-            - generator_log_dict: a dictionary containing the intermediate tensors for logging.
+            - clean_latent: a tensor containing the clean latents [B, F, C, H, W]. 
+            - clean_latent_lr : a tensor containining the lr latent [B, C, F, H, W]
         """
         noise = torch.randn_like(clean_latent)
         #print(f"image_or_video_shape: {image_or_video_shape}")
@@ -196,7 +194,7 @@ class SelfForcingWan_Upsample_Causal(nn.Module):
         target_frames = (num_frames // self.generator.model.num_frame_per_block) * self.generator.model.num_frame_per_block
         clean_latent = clean_latent[:, :target_frames]
         if clean_latent_lr is not None:
-            clean_latent_lr = clean_latent_lr[:, :target_frames]
+            clean_latent_lr = clean_latent_lr[:, :, :target_frames]
 
         # --- recompute seq_len/block_mask for new length ---
         patch_t, ph, pw = self.generator.model.patch_size
