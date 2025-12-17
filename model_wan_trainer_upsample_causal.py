@@ -17,6 +17,7 @@ from utils_long.distributed import EMA_FSDP, fsdp_wrap, fsdp_state_dict, launch_
 import torch.distributed as dist
 from dataset import UnifiedDataset, cycle
 import torch.nn.functional as F
+import torchvision.transforms.functional as TF
 
 class WanModel_Trainer:
     def __init__(self, config):
