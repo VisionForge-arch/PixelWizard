@@ -193,10 +193,7 @@ class SelfForcingWan_Upsample_Causal(nn.Module):
             
         # --- truncate to fit block schedule ---
         num_frames = clean_latent.shape[1]
-        if self.generator.model.independent_first_frame:
-            target_frames = 1 + (num_frames - 1) // self.generator.model.num_frame_per_block * self.generator.model.num_frame_per_block
-        else:
-            target_frames = (num_frames // self.generator.model.num_frame_per_block) * self.generator.model.num_frame_per_block
+        target_frames = (num_frames // self.generator.model.num_frame_per_block) * self.generator.model.num_frame_per_block
         clean_latent = clean_latent[:, :target_frames]
         if clean_latent_lr is not None:
             clean_latent_lr = clean_latent_lr[:, :target_frames]
