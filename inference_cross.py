@@ -4,7 +4,6 @@ import os
 import json
 import logging
 from datetime import datetime
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 from omegaconf import OmegaConf
 from tqdm import tqdm
 from torchvision import transforms
