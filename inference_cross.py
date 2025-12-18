@@ -25,7 +25,7 @@ from dataset_upsample import UnifiedDataset
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config_path", type=str, default="./configs/self_forcing_causal.yaml", help="Path to the config file")
-parser.add_argument("--checkpoint_path", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_causal/checkpoint_model_000600/model.pt", help="Path to the checkpoint folder")
+parser.add_argument("--checkpoint_path", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_causal/checkpoint_model_000700/model.pt", help="Path to the checkpoint folder")
 parser.add_argument("--prompt_file", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file_240p.json", help="JSON file with prompts/files for upsample inference")
 parser.add_argument("--output_folder", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/ar_upsample/pt", help="Output folder")
 parser.add_argument("--num_output_frames", type=int, default=31, help="Number of overlap frames between sliding windows")
