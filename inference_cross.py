@@ -34,6 +34,8 @@ parser.add_argument("--use_ema", action="store_true", help="Whether to use EMA p
 parser.add_argument("--seed", type=int, default=0, help="Random seed")
 parser.add_argument("--num_samples", type=int, default=1, help="Number of samples to generate per prompt")
 parser.add_argument("--save_with_index", action="store_true", help="Whether to save the video using the index or prompt as the filename")
+parser.add_argument("--height", type=int, default=1440)
+parser.add_argument("--width", type=int, default=2560)
 args = parser.parse_args()
 
 # Initialize distributed inference
@@ -61,14 +63,14 @@ config = OmegaConf.merge(default_config, config)
 # set SR/causal flags to match training
 config.sr_mode = True
 config.causal = True
-config.kv_cache_height = int(config.height // 32)
-config.kv_cache_width = int(config.width // 32)
+config.kv_cache_height = int(args.height // 32)
+config.kv_cache_width = int(args.width // 32)
 config.kv_cache_time = args.num_output_frames + 1
 #config.kv_cache_time = 12
 # recompute seq_len based on height/width/num_frames from config
 # time_part = int((config.num_frames - 1) // 4) + 1
 time_part = args.num_output_frames
-config.seq_len = int(config.height // 32) * int(config.width // 32) * time_part
+config.seq_len = int(args.height // 32) * int(args.width // 32) * time_part
 
 # Initialize pipeline
 # Few-step inference
@@ -206,16 +208,18 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
 
         
         initial_latent = None
+        
+        H = int(config.height // 16)
+        W = int(config.width // 16)
 
-        sampled_noise = torch.randn([args.num_samples, args.num_output_frames, 48, 90, 160], device=device, dtype=torch.bfloat16)
+        sampled_noise = torch.randn([args.num_samples, args.num_output_frames, 48, H, W], device=device, dtype=torch.bfloat16)
         
         print(video_input.shape)
 
         with torch.no_grad():
             cond_latent_lr = pipeline.vae.encode_to_latent(video_input).to(device=device, dtype=torch.bfloat16)  # [B,T,C,h',w']
             B, T, C, h, w = cond_latent_lr.shape
-            H = int(config.height // 16)
-            W = int(config.width // 16)
+            
             print("cond_latent_lr.shape:", cond_latent_lr.shape)
             
             #cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)  
