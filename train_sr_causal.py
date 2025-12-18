@@ -34,6 +34,7 @@ def main():
     parser.add_argument("--trainable_backbone", action="store_true")
     parser.add_argument("--use_ema", action="store_true")
     
+    
     args = parser.parse_args()
     
     

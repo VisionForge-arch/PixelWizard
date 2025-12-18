@@ -36,6 +36,7 @@ parser.add_argument("--num_samples", type=int, default=1, help="Number of sample
 parser.add_argument("--save_with_index", action="store_true", help="Whether to save the video using the index or prompt as the filename")
 parser.add_argument("--height", type=int, default=1440)
 parser.add_argument("--width", type=int, default=2560)
+parser.add_argument("--sampling_steps", type=int, default=5)
 args = parser.parse_args()
 
 # Initialize distributed inference
@@ -65,6 +66,7 @@ config.sr_mode = True
 config.causal = True
 config.kv_cache_height = int(args.height // 32)
 config.kv_cache_width = int(args.width // 32)
+config.sampling_steps = args.sampling_steps
 # For causal generation, we pad the requested frames to a multiple of num_frame_per_block.
 target_frames = args.num_output_frames
 pad_frames = (-target_frames) % config.num_frame_per_block
