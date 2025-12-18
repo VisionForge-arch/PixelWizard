@@ -190,28 +190,43 @@ class SelfForcingWan_Upsample_Causal(nn.Module):
             
             
         # --- truncate to fit block schedule ---
+        fsdp_generator = self.generator
+        generator = fsdp_generator
+        try:
+            from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+
+            if isinstance(fsdp_generator, FSDP):
+                generator = fsdp_generator.module
+        except Exception:
+            pass
+
         num_frames = clean_latent.shape[1]
-        target_frames = (num_frames // self.generator.model.num_frame_per_block) * self.generator.model.num_frame_per_block
+        target_frames = (num_frames // generator.model.num_frame_per_block) * generator.model.num_frame_per_block
+        if target_frames <= 0:
+            raise ValueError(
+                f"target_frames must be > 0, got {target_frames} (num_frames={num_frames}, "
+                f"num_frame_per_block={generator.model.num_frame_per_block})"
+            )
         
         timestep = timestep[:, :target_frames]  
         
         clean_latent = clean_latent[:, :target_frames]
         noisy_latents = noisy_latents[:, :target_frames]
+        training_target = training_target[:, :target_frames]
         
         if clean_latent_lr is not None:
             clean_latent_lr = clean_latent_lr[:, :, :target_frames]
             
 
         # --- recompute seq_len/block_mask for new length ---
-        patch_t, ph, pw = self.generator.model.patch_size
+        patch_t, ph, pw = generator.model.patch_size
         frame_tokens = (clean_latent.shape[-2] // ph) * (clean_latent.shape[-1] // pw)
         seq_len_dyn = target_frames * frame_tokens
-        self.generator.seq_len = seq_len_dyn
-        self.generator.model.seq_len = seq_len_dyn
-        self.generator.model.block_mask = None  # force rebuild with new frames
+        generator.seq_len = seq_len_dyn
+        generator.model.block_mask = None  # force rebuild with new frames
 
 
-        flow_pred = self.generator(
+        flow_pred = fsdp_generator(
             noisy_image_or_video=noisy_latents,
             conditional_dict=conditional_dict,
             timestep=timestep,
@@ -224,9 +239,9 @@ class SelfForcingWan_Upsample_Causal(nn.Module):
         loss = torch.nn.functional.mse_loss(
             flow_pred.float(), training_target.float(), reduction='none'
         ).mean(dim=(2, 3, 4))
-        weights = self.scheduler.training_weight(timestep).unflatten(0, (batch_size, num_frame))
+        weights = self.scheduler.training_weight(timestep).unflatten(0, (batch_size, target_frames))
         if cond_frames > 0:
-            weights[:, :cond_frames] = 0
+            weights[:, : min(cond_frames, target_frames)] = 0
         denom = torch.clamp(weights.sum(), min=1e-8)
         loss = torch.sum(loss * weights) / denom
 
