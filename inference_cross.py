@@ -65,12 +65,16 @@ config.sr_mode = True
 config.causal = True
 config.kv_cache_height = int(args.height // 32)
 config.kv_cache_width = int(args.width // 32)
-config.kv_cache_time = args.num_output_frames + 1
-#config.kv_cache_time = 12
-# recompute seq_len based on height/width/num_frames from config
-# time_part = int((config.num_frames - 1) // 4) + 1
-time_part = args.num_output_frames
-config.seq_len = int(args.height // 32) * int(args.width // 32) * time_part
+# For causal generation, we pad the requested frames to a multiple of num_frame_per_block.
+target_frames = args.num_output_frames
+pad_frames = (-target_frames) % config.num_frame_per_block
+total_frames = target_frames + pad_frames
+
+# KV cache needs to cover the padded length; keep +1 for safety/headroom.
+config.kv_cache_time = total_frames + 1
+
+# recompute seq_len based on cache grid and padded time
+config.seq_len = int(args.height // 32) * int(args.width // 32) * total_frames
 
 # Initialize pipeline
 # Few-step inference

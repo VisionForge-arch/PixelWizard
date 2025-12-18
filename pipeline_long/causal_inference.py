@@ -42,7 +42,9 @@ class CausalInferencePipeline(torch.nn.Module):
         self.shift = args.timestep_shift
 
         self.num_transformer_blocks = 30
-        self.frame_seq_length = 45*80 # 30*52
+        # Tokens per frame after patchify (H//2 * W//2 for default patch_size (1,2,2) on VAE latents).
+        # Prefer configured cache grid size when available to avoid hard-coding a single resolution.
+        self.frame_seq_length = getattr(args, "kv_cache_height", 45) * getattr(args, "kv_cache_width", 80)
 
         self.kv_cache_pos = None
         self.kv_cache_neg = None
@@ -166,7 +168,6 @@ class CausalInferencePipeline(torch.nn.Module):
 
         # Step 2: Cache context feature
         current_start_frame = 0
-        cache_start_frame = 0
 
         if profile:
             init_end.record()
@@ -227,7 +228,7 @@ class CausalInferencePipeline(torch.nn.Module):
 
                 
             # Step 3.2: record the model's output
-            output[:, cache_start_frame:cache_start_frame + current_num_frames] = latents
+            output[:, current_start_frame:current_start_frame + current_num_frames] = latents
 
             # Step 3.3: rerun with timestep zero to update KV cache using clean context
             self.generator(
@@ -237,7 +238,7 @@ class CausalInferencePipeline(torch.nn.Module):
                 kv_cache=self.kv_cache_pos,
                 crossattn_cache=self.crossattn_cache_pos,
                 current_start=current_start_frame * self.frame_seq_length,
-                cache_start=cache_start_frame * self.frame_seq_length,
+                cache_start=current_start_frame * self.frame_seq_length,
                 lr_context=lr_chunk,
             )
             self.generator(
@@ -247,7 +248,7 @@ class CausalInferencePipeline(torch.nn.Module):
                 kv_cache=self.kv_cache_neg,
                 crossattn_cache=self.crossattn_cache_neg,
                 current_start=current_start_frame * self.frame_seq_length,
-                cache_start=cache_start_frame * self.frame_seq_length,
+                cache_start=current_start_frame * self.frame_seq_length,
                 lr_context=lr_chunk,
             )
 
