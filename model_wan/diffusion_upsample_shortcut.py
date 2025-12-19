@@ -270,7 +270,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
         loss_fm = torch.zeros((), device=self.device, dtype=torch.float32)
         if fm_mask.any():
             dt_fm = torch.zeros((fm_mask.sum().item(), num_frame), device=self.device, dtype=self.dtype)
-            flow_pred_fm = self._call_generator(
+            flow_pred_fm = self.generator(
                 noisy_latents=noisy_latents[fm_mask],
                 conditional_dict=self._slice_batched_conditionals(conditional_dict, fm_mask),
                 timestep=timestep[fm_mask],
@@ -312,8 +312,9 @@ class SelfForcingWan_Upsample_SC(nn.Module):
             print(f"dt_sc_full: {dt_sc_full}")
             print(f"dt_half: {dt_half}")
 
+
             with torch.no_grad():
-                v1 = self._call_generator(
+                v1 = self.generator(
                     noisy_latents=x_sc,
                     conditional_dict=conditional_dict_sc,
                     timestep=t_sc_full,
@@ -321,7 +322,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                     lr_context=lr_context_sc,
                 )
                 x_mid = x_sc + delta_sigma_half[:, None, None, None, None] * v1
-                v2 = self._call_generator(
+                v2 = self.generator(
                     noisy_latents=x_mid,
                     conditional_dict=conditional_dict_sc,
                     timestep=t_sc_mid,
@@ -329,6 +330,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                     lr_context=lr_context_sc,
                 )
                 v_sc = 0.5 * (v1 + v2)
+                print('finish calculating v_sc')
 
             flow_pred_sc = self._call_generator(
                 noisy_latents=x_sc,
