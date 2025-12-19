@@ -19,10 +19,10 @@ def main():
     parser.add_argument("--dataset_metadata_path", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/UltraVideo/matched_short.json")
     parser.add_argument("--dataset_repeat", type=int, default=1)
     parser.add_argument("--data_file_keys", type=str, default=("clip_id",))
-    parser.add_argument("--max_pixels", type=int, default=3840*2144)    #  2560*1440, 
-    parser.add_argument("--height", type=int, default=2144)
-    parser.add_argument("--width", type=int, default=3840)
-    parser.add_argument("--num_frames", type=int, default=69)
+    parser.add_argument("--max_pixels", type=int, default=2560*1440)    #  2560*1440, 
+    parser.add_argument("--height", type=int, default=1440)
+    parser.add_argument("--width", type=int, default=2560)
+    parser.add_argument("--num_frames", type=int, default=101)
     parser.add_argument("--time_division_factor", type=int, default=4)
     parser.add_argument("--time_division_remainder", type=int, default=1)
     parser.add_argument("--use_gpu", type=bool, default=True)
