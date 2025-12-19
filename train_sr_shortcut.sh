@@ -6,4 +6,4 @@ torchrun --standalone --nproc_per_node=8 \
   --trainable_backbone \
   --use_ema \
   --shortcut \
-  #--load_generator_ckpt \
+  --load_generator_ckpt \
