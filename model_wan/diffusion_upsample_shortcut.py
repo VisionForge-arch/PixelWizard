@@ -251,8 +251,8 @@ class SelfForcingWan_Upsample_SC(nn.Module):
         
         
         print(f'dt: {dt[:, 0]}')
-        print(f'timestep_base: {timestep_base[:, 0]}')
-        exit()
+        print(f'timestep: {timestep[:, 0]}')
+
         
         # if cond_frames > 0:
         #     timestep[:, :cond_frames] = 0
