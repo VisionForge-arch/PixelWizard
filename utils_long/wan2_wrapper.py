@@ -147,14 +147,11 @@ class WanDiffusionWrapper(torch.nn.Module):
             
         elif sr is True and causal is False and shortcut is True:
             from wan2_long.modules.model_upsample_shortcut import register_spatial_control
-            # NOTE: We added new shortcut-specific parameters (e.g. dt_embedding) which are not
-            # present in the base pretrained checkpoint. With diffusers+accelerate low_cpu_mem_usage
-            # meta initialization, missing parameters can remain on meta and crash at `.to(device)`.
-            # Disabling low_cpu_mem_usage ensures missing params are materialized (and can be zero-init).
             self.model = WanModel_Upsample_Shortcut.from_pretrained(
                 f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B",
-                low_cpu_mem_usage=False,
             )
+            # Create dt embedding AFTER loading pretrained weights to keep diffusers/accelerate happy.
+            self.model.enable_dt_conditioning()
             self.model, _ = register_spatial_control(self.model)
         elif sr is True and causal is False:
             # old_in_dim = self.model.in_dim

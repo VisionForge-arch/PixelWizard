@@ -693,13 +693,6 @@ class WanModel_Upsample_Shortcut(ModelMixin, ConfigMixin):
             nn.Linear(freq_dim, dim), nn.SiLU(), nn.Linear(dim, dim))
         self.time_projection = nn.Sequential(nn.SiLU(), nn.Linear(dim, dim * 6))
 
-        # Extra conditioning for shortcut step size (dt).
-        # This is a residual added to the base time embedding so pretrained weights remain usable.
-        # The last linear is zero-initialized so dt has no effect at init.
-        self.dt_embedding = nn.Sequential(
-            nn.Linear(freq_dim, dim), nn.SiLU(), nn.Linear(dim, dim)
-        )
-
         # blocks
         self.blocks = nn.ModuleList([
             WanAttentionBlock(dim, ffn_dim, num_heads, window_size, qk_norm,
@@ -730,10 +723,29 @@ class WanModel_Upsample_Shortcut(ModelMixin, ConfigMixin):
 
         # initialize weights
         self.init_weights()
-        nn.init.zeros_(self.dt_embedding[-1].weight)
-        nn.init.zeros_(self.dt_embedding[-1].bias)
         
         self.gradient_checkpointing = False
+
+        # NOTE: dt_embedding is created post-load (see enable_dt_conditioning) to avoid
+        # diffusers/accelerate meta-loading failures when pretrained weights don't include it.
+        self.dt_embedding = None
+
+    def enable_dt_conditioning(self) -> None:
+        """
+        Create dt embedding parameters (for shortcut step-size conditioning).
+        This must be called after loading pretrained weights.
+        """
+        if self.dt_embedding is not None:
+            return
+
+        dt_embedding = nn.Sequential(
+            nn.Linear(self.freq_dim, self.dim), nn.SiLU(), nn.Linear(self.dim, self.dim)
+        )
+        nn.init.zeros_(dt_embedding[-1].weight)
+        nn.init.zeros_(dt_embedding[-1].bias)
+
+        ref = self.time_embedding[0].weight
+        self.dt_embedding = dt_embedding.to(device=ref.device, dtype=ref.dtype)
         
     def _set_gradient_checkpointing(self, module, value=False):
         self.gradient_checkpointing = value
@@ -832,6 +844,8 @@ class WanModel_Upsample_Shortcut(ModelMixin, ConfigMixin):
             sinusoidal_embedding_1d(self.freq_dim, t).unflatten(0, (bt, seq_len)).type_as(x)) # [1, seqlen, 3072]
 
         if dt is not None:
+            if self.dt_embedding is None:
+                raise RuntimeError("dt was provided but dt conditioning is not enabled; call enable_dt_conditioning() after loading.")
             if dt.dim() == 1:
                 dt = dt.expand(dt.size(0), seq_len)  # [B, seq_len]
             else:
