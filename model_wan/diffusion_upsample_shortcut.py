@@ -2,6 +2,7 @@ import math
 from typing import Tuple
 import torch
 from torch import nn
+import torch.distributed as dist
 from utils_long.wan2_wrapper import WanDiffusionWrapper, WanTextEncoder, WanVAEWrapper2_2
 from pipeline_long import SelfForcingTrainingPipeline
 
@@ -88,30 +89,22 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                 out[k] = v
         return out
 
-    def _call_generator(
+    def _run_generator(
         self,
         noisy_latents: torch.Tensor,
         conditional_dict: dict,
         timestep: torch.Tensor,
-        lr_context,
-        dt,
+        dt: torch.Tensor,
+        lr_context: torch.Tensor | None,
     ) -> torch.Tensor:
-        if dt is None:
-            return self.generator(
-                noisy_image_or_video=noisy_latents,
-                conditional_dict=conditional_dict,
-                timestep=timestep,
-                lr_context=lr_context,
-            )
-
-        else:
-            return self.generator(
-                noisy_image_or_video=noisy_latents,
-                conditional_dict=conditional_dict,
-                timestep=timestep,
-                dt=dt,
-                lr_context=lr_context,
-            )
+        # dt is always provided (dt=0 for flow-matching, dt>0 for shortcut steps).
+        return self.generator(
+            noisy_image_or_video=noisy_latents,
+            conditional_dict=conditional_dict,
+            timestep=timestep,
+            dt=dt,
+            lr_context=lr_context,
+        )
 
     def _dt_idx_candidates(self, num_steps: int, device) -> torch.Tensor:
         """
@@ -171,6 +164,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
         enable_shortcut = bool(getattr(self.args, "shortcut_enable", True))
         rate_sc = float(getattr(self.args, "shortcut_rate_sc", 0.25))
         w_sc = float(getattr(self.args, "shortcut_loss_sc_weight", 1.0))
+        debug_sc = bool(getattr(self.args, "shortcut_debug", False))
 
         noise = torch.randn_like(clean_latent)
         #print(f"image_or_video_shape: {image_or_video_shape}")
@@ -204,33 +198,57 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                     clean_latent_lr[mask] = 0
 
         # ======== Sample (t_idx, dt_idx) on the scheduler grid ========
-        # We sample indices for perfect consistency:
-        # - scheduler.add_noise / training_weight uses argmin over the same grid
-        # - the network time embedding encodes the exact grid value timesteps[t_idx]
-        # - shortcut step size is conditioned by an integer dt_idx ("how many grid steps to jump")
+        # IMPORTANT (FSDP): make branching decisions consistent across ranks, otherwise ranks may
+        # execute a different number of forward passes and deadlock on collectives.
         num_steps = len(self.scheduler.timesteps)
         timesteps_grid = self.scheduler.timesteps.to(device=self.device, dtype=self.dtype)  # [num_steps], float
         sigmas_grid = self.scheduler.sigmas.to(device=self.device, dtype=torch.float32)     # [num_steps], float
 
-        sc_mask = torch.zeros(batch_size, device=self.device, dtype=torch.bool)
         if enable_shortcut and rate_sc > 0:
-            sc_mask = torch.rand(batch_size, device=self.device) < rate_sc
+            if dist.is_available() and dist.is_initialized():
+                sc_mask_u8 = torch.empty(batch_size, device=self.device, dtype=torch.uint8)
+                if dist.get_rank() == 0:
+                    sc_mask_u8.copy_((torch.rand(batch_size, device=self.device) < rate_sc).to(torch.uint8))
+                dist.broadcast(sc_mask_u8, src=0)
+                sc_mask = sc_mask_u8.bool()
+            else:
+                sc_mask = torch.rand(batch_size, device=self.device) < rate_sc
+        else:
+            sc_mask = torch.zeros(batch_size, device=self.device, dtype=torch.bool)
 
         dt_idx = torch.zeros(batch_size, device=self.device, dtype=torch.long)  # 0 for FM, >0 for SC
         if enable_shortcut and sc_mask.any():
-            dt_candidates = self._dt_idx_candidates(num_steps=num_steps, device=self.device)
-            dt_idx_sc = dt_candidates[torch.randint(0, dt_candidates.numel(), (sc_mask.sum().item(),), device=self.device)]
-            dt_idx[sc_mask] = dt_idx_sc
+            if dist.is_available() and dist.is_initialized():
+                if dist.get_rank() == 0:
+                    dt_candidates = self._dt_idx_candidates(num_steps=num_steps, device=self.device)
+                    dt_idx_sc = dt_candidates[torch.randint(0, dt_candidates.numel(), (sc_mask.sum().item(),), device=self.device)]
+                    dt_idx[sc_mask] = dt_idx_sc
+                dist.broadcast(dt_idx, src=0)
+            else:
+                dt_candidates = self._dt_idx_candidates(num_steps=num_steps, device=self.device)
+                dt_idx_sc = dt_candidates[torch.randint(0, dt_candidates.numel(), (sc_mask.sum().item(),), device=self.device)]
+                dt_idx[sc_mask] = dt_idx_sc
 
         t_idx = torch.empty(batch_size, device=self.device, dtype=torch.long)
         fm_mask = ~sc_mask
-        if fm_mask.any():
-            t_idx[fm_mask] = torch.randint(0, num_steps, (fm_mask.sum().item(),), device=self.device, dtype=torch.long)
-        if sc_mask.any():
-            max_start = (num_steps - 1) - dt_idx[sc_mask]  # ensure t_idx + dt_idx <= num_steps - 1
-            max_start = torch.clamp(max_start, min=0)
-            t_idx_sc = (torch.rand_like(max_start.float()) * (max_start.float() + 1.0)).floor().to(torch.long)
-            t_idx[sc_mask] = t_idx_sc
+        if dist.is_available() and dist.is_initialized():
+            if dist.get_rank() == 0:
+                if fm_mask.any():
+                    t_idx[fm_mask] = torch.randint(0, num_steps, (fm_mask.sum().item(),), device=self.device, dtype=torch.long)
+                if sc_mask.any():
+                    max_start = (num_steps - 1) - dt_idx[sc_mask]  # ensure t_idx + dt_idx <= num_steps - 1
+                    max_start = torch.clamp(max_start, min=0)
+                    t_idx_sc = (torch.rand_like(max_start.float()) * (max_start.float() + 1.0)).floor().to(torch.long)
+                    t_idx[sc_mask] = t_idx_sc
+            dist.broadcast(t_idx, src=0)
+        else:
+            if fm_mask.any():
+                t_idx[fm_mask] = torch.randint(0, num_steps, (fm_mask.sum().item(),), device=self.device, dtype=torch.long)
+            if sc_mask.any():
+                max_start = (num_steps - 1) - dt_idx[sc_mask]  # ensure t_idx + dt_idx <= num_steps - 1
+                max_start = torch.clamp(max_start, min=0)
+                t_idx_sc = (torch.rand_like(max_start.float()) * (max_start.float() + 1.0)).floor().to(torch.long)
+                t_idx[sc_mask] = t_idx_sc
 
         t_mid_idx = t_idx + (dt_idx // 2)
 
@@ -270,11 +288,11 @@ class SelfForcingWan_Upsample_SC(nn.Module):
         loss_fm = torch.zeros((), device=self.device, dtype=torch.float32)
         if fm_mask.any():
             dt_fm = torch.zeros((fm_mask.sum().item(), num_frame), device=self.device, dtype=self.dtype)
-            flow_pred_fm = self.generator(
+            flow_pred_fm = self._run_generator(
                 noisy_latents=noisy_latents[fm_mask],
                 conditional_dict=self._slice_batched_conditionals(conditional_dict, fm_mask),
                 timestep=timestep[fm_mask],
-                dt=dt_fm if enable_shortcut else None,
+                dt=dt_fm,
                 lr_context=clean_latent_lr[fm_mask] if clean_latent_lr is not None else None,
             )
             mse_fm = torch.nn.functional.mse_loss(
@@ -307,14 +325,15 @@ class SelfForcingWan_Upsample_SC(nn.Module):
             conditional_dict_sc = self._slice_batched_conditionals(conditional_dict, sc_mask)
             lr_context_sc = clean_latent_lr[sc_mask] if clean_latent_lr is not None else None
             
-            print(f"t_sc_full: {t_sc_full}")
-            print(f"t_sc_mid: {t_sc_mid}")
-            print(f"dt_sc_full: {dt_sc_full}")
-            print(f"dt_half: {dt_half}")
+            if (not dist.is_initialized() or dist.get_rank() == 0):
+                print(f"t_sc_full: {t_sc_full}")
+                print(f"t_sc_mid: {t_sc_mid}")
+                print(f"dt_sc_full: {dt_sc_full}")
+                print(f"dt_half: {dt_half}")
 
 
             with torch.no_grad():
-                v1 = self.generator(
+                v1 = self._run_generator(
                     noisy_latents=x_sc,
                     conditional_dict=conditional_dict_sc,
                     timestep=t_sc_full,
@@ -322,7 +341,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                     lr_context=lr_context_sc,
                 )
                 x_mid = x_sc + delta_sigma_half[:, None, None, None, None] * v1
-                v2 = self.generator(
+                v2 = self._run_generator(
                     noisy_latents=x_mid,
                     conditional_dict=conditional_dict_sc,
                     timestep=t_sc_mid,
@@ -330,9 +349,10 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                     lr_context=lr_context_sc,
                 )
                 v_sc = 0.5 * (v1 + v2)
-                print('finish calculating v_sc')
+                if (not dist.is_initialized() or dist.get_rank() == 0):
+                    print("finish calculating v_sc")
 
-            flow_pred_sc = self._call_generator(
+            flow_pred_sc = self._run_generator(
                 noisy_latents=x_sc,
                 conditional_dict=conditional_dict_sc,
                 timestep=t_sc_full,
@@ -353,5 +373,6 @@ class SelfForcingWan_Upsample_SC(nn.Module):
             "x0": clean_latent.detach(),
             "loss_fm": loss_fm.detach(),
             "loss_sc": loss_sc.detach(),
+            "shortcut_num_sc": sc_mask.sum().to(dtype=torch.float32),
         }
         return loss, log_dict
