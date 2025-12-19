@@ -7,7 +7,7 @@ from omegaconf import OmegaConf
 
 import wandb
 #from model_wan_trainer import WanModel_Trainer
-from model_wan_trainer_upsample import WanModel_Trainer
+
     
     
 
@@ -33,7 +33,7 @@ def main():
     parser.add_argument("--load_generator_ckpt", action="store_true")
     parser.add_argument("--trainable_backbone", action="store_true")
     parser.add_argument("--use_ema", action="store_true")
-    
+    parser.add_argument("--shortcut", action="store_true")
     args = parser.parse_args()
     
     
@@ -69,6 +69,12 @@ def main():
     config.sr_mode = True
     
     # =========init dataset=========
+    
+    if args.shortcut is True:
+        print("Utilizing ShortCut Trainer")
+        from model_wan_trainer_upsample_shortcut import WanModel_Trainer
+    else:
+        from model_wan_trainer_upsample import WanModel_Trainer
     
     
     model_trainer = WanModel_Trainer(config)

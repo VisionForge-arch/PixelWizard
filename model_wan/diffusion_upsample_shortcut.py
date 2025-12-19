@@ -6,7 +6,7 @@ from utils_long.wan2_wrapper import WanDiffusionWrapper, WanTextEncoder, WanVAEW
 from pipeline_long import SelfForcingTrainingPipeline
 
 
-class SelfForcingWan_Upsample(nn.Module):
+class SelfForcingWan_Upsample_SC(nn.Module):
     def __init__(self, args, device):
         """
         Initialize the Diffusion loss module.
