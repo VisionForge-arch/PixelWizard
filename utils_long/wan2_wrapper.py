@@ -1,4 +1,5 @@
 import types
+import inspect
 from typing import List, Optional
 import torch
 from torch import nn
@@ -174,6 +175,13 @@ class WanDiffusionWrapper(torch.nn.Module):
         else:   
             self.model = WanModel.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
         self.model.eval()
+
+        # Whether the underlying model implementation supports dt conditioning.
+        # We inspect `_forward` because `forward` is a thin `*args, **kwargs` wrapper.
+        try:
+            self._accepts_dt = "dt" in inspect.signature(self.model._forward).parameters
+        except Exception:
+            self._accepts_dt = False
         
         
 
@@ -301,55 +309,39 @@ class WanDiffusionWrapper(torch.nn.Module):
         # if x.shape[1] == 96:
             #x = self.proj_in(x)
             
-        print(f"LR's shape {lr_context.shape}:")
-        print(f"x's shape {x.shape}:")
-            
+        dt_kwargs = {"dt": input_dt} if (input_dt is not None and self._accepts_dt) else {}
+
         if kv_cache is not None:
             flow_pred = self.model(
                 noisy_image_or_video.permute(0, 2, 1, 3, 4),
-                t=input_timestep, context=prompt_embeds,
+                t=input_timestep,
+                context=prompt_embeds,
                 lr_latents=lr_context,
                 seq_len=self.seq_len,
                 kv_cache=kv_cache,
                 crossattn_cache=crossattn_cache,
                 current_start=current_start,
-                cache_start=cache_start
+                cache_start=cache_start,
+                **dt_kwargs,
             ).permute(0, 2, 1, 3, 4)
         else:
             if lr_context is not None:
-                try:
-                    flow_pred = self.model(
-                        x,
-                        t=input_timestep,
-                        dt=input_dt,
-                        context=prompt_embeds,
-                        seq_len=self.seq_len,
-                        lr_latents=lr_context,
-                    ).permute(0, 2, 1, 3, 4)
-                except TypeError:
-                    flow_pred = self.model(
-                        x,
-                        t=input_timestep,
-                        context=prompt_embeds,
-                        seq_len=self.seq_len,
-                        lr_latents=lr_context,
-                    ).permute(0, 2, 1, 3, 4)
+                flow_pred = self.model(
+                    x,
+                    t=input_timestep,
+                    context=prompt_embeds,
+                    seq_len=self.seq_len,
+                    lr_latents=lr_context,
+                    **dt_kwargs,
+                ).permute(0, 2, 1, 3, 4)
             else:
-                try:
-                    flow_pred = self.model(
-                        x,
-                        t=input_timestep,
-                        dt=input_dt,
-                        context=prompt_embeds,
-                        seq_len=self.seq_len,
-                    ).permute(0, 2, 1, 3, 4)
-                except TypeError:
-                    flow_pred = self.model(
-                        x,
-                        t=input_timestep,
-                        context=prompt_embeds,
-                        seq_len=self.seq_len,
-                    ).permute(0, 2, 1, 3, 4)
+                flow_pred = self.model(
+                    x,
+                    t=input_timestep,
+                    context=prompt_embeds,
+                    seq_len=self.seq_len,
+                    **dt_kwargs,
+                ).permute(0, 2, 1, 3, 4)
 
         # Convert flow prediction (noise - x0) to x0 so callers can use denoised latents directly.
         # if self.training is False:
