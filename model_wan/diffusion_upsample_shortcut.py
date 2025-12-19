@@ -262,10 +262,9 @@ class SelfForcingWan_Upsample_SC(nn.Module):
         #     timestep[:, :cond_frames] = 0
         # Flow Matching: x_t = (1-sigma) * x0 + sigma * noise
         
-        if dist.get_rank():
-            print(f"dt: {dt}")
-            print(f"dt[sc_mask]: {dt[sc_mask]}")
-            print(f"timestep: {timestep}")
+        print(f"dt: {dt}")
+        print(f"dt[sc_mask]: {dt[sc_mask]}")
+        print(f"timestep: {timestep}")
             
             
         exit()
