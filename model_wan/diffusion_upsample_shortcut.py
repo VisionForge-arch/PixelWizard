@@ -2,6 +2,7 @@ from typing import Tuple
 import torch
 import torch.nn.functional as F
 from torch import nn
+import torch.distributed as dist
 from utils_long.wan2_wrapper import WanDiffusionWrapper, WanTextEncoder, WanVAEWrapper2_2
 from pipeline_long import SelfForcingTrainingPipeline
 
@@ -261,7 +262,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
         #     timestep[:, :cond_frames] = 0
         # Flow Matching: x_t = (1-sigma) * x0 + sigma * noise
         
-        if self.is_main_process:
+        if dist.get_rank():
             print(f"dt: {dt}")
             print(f"dt[sc_mask]: {dt[sc_mask]}")
             print(f"timestep: {timestep}")
