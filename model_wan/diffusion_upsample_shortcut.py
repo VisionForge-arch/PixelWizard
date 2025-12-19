@@ -261,7 +261,8 @@ class SelfForcingWan_Upsample_SC(nn.Module):
         # if cond_frames > 0:
         #     timestep[:, :cond_frames] = 0
         # Flow Matching: x_t = (1-sigma) * x0 + sigma * noise
-        
+        if dist.get_rank() == 0:
+            print(self.scheduler.timesteps)
         print(f"dt: {dt[:, 0]}")
         print(f"dt[sc_mask]: {dt[sc_mask][:, 0]}")
         print(f"timestep: {timestep[:, 0]}")
