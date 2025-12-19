@@ -55,14 +55,18 @@ class SelfForcingWan_Upsample_SC(nn.Module):
     def _initialize_models(self, args, device):
         self.sr_mode = args.sr_mode
         self.seq_len = args.seq_len
-        self.generator = WanDiffusionWrapper(**getattr(args, "model_kwargs", {}), seq_len=self.seq_len, sr=self.sr_mode)
+        self.generator = WanDiffusionWrapper(**getattr(args, "model_kwargs", {}),
+            seq_len=self.seq_len,
+            sr=self.sr_mode,
+            shortcut=True,
+        )
         self.generator.model.requires_grad_(True)
         
         # 追加：冻结主干、仅保留 adapter
         if args.trainable_backbone is False:
             
             for name, p in self.generator.model.named_parameters():
-                if not name.startswith("spatial_adapter"):
+                if not (name.startswith("spatial_adapter") or name.startswith("dt_embedding")):
                     p.requires_grad_(False)
 
         self.text_encoder = WanTextEncoder()
@@ -100,27 +104,14 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                 lr_context=lr_context,
             )
 
-        try:
+        else:
             return self.generator(
                 noisy_image_or_video=noisy_latents,
                 conditional_dict=conditional_dict,
                 timestep=timestep,
-                #dt=dt,
+                dt=dt,
                 lr_context=lr_context,
             )
-        except TypeError as e:
-            if torch.is_tensor(dt) and torch.all(dt == 0):
-                return self.generator(
-                    noisy_image_or_video=noisy_latents,
-                    conditional_dict=conditional_dict,
-                    timestep=timestep,
-                    lr_context=lr_context,
-                )
-            raise TypeError(
-                "Shortcut training requires passing `dt` into the generator. "
-                "Please update `utils_long/wan2_wrapper.py:WanDiffusionWrapper.forward(...)` and "
-                "`wan2_long/modules/model_upsample.py:WanModel_Upsample` to accept/use `dt`."
-            ) from e
 
     def _dt_idx_candidates(self, num_steps: int, device) -> torch.Tensor:
         """
@@ -248,10 +239,6 @@ class SelfForcingWan_Upsample_SC(nn.Module):
 
         # dt conditioning uses integer grid step counts (encoded as numbers, but semantically dt_idx)
         dt = dt_idx.to(dtype=self.dtype)[:, None].expand(batch_size, num_frame)  # [B, F]
-        
-        
-        print(f'dt: {dt[:, 0]}')
-        print(f'timestep: {timestep[:, 0]}')
 
         
         # if cond_frames > 0:
@@ -272,36 +259,30 @@ class SelfForcingWan_Upsample_SC(nn.Module):
         if cond_frames > 0 and cond_latent.shape[2:] == noisy_latents.shape[2:]:
             noisy_latents[:, :cond_frames] = cond_latent
 
-
-        dt_in = dt if enable_shortcut else None
-        flow_pred = self._call_generator(
-            noisy_latents=noisy_latents,
-            conditional_dict=conditional_dict,
-            timestep=timestep,
-            #dt=dt_in,
-            lr_context=clean_latent_lr,
-        )
-        
-
-        # losses
-        
-        # ===== 计算 Flow Matching Loss =======
-        mse_fm = torch.nn.functional.mse_loss(
-            flow_pred.float(), training_target.float(), reduction="none"
-        ).mean(dim=(2, 3, 4))  # [B, F]
-
         weights_all = self.scheduler.training_weight(timestep).unflatten(0, (batch_size, num_frame))
         if cond_frames > 0:
             weights_all[:, :cond_frames] = 0
 
-        weights_fm = weights_all.clone()
-        if enable_shortcut and sc_mask.any():
-            weights_fm[sc_mask] = 0
-        denom_fm = torch.clamp(weights_fm.sum(), min=1e-8)
-        loss_fm = torch.sum(mse_fm * weights_fm) / denom_fm
-        
-        
-        
+        # ===== Losses =====
+        # Flow-matching loss is computed ONLY on FM samples, with dt fixed to 0.
+        # Self-consistency loss is computed ONLY on SC samples, with dt_idx conditioning.
+
+        loss_fm = torch.zeros((), device=self.device, dtype=torch.float32)
+        if fm_mask.any():
+            dt_fm = torch.zeros((fm_mask.sum().item(), num_frame), device=self.device, dtype=self.dtype)
+            flow_pred_fm = self._call_generator(
+                noisy_latents=noisy_latents[fm_mask],
+                conditional_dict=self._slice_batched_conditionals(conditional_dict, fm_mask),
+                timestep=timestep[fm_mask],
+                dt=dt_fm if enable_shortcut else None,
+                lr_context=clean_latent_lr[fm_mask] if clean_latent_lr is not None else None,
+            )
+            mse_fm = torch.nn.functional.mse_loss(
+                flow_pred_fm.float(), training_target[fm_mask].float(), reduction="none"
+            ).mean(dim=(2, 3, 4))  # [B_fm, F]
+            weights_fm = weights_all[fm_mask]
+            denom_fm = torch.clamp(weights_fm.sum(), min=1e-8)
+            loss_fm = torch.sum(mse_fm * weights_fm) / denom_fm
 
         loss_sc = torch.zeros((), device=self.device, dtype=torch.float32)
         if enable_shortcut and sc_mask.any():
@@ -310,6 +291,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
             # where x_mid is advanced by the *actual* grid delta in sigma space.
             x_sc = noisy_latents[sc_mask]
             t_sc_full = timestep[sc_mask]
+            dt_sc_full = dt[sc_mask]
 
             dt_idx_sc = dt_idx[sc_mask]
             t_idx_sc = t_idx[sc_mask]
@@ -324,6 +306,11 @@ class SelfForcingWan_Upsample_SC(nn.Module):
 
             conditional_dict_sc = self._slice_batched_conditionals(conditional_dict, sc_mask)
             lr_context_sc = clean_latent_lr[sc_mask] if clean_latent_lr is not None else None
+            
+            print(f"t_sc_full: {t_sc_full}")
+            print(f"t_sc_mid: {t_sc_mid}")
+            print(f"dt_sc_full: {dt_sc_full}")
+            print(f"dt_half: {dt_half}")
 
             with torch.no_grad():
                 v1 = self._call_generator(
@@ -343,14 +330,20 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                 )
                 v_sc = 0.5 * (v1 + v2)
 
+            flow_pred_sc = self._call_generator(
+                noisy_latents=x_sc,
+                conditional_dict=conditional_dict_sc,
+                timestep=t_sc_full,
+                dt=dt_sc_full,
+                lr_context=lr_context_sc,
+            )
             mse_sc = torch.nn.functional.mse_loss(
-                flow_pred[sc_mask].float(), v_sc.float(), reduction="none"
+                flow_pred_sc.float(), v_sc.float(), reduction="none"
             ).mean(dim=(2, 3, 4))  # [B_sc, F]
 
-            weights_sc = weights_all.clone()
-            weights_sc[~sc_mask] = 0
+            weights_sc = weights_all[sc_mask]
             denom_sc = torch.clamp(weights_sc.sum(), min=1e-8)
-            loss_sc = torch.sum(mse_sc * weights_sc[sc_mask]) / denom_sc
+            loss_sc = torch.sum(mse_sc * weights_sc) / denom_sc
 
         loss = loss_fm + w_sc * loss_sc
 

@@ -150,7 +150,8 @@ class WanModel_Trainer:
                 state_dict = state_dict["generator"]
             elif "model" in state_dict:
                 state_dict = state_dict["model"]
-            self.model.generator.load_state_dict(state_dict, strict=True)
+            # Allow missing keys for newly added shortcut dt embeddings.
+            self.model.generator.load_state_dict(state_dict, strict=False)
             
 
         ##############################################################################################################

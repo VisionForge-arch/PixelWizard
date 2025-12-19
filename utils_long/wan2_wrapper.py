@@ -7,6 +7,7 @@ from utils_long.scheduler import SchedulerInterface, FlowMatchScheduler
 from wan2_long.modules.model_upsample import WanModel_Upsample
 from wan2_long.modules.model_upsample_cross import WanModel_Upsample_Cross
 from wan2_long.modules.model_upsample_causal import WanModel_Upsample_Causal
+from wan2_long.modules.model_upsample_shortcut import WanModel_Upsample_Shortcut
 from wan2_long.modules.tokenizers import HuggingfaceTokenizer
 from wan2_long.modules.model import WanModel, RegisterTokens, GanAttentionBlock
 from wan2_long.modules.model_cross import WanModel_Cross
@@ -136,12 +137,18 @@ class WanDiffusionWrapper(torch.nn.Module):
             sr=False,
             cross=False,
             causal=False,
+            shortcut=False,
     ):
         super().__init__()
         if cross is True:
             from wan2_long.modules.model_cross import register_lr_adapter
             self.model = WanModel_Cross.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
             self.model, _ = register_lr_adapter(self.model)
+            
+        elif sr is True and causal is False and shortcut is True:
+            from wan2_long.modules.model_upsample_shortcut import register_spatial_control
+            self.model = WanModel_Upsample_Shortcut.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
+            self.model, _ = register_spatial_control(self.model)
         elif sr is True and causal is False:
             # old_in_dim = self.model.in_dim
             # new_in_dim = old_in_dim * 2
@@ -258,6 +265,7 @@ class WanDiffusionWrapper(torch.nn.Module):
         noisy_image_or_video: torch.Tensor, 
         conditional_dict: dict,
         timestep: torch.Tensor, 
+        dt: Optional[torch.Tensor] = None,
         kv_cache: Optional[List[dict]] = None,
         crossattn_cache: Optional[List[dict]] = None,
         current_start: Optional[int] = None,
@@ -275,6 +283,14 @@ class WanDiffusionWrapper(torch.nn.Module):
             input_timestep = timestep[:, 0]
         else:
             input_timestep = timestep
+
+        if dt is not None:
+            if self.uniform_timestep:
+                input_dt = dt[:, 0]
+            else:
+                input_dt = dt
+        else:
+            input_dt = None
 
         
         x = noisy_image_or_video.permute(0, 2, 1, 3, 4)
@@ -297,20 +313,39 @@ class WanDiffusionWrapper(torch.nn.Module):
             ).permute(0, 2, 1, 3, 4)
         else:
             if lr_context is not None:
-                flow_pred = self.model(
-                    x,
-                    t=input_timestep, 
-                    context=prompt_embeds,
-                    seq_len=self.seq_len,
-                    lr_latents=lr_context,
-                ).permute(0, 2, 1, 3, 4)
+                try:
+                    flow_pred = self.model(
+                        x,
+                        t=input_timestep,
+                        dt=input_dt,
+                        context=prompt_embeds,
+                        seq_len=self.seq_len,
+                        lr_latents=lr_context,
+                    ).permute(0, 2, 1, 3, 4)
+                except TypeError:
+                    flow_pred = self.model(
+                        x,
+                        t=input_timestep,
+                        context=prompt_embeds,
+                        seq_len=self.seq_len,
+                        lr_latents=lr_context,
+                    ).permute(0, 2, 1, 3, 4)
             else:
-                flow_pred = self.model(
-                    x,
-                    t=input_timestep, 
-                    context=prompt_embeds,
-                    seq_len=self.seq_len,
-                ).permute(0, 2, 1, 3, 4)
+                try:
+                    flow_pred = self.model(
+                        x,
+                        t=input_timestep,
+                        dt=input_dt,
+                        context=prompt_embeds,
+                        seq_len=self.seq_len,
+                    ).permute(0, 2, 1, 3, 4)
+                except TypeError:
+                    flow_pred = self.model(
+                        x,
+                        t=input_timestep,
+                        context=prompt_embeds,
+                        seq_len=self.seq_len,
+                    ).permute(0, 2, 1, 3, 4)
 
         # Convert flow prediction (noise - x0) to x0 so callers can use denoised latents directly.
         # if self.training is False:

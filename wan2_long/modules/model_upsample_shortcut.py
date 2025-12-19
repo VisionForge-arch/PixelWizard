@@ -12,7 +12,7 @@ try:
 except:
     from attention import flash_attention
 
-__all__ = ['WanModel_Upsample']
+__all__ = ['WanModel_Upsample_Shortcut']
 
 
 
@@ -598,7 +598,7 @@ def register_spatial_control(model):
     
     return model, model.spatial_adapter
 
-class WanModel_Upsample(ModelMixin, ConfigMixin):
+class WanModel_Upsample_Shortcut(ModelMixin, ConfigMixin):
     r"""
     Wan diffusion backbone supporting both text-to-video and image-to-video.
     """
@@ -693,6 +693,13 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
             nn.Linear(freq_dim, dim), nn.SiLU(), nn.Linear(dim, dim))
         self.time_projection = nn.Sequential(nn.SiLU(), nn.Linear(dim, dim * 6))
 
+        # Extra conditioning for shortcut step size (dt).
+        # This is a residual added to the base time embedding so pretrained weights remain usable.
+        # The last linear is zero-initialized so dt has no effect at init.
+        self.dt_embedding = nn.Sequential(
+            nn.Linear(freq_dim, dim), nn.SiLU(), nn.Linear(dim, dim)
+        )
+
         # blocks
         self.blocks = nn.ModuleList([
             WanAttentionBlock(dim, ffn_dim, num_heads, window_size, qk_norm,
@@ -723,6 +730,8 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
 
         # initialize weights
         self.init_weights()
+        nn.init.zeros_(self.dt_embedding[-1].weight)
+        nn.init.zeros_(self.dt_embedding[-1].bias)
         
         self.gradient_checkpointing = False
         
@@ -746,6 +755,7 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
         t,
         context,
         seq_len,
+        dt=None,
         classify_mode=False,
         concat_time_embeddings=False,
         register_tokens=None,
@@ -820,6 +830,25 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
         t = t.flatten()      # [B*seq_len]
         e = self.time_embedding(
             sinusoidal_embedding_1d(self.freq_dim, t).unflatten(0, (bt, seq_len)).type_as(x)) # [1, seqlen, 3072]
+
+        if dt is not None:
+            if dt.dim() == 1:
+                dt = dt.expand(dt.size(0), seq_len)  # [B, seq_len]
+            else:
+                if dt.shape[1] != seq_len:
+                    num_frames = grid_sizes[0][0].item()
+                    frame_len = seq_lens[0].item() // num_frames
+                    dt_expanded = torch.repeat_interleave(dt, frame_len, dim=1)  # [B, num_frames*frame_len]
+                    if dt_expanded.shape[1] < seq_len:
+                        pad = seq_len - dt_expanded.shape[1]
+                        dt = torch.cat([dt_expanded, dt_expanded[:, -1:].expand(-1, pad)], dim=1)
+                    else:
+                        dt = dt_expanded[:, :seq_len]
+            dt_flat = dt.flatten()
+            e_dt = self.dt_embedding(
+                sinusoidal_embedding_1d(self.freq_dim, dt_flat).unflatten(0, (bt, seq_len)).type_as(x)
+            )
+            e = e + e_dt
         e0 = self.time_projection(e).unflatten(2, (6, self.dim))           # [1, 27280, 6, 3072]
 
         # context
@@ -982,7 +1011,7 @@ if __name__ == "__main__":
     
     
     
-    model = WanModel_Upsample.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B")
+    model = WanModel_Upsample_Shortcut.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B", )
     model, lr_layers = register_spatial_control(model)
     
     model.eval()
