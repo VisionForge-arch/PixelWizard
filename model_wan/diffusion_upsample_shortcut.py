@@ -105,7 +105,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                 noisy_image_or_video=noisy_latents,
                 conditional_dict=conditional_dict,
                 timestep=timestep,
-                dt=dt,
+                #dt=dt,
                 lr_context=lr_context,
             )
         except TypeError as e:
@@ -278,7 +278,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
             noisy_latents=noisy_latents,
             conditional_dict=conditional_dict,
             timestep=timestep,
-            dt=dt_in,
+            #dt=dt_in,
             lr_context=clean_latent_lr,
         )
         
