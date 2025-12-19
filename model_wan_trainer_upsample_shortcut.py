@@ -341,10 +341,23 @@ class WanModel_Trainer:
                             "generator_grad_norm": generator_log_dict["generator_grad_norm"].mean().item(),
                         }
                     )
+                if "loss_fm" in generator_log_dict:
+                    wandb_loss_dict["loss_fm"] = generator_log_dict["loss_fm"].mean().item()
+                if "loss_sc" in generator_log_dict:
+                    wandb_loss_dict["loss_sc"] = generator_log_dict["loss_sc"].mean().item()
+                if "shortcut_num_sc" in generator_log_dict:
+                    wandb_loss_dict["shortcut_num_sc"] = generator_log_dict["shortcut_num_sc"].mean().item()
                 wandb.log(wandb_loss_dict, step=self.step)
             
             # ======
-            print("generator_loss of Step", self.step, ":", generator_log_dict["generator_loss"].mean().item())
+            if self.is_main_process:
+                loss_total = generator_log_dict["generator_loss"].mean().item()
+                loss_fm = generator_log_dict.get("loss_fm", torch.tensor(0.0)).mean().item()
+                loss_sc = generator_log_dict.get("loss_sc", torch.tensor(0.0)).mean().item()
+                num_sc = generator_log_dict.get("shortcut_num_sc", torch.tensor(0.0)).mean().item()
+                print(
+                    f"Step {self.step} | loss={loss_total:.6g} | fm={loss_fm:.6g} | sc={loss_sc:.6g} | num_sc={num_sc:.0f}"
+                )
     
 
             if self.step % self.config.gc_interval == 0:
