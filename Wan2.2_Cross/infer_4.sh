@@ -1,5 +1,5 @@
 torchrun --standalone --nproc_per_node=4 \
-    generate_multiple_upsampl_shortcut.py \
+    generate_multiple_upsample_shortcut.py \
     --size=2560*1440 \
     --sample_steps=5 \
     --prompt_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file_240p.json \
