@@ -68,6 +68,7 @@ def sp_dit_forward(
     context,
     seq_len,
     y=None,
+    dt=None,
 ):
     """
     x:              A list of videos each with shape [C, T, H, W].
@@ -96,15 +97,27 @@ def sp_dit_forward(
         for u in x
     ])
 
-    # time embeddings
+    # time embeddings (+ optional dt embeddings for shortcut step-size conditioning)
     if t.dim() == 1:
         t = t.expand(t.size(0), seq_len)
+    if dt is not None and getattr(self, "dt_embedding", None) is None:
+        raise RuntimeError(
+            "dt was provided but dt conditioning is not enabled; call enable_dt_conditioning() after loading."
+        )
+    if dt is not None and dt.dim() == 1:
+        dt = dt.expand(dt.size(0), seq_len)
     with torch.amp.autocast('cuda', dtype=torch.float32):
         bt = t.size(0)
-        t = t.flatten()
+        t_flat = t.flatten()
         e = self.time_embedding(
-            sinusoidal_embedding_1d(self.freq_dim,
-                                    t).unflatten(0, (bt, seq_len)).float())
+            sinusoidal_embedding_1d(self.freq_dim, t_flat).unflatten(0, (bt, seq_len)).float()
+        )
+        if dt is not None:
+            dt_flat = dt.flatten()
+            e_dt = self.dt_embedding(
+                sinusoidal_embedding_1d(self.freq_dim, dt_flat).unflatten(0, (bt, seq_len)).float()
+            )
+            e = e + e_dt
         e0 = self.time_projection(e).unflatten(2, (6, self.dim))
         assert e.dtype == torch.float32 and e0.dtype == torch.float32
 
