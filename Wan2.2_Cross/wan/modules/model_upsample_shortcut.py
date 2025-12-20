@@ -547,7 +547,7 @@ def register_spatial_control(model):
 
 
 
-class WanModel_Upsample(ModelMixin, ConfigMixin):
+class WanModel_Upsample_Shortcut(ModelMixin, ConfigMixin):
     r"""
     Wan diffusion backbone supporting both text-to-video and image-to-video.
     """
