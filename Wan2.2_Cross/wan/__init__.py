@@ -6,4 +6,5 @@ from .text2video import WanT2V
 from .textimage2video import WanTI2V
 from .textimage2video_sr import WanTI2V_Upsample
 from .textimage2video_cross import WanTI2V_Cross
+from .textimage2video_sr_shortcut import WanTI2V_Upsample_Shortcut
 from .animate import WanAnimate

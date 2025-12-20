@@ -773,10 +773,6 @@ class WanModel_Upsample(ModelMixin, ConfigMixin):
             assert e.dtype == torch.float32 and e0.dtype == torch.float32
 
         
-            
-            
-        
-        
         # context
         context_lens = None
         context = self.text_embedding(
