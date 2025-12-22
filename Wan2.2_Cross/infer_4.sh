@@ -1,7 +1,7 @@
 torchrun --standalone --nproc_per_node=8 \
     generate_multiple_upsample_shortcut.py \
     --size=2560*1440 \
-    --sample_steps=3 \
+    --sample_steps=8 \
     --prompt_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompt_to_file_240p.json \
     --frame_num=121 \
     --use_ema \
