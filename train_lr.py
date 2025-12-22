@@ -13,7 +13,7 @@ def main():
     
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_base_path", type=str, default=None)
-    parser.add_argument("--dataset_metadata_path", type=str, default="/mnt/vision-gen-ks3/Video_Generation/DataSets/vidgen-1M-sub/jsons/VidGen_1M_video3_recaption.jsonl")
+    parser.add_argument("--dataset_metadata_path", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/VidGen_1M_video3_recaption.jsonl")
     parser.add_argument("--dataset_repeat", type=int, default=1)
     parser.add_argument("--data_file_keys", type=str, default="video_path")
     parser.add_argument("--max_pixels", type=int, default=448*256)    #  640*352, 
