@@ -50,7 +50,7 @@ def main():
     parser.add_argument(
         "--input",
         type=Path,
-        default=Path("../extracted_texts.txt"),
+        default=Path("/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/extracted_texts.txt"),
         help="输入文本文件路径，每行一条。",
     )
     parser.add_argument(
