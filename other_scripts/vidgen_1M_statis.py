@@ -295,7 +295,7 @@ def main():
     parser.add_argument(
         "--input",
         type=str,
-        default="/mnt/vision-gen-ks3/Video_Generation/DataSets/vidgen-1M-sub/jsons/VidGen_1M_video3_recaption.jsonl",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/VidGen_1M_video3_recaption.jsonl",
         help="Path to metadata json/jsonl file.",
     )
     parser.add_argument("--format", type=str, default="text", choices=["text", "json"], help="Output format.")
