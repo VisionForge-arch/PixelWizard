@@ -56,7 +56,7 @@ def main():
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/data/prompts.jsonl"),
+        default=Path("/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/prompts.jsonl"),
         help="输出路径，后缀不限制（由 --format 决定内容）。",
     )
     parser.add_argument(
