@@ -432,7 +432,7 @@ def generate(args):
                 logging.info(f"Prompt: {prompt_text}")
                 logging.info(f"{'='*80}\n")
                 
-            current_prompt = prompt
+            current_prompt = prompt_text
             img = None
             
             # 设置随机种子
