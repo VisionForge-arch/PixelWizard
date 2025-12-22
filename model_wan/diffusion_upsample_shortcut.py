@@ -106,7 +106,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
             lr_context=lr_context,
         )
 
-    def _dt_idx_candidates(self, num_steps: int, device) -> torch.Tensor:
+    def _dt_idx_candidates_uniform(self, num_steps: int, device) -> torch.Tensor:
         """
         Build discrete dt candidates on the scheduler grid index scale.
 
@@ -138,6 +138,54 @@ class SelfForcingWan_Upsample_SC(nn.Module):
             raise ValueError(f"No valid even dt_idx candidates for num_steps={num_steps}, shortcut_min_dt_pow={min_pow}.")
 
         return torch.tensor(cands, device=device, dtype=torch.long)
+    
+
+    def _dt_idx_candidates_non_uniform(self, num_steps: int, device, t_idx_sc: torch.Tensor) -> torch.Tensor:
+        """
+        Build dt candidates conditioned on the current timestep scale T.
+
+        For each SC sample with index `t_idx_sc`, we take its timestep value:
+          T = scheduler.timesteps[t_idx_sc]   (typically an integer-like float, in [0, num_train_timesteps])
+
+        and construct discrete candidates (integer grid jumps):
+          { T, floor(T/2), floor(T/4), ..., floor(T/2^k) }  where k=shortcut_min_dt_pow (default 7).
+
+        Then we:
+          - clamp dt >= 2
+          - snap dt to even so dt/2 is an integer jump
+          - clamp dt so that t_idx_sc + dt <= num_steps - 1
+
+        Returns:
+            Tensor of shape [B_sc, K] where K = shortcut_min_dt_pow + 1.
+        """
+        min_pow = int(getattr(self.args, "shortcut_min_dt_pow", 7))
+        assert min_pow >= 1
+        if t_idx_sc.numel() == 0:
+            return torch.empty((0, min_pow + 1), device=device, dtype=torch.long)
+
+        timesteps_grid = self.scheduler.timesteps
+        if timesteps_grid.device != device:
+            timesteps_grid = timesteps_grid.to(device)
+
+        # T on the model conditioning scale (often integer-like floats).
+        T = timesteps_grid[t_idx_sc].to(torch.float32).round().to(torch.long)  # [B_sc]
+
+        # candidates: [B_sc, K] = {T, T/2, ..., T/2^k}
+        powers = torch.arange(0, min_pow + 1, device=device, dtype=torch.long)  # [K]
+        div = (2**powers).to(torch.long)  # [K]
+        dt = torch.div(T[:, None], div[None, :], rounding_mode="floor")  # [B_sc, K]  dt_k = floor(T / 2^k)
+
+        # ensure t_idx + dt stays within the scheduler grid
+        max_dt_allowed = (num_steps - 1) - t_idx_sc  # [B_sc]
+        max_dt_allowed = torch.clamp(max_dt_allowed, min=0)
+        dt = torch.minimum(dt, max_dt_allowed[:, None])
+
+        # ensure dt/2 is integer grid jump
+        dt = torch.clamp(dt, min=2)
+        dt = dt - (dt % 2)
+        dt = torch.clamp(dt, min=2)
+
+        return dt.to(dtype=torch.long)
 
 
     def generator_loss(
@@ -216,18 +264,12 @@ class SelfForcingWan_Upsample_SC(nn.Module):
         else:
             sc_mask = torch.zeros(batch_size, device=self.device, dtype=torch.bool)
 
-        dt_idx = torch.zeros(batch_size, device=self.device, dtype=torch.long)  # 0 for FM, >0 for SC
-        if enable_shortcut and sc_mask.any():
-            if dist.is_available() and dist.is_initialized():
-                if dist.get_rank() == 0:
-                    dt_candidates = self._dt_idx_candidates(num_steps=num_steps, device=self.device)
-                    dt_idx_sc = dt_candidates[torch.randint(0, dt_candidates.numel(), (sc_mask.sum().item(),), device=self.device)]
-                    dt_idx[sc_mask] = dt_idx_sc
-                dist.broadcast(dt_idx, src=0)
-            else:
-                dt_candidates = self._dt_idx_candidates(num_steps=num_steps, device=self.device)
-                dt_idx_sc = dt_candidates[torch.randint(0, dt_candidates.numel(), (sc_mask.sum().item(),), device=self.device)]
-                dt_idx[sc_mask] = dt_idx_sc
+
+        # ============ Sample T ============
+        # Note: `t_idx` is an index on the scheduler grid, NOT the timestep value itself.
+        # If we want to sample specific timestep values (e.g. 600/700/800...), we must
+        # "snap" them onto the nearest scheduler grid point index.
+        timesteps_grid_snap = self.scheduler.timesteps.to(device=self.device, dtype=torch.float32)  # [num_steps]
 
         t_idx = torch.empty(batch_size, device=self.device, dtype=torch.long)
         fm_mask = ~sc_mask
@@ -236,21 +278,91 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                 if fm_mask.any():
                     t_idx[fm_mask] = torch.randint(0, num_steps, (fm_mask.sum().item(),), device=self.device, dtype=torch.long)
                 if sc_mask.any():
-                    max_start = (num_steps - 1) - dt_idx[sc_mask]  # ensure t_idx + dt_idx <= num_steps - 1
-                    max_start = torch.clamp(max_start, min=0)
-                    t_idx_sc = (torch.rand_like(max_start.float()) * (max_start.float() + 1.0)).floor().to(torch.long)
+                    # -------- Uniform Sampling --------
+                    # max_start = (num_steps - 1) - dt_idx[sc_mask]  # ensure t_idx + dt_idx <= num_steps - 1
+                    # max_start = torch.clamp(max_start, min=0)
+                    # t_idx_sc = (torch.rand_like(max_start.float()) * (max_start.float() + 1.0)).floor().to(torch.long)
+                    # t_idx[sc_mask] = t_idx_sc
+                    
+                    # -------- None Uniform Sampling --------
+                    t_min = int(getattr(self.args, "shortcut_t_min", 600))
+                    t_max = int(getattr(self.args, "shortcut_t_max", 1000))
+                    t_stride = int(getattr(self.args, "shortcut_t_stride", 100))  # 600,700,800,...
+
+                    anchors = torch.arange(t_min, t_max + 1, t_stride, device=self.device, dtype=torch.float32)
+
+                    # sample anchor
+                    pick = torch.randint(0, anchors.numel(), (sc_mask.sum().item(),), device=self.device)
+                    t_target = anchors[pick]  # timestep values, not indices
+                    # snap timestep value -> nearest scheduler grid index
+                    t_idx_sc = torch.argmin(
+                        (timesteps_grid_snap[None, :] - t_target[:, None]).abs(), dim=1
+                    ).to(dtype=torch.long)
+
+                    # leave at least 2 grid steps for dt (since dt/2 must be >= 1)
+                    max_t_allowed = torch.full_like(t_idx_sc, num_steps - 3)
+                    t_idx_sc = torch.minimum(t_idx_sc, max_t_allowed)
+
                     t_idx[sc_mask] = t_idx_sc
+                    
             dist.broadcast(t_idx, src=0)
         else:
             if fm_mask.any():
                 t_idx[fm_mask] = torch.randint(0, num_steps, (fm_mask.sum().item(),), device=self.device, dtype=torch.long)
             if sc_mask.any():
-                max_start = (num_steps - 1) - dt_idx[sc_mask]  # ensure t_idx + dt_idx <= num_steps - 1
-                max_start = torch.clamp(max_start, min=0)
-                t_idx_sc = (torch.rand_like(max_start.float()) * (max_start.float() + 1.0)).floor().to(torch.long)
+                
+                # -------- Uniform Sampling --------
+                # max_start = (num_steps - 1) - dt_idx[sc_mask]  # ensure t_idx + dt_idx <= num_steps - 1
+                # max_start = torch.clamp(max_start, min=0)
+                # t_idx_sc = (torch.rand_like(max_start.float()) * (max_start.float() + 1.0)).floor().to(torch.long)
+                # t_idx[sc_mask] = t_idx_sc
+                
+                # -------- None Uniform Sampling --------
+                t_min = int(getattr(self.args, "shortcut_t_min", 600))
+                t_max = int(getattr(self.args, "shortcut_t_max", 1000))
+                t_stride = int(getattr(self.args, "shortcut_t_stride", 100))  # 600,700,800,...
+
+                anchors = torch.arange(t_min, t_max + 1, t_stride, device=self.device, dtype=torch.float32)
+
+                # sample anchor
+                pick = torch.randint(0, anchors.numel(), (sc_mask.sum().item(),), device=self.device)
+                t_target = anchors[pick]  # timestep values, not indices
+                # snap timestep value -> nearest scheduler grid index
+                t_idx_sc = torch.argmin(
+                    (timesteps_grid_snap[None, :] - t_target[:, None]).abs(), dim=1
+                ).to(dtype=torch.long)
+
+                # leave at least 2 grid steps for dt (since dt/2 must be >= 1)
+                max_t_allowed = torch.full_like(t_idx_sc, num_steps - 3)
+                t_idx_sc = torch.minimum(t_idx_sc, max_t_allowed)
+
                 t_idx[sc_mask] = t_idx_sc
 
+        # ============ Sample dt (conditioned on T) ============
+
+        dt_idx = torch.zeros(batch_size, device=self.device, dtype=torch.long)  # 0 for FM, >0 for SC
+        if enable_shortcut and sc_mask.any():
+            if dist.is_available() and dist.is_initialized():
+                if dist.get_rank() == 0:
+                    t_idx_sc = t_idx[sc_mask]
+                    dt_candidates = self._dt_idx_candidates_non_uniform(
+                        num_steps=num_steps, device=self.device, t_idx_sc=t_idx_sc
+                    )  # [B_sc, K]
+                    k = torch.randint(0, dt_candidates.size(1), (t_idx_sc.numel(),), device=self.device)
+                    dt_idx_sc = dt_candidates[torch.arange(t_idx_sc.numel(), device=self.device), k]
+                    dt_idx[sc_mask] = dt_idx_sc
+                dist.broadcast(dt_idx, src=0)
+            else:
+                t_idx_sc = t_idx[sc_mask]
+                dt_candidates = self._dt_idx_candidates_non_uniform(
+                    num_steps=num_steps, device=self.device, t_idx_sc=t_idx_sc
+                )  # [B_sc, K]
+                k = torch.randint(0, dt_candidates.size(1), (t_idx_sc.numel(),), device=self.device)
+                dt_idx_sc = dt_candidates[torch.arange(t_idx_sc.numel(), device=self.device), k]
+                dt_idx[sc_mask] = dt_idx_sc
+
         t_mid_idx = t_idx + (dt_idx // 2)
+        
 
         timestep_base = timesteps_grid[t_idx]  # [B]
         timestep = timestep_base[:, None].expand(batch_size, num_frame)  # [B, F]
@@ -325,7 +437,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
             conditional_dict_sc = self._slice_batched_conditionals(conditional_dict, sc_mask)
             lr_context_sc = clean_latent_lr[sc_mask] if clean_latent_lr is not None else None
             
-            if (not dist.is_initialized() or dist.get_rank() == 0):
+            if debug_sc and (not dist.is_initialized() or dist.get_rank() == 0):
                 print(f"t_sc_full: {t_sc_full}")
                 print(f"t_sc_mid: {t_sc_mid}")
                 print(f"dt_sc_full: {dt_sc_full}")
@@ -349,7 +461,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                     lr_context=lr_context_sc,
                 )
                 v_sc = 0.5 * (v1 + v2)
-                if (not dist.is_initialized() or dist.get_rank() == 0):
+                if debug_sc and (not dist.is_initialized() or dist.get_rank() == 0):
                     print("finish calculating v_sc")
 
             flow_pred_sc = self._run_generator(
