@@ -50,13 +50,13 @@ def main():
     parser.add_argument(
         "--input",
         type=Path,
-        default=Path("/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/extracted_texts.txt"),
+        default=Path("../extracted_texts.txt"),
         help="输入文本文件路径，每行一条。",
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("../data/prompts.jsonl"),
+        default=Path("/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/data/prompts.jsonl"),
         help="输出路径，后缀不限制（由 --format 决定内容）。",
     )
     parser.add_argument(
