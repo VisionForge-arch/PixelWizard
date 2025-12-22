@@ -14,7 +14,7 @@ import random
 import torch
 import torch.distributed as dist
 from PIL import Image
-
+import json
 import wan
 from wan.configs import MAX_AREA_CONFIGS, SIZE_CONFIGS, SUPPORTED_SIZES, WAN_CONFIGS
 from wan.distributed.util import init_distributed_group
@@ -298,7 +298,7 @@ def _parse_args():
     parser.add_argument(
         "--prompt_file",
         type=str,
-        default="/root/ultrawan/Wan2.2/prompt_old.txt",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/prompts.jsonl",
         help="The file to read the prompts from.")
     parser.add_argument(
         "--wan_ckpt",
@@ -358,8 +358,15 @@ def generate(args):
         
     # 读取prompt文件
     prompt_file = args.prompt_file
+    prompts = []
     with open(prompt_file, 'r', encoding='utf-8') as f:
-        prompts = [line.strip() for line in f.readlines() if line.strip()]
+        for line in f:
+            rec = json.loads(line)
+            if isinstance(rec, dict):
+                pid = rec.get("id")
+                text = rec.get("text")
+            prompts.append({"id": pid, "text": text})
+        
     
     logging.info(f"从 {prompt_file} 读取了 {len(prompts)} 条 prompts")
     
@@ -416,11 +423,13 @@ def generate(args):
 
     
     for prompt_idx, prompt in enumerate(prompts, 1):
+        prompt_id = prompt.get("id")
+        prompt_text = prompt.get("text")
         for resolution in resolutions:
             if rank == 0:
                 logging.info(f"\n{'='*80}")
-                logging.info(f"处理 Prompt {prompt_idx}/{len(prompts)}, 分辨率: {resolution}")
-                logging.info(f"Prompt: {prompt}")
+                logging.info(f"处理 Prompt {prompt_id}/{len(prompts)}, 分辨率: {resolution}")
+                logging.info(f"Prompt: {prompt_text}")
                 logging.info(f"{'='*80}\n")
                 
             current_prompt = prompt
@@ -454,15 +463,13 @@ def generate(args):
 
             
             if rank == 0:
-                formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-                formatted_prompt = current_prompt.replace(" ", "_").replace("/", "_")[:50]
-                file_name = f"{args.task}_{resolution.replace('*','x') if sys.platform=='win32' else resolution}_{args.ulysses_size}_{formatted_prompt}_{formatted_time}.pt"
+                file_name = f"{prompt_id}.pt"
                 args.save_file = os.path.join(output_dir, file_name)
                 
                 logging.info(f"Saving latent to {args.save_file}")
                 torch.save({
                     'latent': video,
-                    'prompt': args.prompt,
+                    'prompt': prompt_text,
                     'seed': args.base_seed,
                     'size': resolution,
                     'frame_num': args.frame_num,
