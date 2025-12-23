@@ -112,7 +112,7 @@ class WanTI2V:
             convert_model_dtype=convert_model_dtype)
         
         # ==============load the model from the checkpoint=============
-        if config.use_lora:
+        if use_lora:
         
             lora_config = LoraConfig(
                 r=64,
