@@ -20,7 +20,8 @@ from wan.configs import MAX_AREA_CONFIGS, SIZE_CONFIGS, SUPPORTED_SIZES, WAN_CON
 from wan.distributed.util import init_distributed_group
 from wan.utils.prompt_extend import DashScopePromptExpander, QwenPromptExpander
 from wan.utils.utils import merge_video_audio, save_video, str2bool
-
+from peft import set_peft_model_state_dict
+from wan.modules.animate.animate_utils import get_loraconfig
 
 EXAMPLE_PROMPT = {
     "t2v-A14B": {
@@ -303,10 +304,12 @@ def _parse_args():
     parser.add_argument(
         "--wan_ckpt",
         type=str,
-        #default=None,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p/checkpoint_model_006700/model.pt",
+        default=None,
+        #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p/checkpoint_model_006700/model.pt",
         help="The path to the Wan checkpoint.")
     parser.add_argument("--use_ema", action="store_true", help="Whether to use EMA parameters")
+    parser.add_argument("--use_lora", action="store_true")
+    parser.add_argument("--lora_path", action="store_true")
     args = parser.parse_args()
     _validate_args(args)
 
@@ -399,6 +402,12 @@ def generate(args):
         wan_ckpt=args.wan_ckpt,
         use_ema=args.use_ema,
     )
+    
+    wan_ti2v.model.add_adapter(get_loraconfig(wan_ti2v.model, rank=64, alpha=64))
+    sd = torch.load(args.lora_path, map_location="cpu")
+    set_peft_model_state_dict(wan_ti2v.model, sd.get("state_dict", sd))
+    wan_ti2v.model.eval().requires_grad_(False)
+    
     
     logging.info(f"Generating video ...")
         # video = wan_ti2v.generate(
