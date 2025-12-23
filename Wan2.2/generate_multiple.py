@@ -399,6 +399,7 @@ def generate(args):
         convert_model_dtype=args.convert_model_dtype,
         wan_ckpt=args.wan_ckpt,
         use_ema=args.use_ema,
+        use_lora=args.use_lora,
     )
     
 

@@ -47,6 +47,7 @@ class WanTI2V:
         convert_model_dtype=False,
         wan_ckpt=None,
         use_ema=False,
+        use_lora=False,
     ):
         r"""
         Initializes the Wan text-to-video generation model components.
