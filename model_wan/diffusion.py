@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch import nn
 from utils_long.wan2_wrapper import WanDiffusionWrapper, WanTextEncoder, WanVAEWrapper2_2
 from pipeline_long import SelfForcingTrainingPipeline
-
+from peft import LoraConfig, get_peft_model
 
 class SelfForcingWan(nn.Module):
     def __init__(self, args, device):
@@ -71,7 +71,25 @@ class SelfForcingWan(nn.Module):
         self.sr_mode = args.sr_mode
         self.seq_len = args.seq_len
         self.generator = WanDiffusionWrapper(**getattr(args, "model_kwargs", {}), seq_len=self.seq_len, sr=self.sr_mode)
-        self.generator.model.requires_grad_(True)
+        
+        if getattr(args, "use_lora", False):
+            print("Using LoRA for training generator.")
+            self.generator.model.requires_grad_(False)
+
+            lora_config = LoraConfig(
+                r=getattr(args, "lora_r", 64),
+                lora_alpha=getattr(args, "lora_alpha", 64),
+                target_modules=["q", "k", "v", "o", "ffn.0", "ffn.2"],
+                lora_dropout=getattr(args, "lora_dropout", 0.1),
+                bias="none",
+            )
+
+            self.generator.model = get_peft_model(self.generator.model, lora_config)
+            print("Generator trainable parameters:")
+            self.generator.model.print_trainable_parameters()
+
+        else:
+            self.generator.model.requires_grad_(True)
 
         self.text_encoder = WanTextEncoder()
         self.text_encoder.requires_grad_(False)

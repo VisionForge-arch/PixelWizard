@@ -101,8 +101,6 @@ class WanModel_Trainer:
         self.model.vae = self.model.vae.to(device=self.device, dtype=torch.bfloat16 if config.mixed_precision else torch.float32)
 
 
-
-
         # 设置训练参数
         self.max_grad_norm_generator = getattr(config, "max_grad_norm_generator", 1.0)
 
