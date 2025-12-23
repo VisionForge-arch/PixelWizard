@@ -152,8 +152,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
 
         Then we:
           - clamp dt >= 2
-          - snap dt to even so dt/2 is an integer jump
-          - clamp dt so that t_idx_sc + dt <= num_steps - 1
+          - snap dt to even so dt/2 is an integer (used in SC)
 
         Returns:
             Tensor of shape [B_sc, K] where K = shortcut_min_dt_pow + 1.
@@ -174,11 +173,6 @@ class SelfForcingWan_Upsample_SC(nn.Module):
         powers = torch.arange(0, min_pow + 1, device=device, dtype=torch.long)  # [K]
         div = (2**powers).to(torch.long)  # [K]
         dt = torch.div(T[:, None], div[None, :], rounding_mode="floor")  # [B_sc, K]  dt_k = floor(T / 2^k)
-
-        # ensure t_idx + dt stays within the scheduler grid
-        max_dt_allowed = (num_steps - 1) - t_idx_sc  # [B_sc]
-        max_dt_allowed = torch.clamp(max_dt_allowed, min=0)
-        dt = torch.minimum(dt, max_dt_allowed[:, None])
 
         # ensure dt/2 is integer grid jump
         dt = torch.clamp(dt, min=2)
@@ -361,13 +355,24 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                 dt_idx_sc = dt_candidates[torch.arange(t_idx_sc.numel(), device=self.device), k]
                 dt_idx[sc_mask] = dt_idx_sc
 
-        t_mid_idx = t_idx + (dt_idx // 2)
+        # Mid-point index for self-consistency is computed in *timestep-value space* then snapped to the scheduler grid.
+        # dt_idx is treated as a timestep-scale delta (integer-like), not an index jump.
+        t_mid_idx = t_idx.clone()
+        if enable_shortcut and sc_mask.any():
+            t_base_sc = timesteps_grid_snap[t_idx[sc_mask]]  # [B_sc], float32
+            t_mid_target = t_base_sc - 0.5 * dt_idx[sc_mask].to(dtype=torch.float32)
+            t_mid_idx_sc = torch.argmin(
+                (timesteps_grid_snap[None, :] - t_mid_target[:, None]).abs(), dim=1
+            ).to(dtype=torch.long)
+            # enforce monotonicity on the grid index (time flows forward as index increases)
+            t_mid_idx_sc = torch.maximum(t_mid_idx_sc, t_idx[sc_mask])
+            t_mid_idx[sc_mask] = t_mid_idx_sc
         
 
         timestep_base = timesteps_grid[t_idx]  # [B]
         timestep = timestep_base[:, None].expand(batch_size, num_frame)  # [B, F]
 
-        # dt conditioning uses integer grid step counts (encoded as numbers, but semantically dt_idx)
+        # dt conditioning uses integer timestep deltas on the same scale as `timestep`.
         dt = dt_idx.to(dtype=self.dtype)[:, None].expand(batch_size, num_frame)  # [B, F]
 
         

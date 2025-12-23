@@ -467,9 +467,10 @@ class WanTI2V_Upsample_Shortcut:
                 latent_model_input = latents
                 timestep = torch.stack([t])
                 t_next = timesteps[i + 1] if (i + 1) < len(timesteps) else timestep.new_zeros(())
-                dt_idx = (timestep[0] - t_next).abs()
-                dt_choices = dt_idx.new_tensor([8, 16, 32, 64, 128, 256, 512, 1024])
-                dt_idx = dt_choices[torch.argmin((dt_choices - dt_idx).abs())]
+                # dt conditioning is on the same "timestep value" scale as `t` (typically integer-like floats).
+                # Keep it integer and (optionally) even for consistency with training (dt/2 used there).
+                dt_idx = (timestep[0] - t_next).abs().to(torch.int64)
+                dt_idx = torch.clamp(dt_idx - (dt_idx % 2), min=2)
 
                 temp_ts = (mask2[0][0][:, ::2, ::2] * timestep).flatten()
                 temp_ts = torch.cat([
@@ -681,9 +682,10 @@ class WanTI2V_Upsample_Shortcut:
                 latent_model_input = [latent.to(self.device)]
                 timestep = torch.stack([t]).to(self.device)
                 t_next = timesteps[i + 1] if (i + 1) < len(timesteps) else timestep.new_zeros(())
-                dt_idx = (timestep[0] - t_next).abs()
-                dt_choices = dt_idx.new_tensor([8, 16, 32, 64, 128, 256, 512, 1024])
-                dt_idx = dt_choices[torch.argmin((dt_choices - dt_idx).abs())]
+                # dt conditioning is on the same "timestep value" scale as `t` (typically integer-like floats).
+                # Keep it integer and (optionally) even for consistency with training (dt/2 used there).
+                dt_idx = (timestep[0] - t_next).abs().to(torch.int64)
+                dt_idx = torch.clamp(dt_idx - (dt_idx % 2), min=2)
 
                 temp_ts = (mask2[0][0][:, ::2, ::2] * timestep).flatten()
                 temp_ts = torch.cat([
