@@ -20,8 +20,7 @@ from wan.configs import MAX_AREA_CONFIGS, SIZE_CONFIGS, SUPPORTED_SIZES, WAN_CON
 from wan.distributed.util import init_distributed_group
 from wan.utils.prompt_extend import DashScopePromptExpander, QwenPromptExpander
 from wan.utils.utils import merge_video_audio, save_video, str2bool
-from peft import set_peft_model_state_dict
-from wan.modules.animate.animate_utils import get_loraconfig
+from peft import LoraConfig, get_peft_model, set_peft_model_state_dict
 
 EXAMPLE_PROMPT = {
     "t2v-A14B": {
@@ -403,10 +402,22 @@ def generate(args):
         use_ema=args.use_ema,
     )
     if args.use_lora:
-        wan_ti2v.model.add_adapter(get_loraconfig(wan_ti2v.model, rank=64, alpha=64))
+        
+        lora_config = LoraConfig(
+            r=64,
+            lora_alpha=64,
+            target_modules=["q", "k", "v", "o", "ffn.0", "ffn.2"],
+            lora_dropout=0.0,
+            bias="none",
+        )
+
+        wan_ti2v.model = get_peft_model(wan_ti2v.model, lora_config)
+
         sd = torch.load(args.lora_path, map_location="cpu")
-        set_peft_model_state_dict(wan_ti2v.model, sd.get("state_dict", sd))
-        wan_ti2v.model.eval().requires_grad_(False)
+        sd = sd["state_dict"] if isinstance(sd, dict) and "state_dict" in sd else sd
+        set_peft_model_state_dict(wan_ti2v.model, sd)
+
+        wan_ti2v.model.eval()
     
     
     logging.info(f"Generating video ...")
