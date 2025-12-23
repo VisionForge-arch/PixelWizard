@@ -402,11 +402,11 @@ def generate(args):
         wan_ckpt=args.wan_ckpt,
         use_ema=args.use_ema,
     )
-    
-    wan_ti2v.model.add_adapter(get_loraconfig(wan_ti2v.model, rank=64, alpha=64))
-    sd = torch.load(args.lora_path, map_location="cpu")
-    set_peft_model_state_dict(wan_ti2v.model, sd.get("state_dict", sd))
-    wan_ti2v.model.eval().requires_grad_(False)
+    if args.use_lora:
+        wan_ti2v.model.add_adapter(get_loraconfig(wan_ti2v.model, rank=64, alpha=64))
+        sd = torch.load(args.lora_path, map_location="cpu")
+        set_peft_model_state_dict(wan_ti2v.model, sd.get("state_dict", sd))
+        wan_ti2v.model.eval().requires_grad_(False)
     
     
     logging.info(f"Generating video ...")
