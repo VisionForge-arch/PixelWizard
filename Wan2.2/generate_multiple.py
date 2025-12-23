@@ -401,31 +401,8 @@ def generate(args):
         wan_ckpt=args.wan_ckpt,
         use_ema=args.use_ema,
     )
-    if args.use_lora:
-        
-        lora_config = LoraConfig(
-            r=64,
-            lora_alpha=64,
-            target_modules=["q", "k", "v", "o", "ffn.0", "ffn.2"],
-            lora_dropout=0.0,
-            bias="none",
-        )
-
-        wan_ti2v.model = get_peft_model(wan_ti2v.model, lora_config)
-
-        sd = torch.load(args.lora_path, map_location="cpu")
-        sd = sd["state_dict"] if isinstance(sd, dict) and "state_dict" in sd else sd
-        set_peft_model_state_dict(wan_ti2v.model, sd)
-
-        wan_ti2v.model.eval()
-        
-        from peft import get_peft_model_state_dict
-        
-        peft_sd = get_peft_model_state_dict(wan_ti2v.model)
-        common = set(peft_sd).intersection(sd)
-        print("ckpt_keys:", len(sd), "model_peft_keys:", len(peft_sd), "common:", len(common))
-
     
+
     
     logging.info(f"Generating video ...")
         # video = wan_ti2v.generate(

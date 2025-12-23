@@ -29,7 +29,7 @@ from .utils.fm_solvers import (
 )
 from .utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
 from .utils.utils import best_output_size, masks_like
-
+from peft import LoraConfig, get_peft_model, set_peft_model_state_dict
 
 class WanTI2V:
 
@@ -111,6 +111,19 @@ class WanTI2V:
             convert_model_dtype=convert_model_dtype)
         
         # ==============load the model from the checkpoint=============
+        if config.use_lora:
+        
+            lora_config = LoraConfig(
+                r=64,
+                lora_alpha=64,
+                target_modules=["q", "k", "v", "o", "ffn.0", "ffn.2"],
+                lora_dropout=0.0,
+                bias="none",
+            )
+
+            self.model = get_peft_model(self.model, lora_config)
+        
+        
         if wan_ckpt is not None:
             if use_sp is False:
                 print(f"Loading Wan model from {wan_ckpt}")
