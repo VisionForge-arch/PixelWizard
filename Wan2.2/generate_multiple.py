@@ -418,6 +418,13 @@ def generate(args):
         set_peft_model_state_dict(wan_ti2v.model, sd)
 
         wan_ti2v.model.eval()
+        
+        from peft import get_peft_model_state_dict
+        
+        peft_sd = get_peft_model_state_dict(wan_ti2v.model)
+        common = set(peft_sd).intersection(sd)
+        print("ckpt_keys:", len(sd), "model_peft_keys:", len(peft_sd), "common:", len(common))
+
     
     
     logging.info(f"Generating video ...")
