@@ -6,7 +6,7 @@ torchrun --standalone --nproc_per_node=8 \
     --wan_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_shortcut/checkpoint_model_001000/model.pt \
     --frame_num=121 \
     --use_ema \
-    --sample_shift=5.5 \
+    --sample_shift=5 \
     --dit_fsdp \
     --t5_fsdp \
     --ulysses_size 8 \
