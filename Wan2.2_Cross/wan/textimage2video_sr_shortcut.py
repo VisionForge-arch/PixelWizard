@@ -227,6 +227,48 @@ class WanTI2V_Upsample_Shortcut:
 
         return model
 
+    def _shortcut_quantize_dt(self, t_cur: torch.Tensor, t_next: torch.Tensor) -> torch.Tensor:
+        """
+        Quantize inference-time dt to match the training-time shortcut dt distribution.
+
+        Training uses dt candidates derived from a (snapped) timestep scale T:
+          dt_candidates = {T, floor(T/2), ..., floor(T/2^k)}  (k=shortcut_min_dt_pow)
+        and dt is made even so dt/2 is an integer (used in the self-consistency midpoint).
+
+        Here we:
+          1) optionally snap `t_cur` onto anchor timesteps (e.g. 600/700/...)
+          2) build dt_candidates from that snapped T
+          3) snap the raw solver step |t_cur - t_next| onto the nearest candidate.
+        """
+        device = t_cur.device
+        t_cur_f = t_cur.to(dtype=torch.float32)
+        t_next_f = t_next.to(dtype=torch.float32)
+        dt_raw = (t_cur_f - t_next_f).abs()
+
+        k = int(getattr(self.config, "shortcut_min_dt_pow", 7))
+        t_min = float(getattr(self.config, "shortcut_t_min", 600))
+        t_max = float(getattr(self.config, "shortcut_t_max", 1000))
+        t_stride = float(getattr(self.config, "shortcut_t_stride", 100))
+        snap_t = bool(getattr(self.config, "shortcut_infer_snap_t", True))
+
+        if snap_t:
+            anchors = torch.arange(t_min, t_max + 1e-6, t_stride, device=device, dtype=torch.float32)
+            T = anchors[torch.argmin((anchors - t_cur_f).abs())]
+        else:
+            T = t_cur_f
+
+        powers = torch.arange(0, k + 1, device=device, dtype=torch.long)
+        div = (2**powers).to(dtype=torch.float32)
+        dt_cands = torch.div(T, div, rounding_mode="floor").to(dtype=torch.int64)  # [K]
+
+        # ensure dt/2 is an integer-like jump and keep dt >= 2
+        dt_cands = torch.clamp(dt_cands, min=2)
+        dt_cands = dt_cands - (dt_cands % 2)
+        dt_cands = torch.clamp(dt_cands, min=2)
+
+        dt_idx = dt_cands[torch.argmin((dt_cands.to(torch.float32) - dt_raw).abs())]
+        return dt_idx.to(dtype=torch.int64)
+
     def generate(self,
                  input_prompt,
                  cond_latent=None,
@@ -467,10 +509,7 @@ class WanTI2V_Upsample_Shortcut:
                 latent_model_input = latents
                 timestep = torch.stack([t])
                 t_next = timesteps[i + 1] if (i + 1) < len(timesteps) else timestep.new_zeros(())
-                # dt conditioning is on the same "timestep value" scale as `t` (typically integer-like floats).
-                # Keep it integer and (optionally) even for consistency with training (dt/2 used there).
-                dt_idx = (timestep[0] - t_next).abs().to(torch.int64)
-                dt_idx = torch.clamp(dt_idx - (dt_idx % 2), min=2)
+                dt_idx = self._shortcut_quantize_dt(timestep[0], t_next)
 
                 temp_ts = (mask2[0][0][:, ::2, ::2] * timestep).flatten()
                 temp_ts = torch.cat([
@@ -682,10 +721,7 @@ class WanTI2V_Upsample_Shortcut:
                 latent_model_input = [latent.to(self.device)]
                 timestep = torch.stack([t]).to(self.device)
                 t_next = timesteps[i + 1] if (i + 1) < len(timesteps) else timestep.new_zeros(())
-                # dt conditioning is on the same "timestep value" scale as `t` (typically integer-like floats).
-                # Keep it integer and (optionally) even for consistency with training (dt/2 used there).
-                dt_idx = (timestep[0] - t_next).abs().to(torch.int64)
-                dt_idx = torch.clamp(dt_idx - (dt_idx % 2), min=2)
+                dt_idx = self._shortcut_quantize_dt(timestep[0], t_next)
 
                 temp_ts = (mask2[0][0][:, ::2, ::2] * timestep).flatten()
                 temp_ts = torch.cat([
