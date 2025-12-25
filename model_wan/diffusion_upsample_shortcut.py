@@ -316,10 +316,10 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                 t_max = int(getattr(self.args, "shortcut_t_max", 1000))
                 t_stride = int(getattr(self.args, "shortcut_t_stride", 100))  # 600,700,800,...
 
-                anchors = torch.arange(t_min, t_max + 1, t_stride, device=self.device, dtype=torch.float32)
+                anchors = torch.arange(t_min, t_max + 1, t_stride, device=self.device, dtype=torch.float32)   # anchors = [600, 700, 800, 900, 1000]
 
                 # sample anchor
-                pick = torch.randint(0, anchors.numel(), (sc_mask.sum().item(),), device=self.device)
+                pick = torch.randint(0, anchors.numel(), (sc_mask.sum().item(),), device=self.device)          # 随机选一个 anchor
                 t_target = anchors[pick]  # timestep values, not indices
                 # snap timestep value -> nearest scheduler grid index
                 t_idx_sc = torch.argmin(
@@ -442,7 +442,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
             conditional_dict_sc = self._slice_batched_conditionals(conditional_dict, sc_mask)
             lr_context_sc = clean_latent_lr[sc_mask] if clean_latent_lr is not None else None
             
-            if debug_sc and (not dist.is_initialized() or dist.get_rank() == 0):
+            if (not dist.is_initialized() or dist.get_rank() == 0):
                 print(f"t_sc_full: {t_sc_full}")
                 print(f"t_sc_mid: {t_sc_mid}")
                 print(f"dt_sc_full: {dt_sc_full}")
