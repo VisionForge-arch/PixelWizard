@@ -5,6 +5,7 @@ import torch
 from torch import nn
 
 from utils_long.scheduler import SchedulerInterface, FlowMatchScheduler
+from wan2_long.modules import WanModel_Upsample_Shortcut2
 from wan2_long.modules.model_upsample import WanModel_Upsample
 from wan2_long.modules.model_upsample_cross import WanModel_Upsample_Cross
 from wan2_long.modules.model_upsample_causal import WanModel_Upsample_Causal
@@ -147,10 +148,16 @@ class WanDiffusionWrapper(torch.nn.Module):
             self.model, _ = register_lr_adapter(self.model)
             
         elif sr is True and causal is False and shortcut is True:
+            from wan2_long.modules.model_upsample_shortcut2 import register_spatial_control
+            self.model = WanModel_Upsample_Shortcut2.from_pretrained(
+                f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B",
+            )
+            
             from wan2_long.modules.model_upsample_shortcut import register_spatial_control
             self.model = WanModel_Upsample_Shortcut.from_pretrained(
                 f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B",
             )
+            
             # Create dt embedding AFTER loading pretrained weights to keep diffusers/accelerate happy.
             self.model.enable_dt_conditioning()
             self.model, _ = register_spatial_control(self.model)

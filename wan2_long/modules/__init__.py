@@ -4,6 +4,7 @@ from .model import WanModel
 from .model_cross import WanModel_Cross
 from .model_upsample import WanModel_Upsample
 from .model_upsample_shortcut import WanModel_Upsample_Shortcut
+from .model_upsample_shortcut2 import WanModel_Upsample_Shortcut2
 from .model_upsample_cross import WanModel_Upsample_Cross
 from .model_upsample_causal import WanModel_Upsample_Causal
 from .t5 import T5Decoder, T5Encoder, T5EncoderModel, T5Model
@@ -19,6 +20,7 @@ __all__ = [
     'WanModel_Cross',
     'WanModel_Upsample',
     'WanModel_Upsample_Shortcut',
+    'WanModel_Upsample_Shortcut2',
     "WanModel_Upsample_Causal",
     "WanModel_Upsample_Cross",
     'T5Model',
