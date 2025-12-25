@@ -210,7 +210,7 @@ def _parse_args():
     parser.add_argument(
         "--sample_shift",
         type=float,
-        default=4.0,
+        default=4.3,
         help="Sampling shift factor for flow matching schedulers.")
     parser.add_argument(
         "--sample_guide_scale",
@@ -304,7 +304,7 @@ def _parse_args():
         "--wan_ckpt",
         type=str,
         #default=None,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p/checkpoint_model_006000/model.pt",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p/checkpoint_model_001000/model.pt",
         help="The path to the Wan checkpoint.")
     parser.add_argument("--use_ema", action="store_true", help="Whether to use EMA parameters")
     parser.add_argument("--use_lora", action="store_true", help="Whether to use LoRA parameters")
