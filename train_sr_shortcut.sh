@@ -4,6 +4,5 @@ export WANDB_MODE=offline
 torchrun --standalone --nproc_per_node=8 \
   train_sr.py \
   --trainable_backbone \
-  --use_ema \
   --shortcut \
   --load_generator_ckpt \
