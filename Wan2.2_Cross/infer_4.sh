@@ -7,7 +7,7 @@ torchrun --standalone --nproc_per_node=8 \
     --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_upsample_2k_shortcut/pt2 \
     --frame_num=121 \
     --use_ema \
-    --sample_shift=5.5 \
+    --sample_shift=5 \
     --dit_fsdp \
     --t5_fsdp \
     --ulysses_size 8 \
