@@ -111,8 +111,23 @@ class WanTI2V_Upsample_Shortcut:
         #==============load the model from the checkpoint (在 FSDP 之前加载)=============
         adapter_state_dict = None
         if wan_ckpt is not None:
-            print(f"Loading Wan model from {wan_ckpt}")
-            state_dict = torch.load(wan_ckpt, map_location="cpu")
+            if use_sp is False:
+                print(f"Loading Wan model from {wan_ckpt}")
+                state_dict = torch.load(wan_ckpt, map_location="cpu")
+                
+            else:
+                print(f"Loading Wan model from {wan_ckpt} for SP mode")
+                state_dict = None  # 先占位
+                if not dist.is_initialized() or dist.get_rank() == 0:
+                    state_dict = torch.load(wan_ckpt, map_location="cpu")
+                    print(f"[rank0] loaded Wan model from {wan_ckpt}")
+                    
+                if dist.is_initialized():
+                    dist.barrier()  # 确保其它 rank 等待
+                    obj_list = [state_dict]
+                    dist.broadcast_object_list(obj_list, src=0)
+                    state_dict = obj_list[0]  # 其它 rank 拿到同一个 state_dict
+                
             if use_ema:
                 print("------- Using EMA Weight ------")
                 generator_state_dict = state_dict['generator_ema']
@@ -121,38 +136,47 @@ class WanTI2V_Upsample_Shortcut:
                 generator_state_dict = state_dict['generator']
             
             
-            # 先去掉 FSDP 产生的中间前缀
-            def clean_fsdp_keys(d):
-                new = {}
-                for k, v in d.items():
-                    k2 = (k.replace("_fsdp_wrapped_module.", "")
-                            .replace("_checkpoint_wrapped_module.", "")
-                            .replace("_orig_mod.", ""))
-                    new[k2] = v
-                return new
-            if use_ema:
-                generator_state_dict = clean_fsdp_keys(generator_state_dict)
+                # 先去掉 FSDP 产生的中间前缀
+                def clean_fsdp_keys(d):
+                    new = {}
+                    for k, v in d.items():
+                        k2 = (k.replace("_fsdp_wrapped_module.", "")
+                                .replace("_checkpoint_wrapped_module.", "")
+                                .replace("_orig_mod.", ""))
+                        new[k2] = v
+                    return new
+                if use_ema:
+                    generator_state_dict = clean_fsdp_keys(generator_state_dict)
+                
+                def strip_prefix(d, prefix="model."):
+                    new_dict = {}
+                    for k, v in d.items():
+                        if k.startswith(prefix):
+                            new_dict[k[len(prefix):]] = v
+                        else:
+                            new_dict[k] = v
+                    return new_dict
+                
+                generator_state_dict = strip_prefix(generator_state_dict)
+                
+                # 分离 adapter 的权重
+                adapter_keys = [k for k in generator_state_dict.keys() if k.startswith('spatial_adapter.')]
+                adapter_state_dict = {k[len('spatial_adapter.'):]: generator_state_dict.pop(k) for k in adapter_keys}
+                print(f"Found {len(adapter_keys)} adapter keys in checkpoint")
             
-            def strip_prefix(d, prefix="model."):
-                new_dict = {}
-                for k, v in d.items():
-                    if k.startswith(prefix):
-                        new_dict[k[len(prefix):]] = v
-                    else:
-                        new_dict[k] = v
-                return new_dict
-            
-            generator_state_dict = strip_prefix(generator_state_dict)
-            
-            # 分离 adapter 的权重
-            adapter_keys = [k for k in generator_state_dict.keys() if k.startswith('spatial_adapter.')]
-            adapter_state_dict = {k[len('spatial_adapter.'):]: generator_state_dict.pop(k) for k in adapter_keys}
-            print(f"Found {len(adapter_keys)} adapter keys in checkpoint")
-        
-            # 加载主模型权重
-            missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict, strict=False)
-            print(f"Missing keys: {len(missing_keys)}, unexpected: {len(unexpected_keys)}")
+                # 加载主模型权重
+                missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict, strict=False)
+                print(f"Missing keys: {len(missing_keys)}, unexpected: {len(unexpected_keys)}")
 
+        else:
+
+                
+            if use_ema:
+                print("------- Using EMA Weight ------")
+                generator_state_dict = state_dict['generator_ema']
+            else:
+                print("------- Using None EMA Weight ------")
+                generator_state_dict = state_dict['generator']
         # ==============================================================
 
         
