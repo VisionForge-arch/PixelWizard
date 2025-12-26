@@ -20,6 +20,7 @@ from .distributed.fsdp import shard_model
 from .distributed.sequence_parallel import sp_attn_forward, sp_dit_forward
 from .distributed.util import get_world_size
 from .modules.model_upsample_shortcut import WanModel_Upsample_Shortcut
+from .modules.model_upsample_shortcut2 import WanModel_Upsample_Shortcut2
 from .modules.t5 import T5EncoderModel
 from .modules.vae2_2 import Wan2_2_VAE
 from .utils.fm_solvers import (
@@ -103,7 +104,7 @@ class WanTI2V_Upsample_Shortcut:
 
         logging.info(f"Creating WanModel from {checkpoint_dir}")
         from .modules.model_upsample_shortcut import register_spatial_control
-        self.model = WanModel_Upsample_Shortcut.from_pretrained(checkpoint_dir)
+        self.model = WanModel_Upsample_Shortcut2.from_pretrained(checkpoint_dir)
         self.model.enable_dt_conditioning()
         #==============load the model from the checkpoint (在 FSDP 之前加载)=============
         adapter_state_dict = None
@@ -162,16 +163,13 @@ class WanTI2V_Upsample_Shortcut:
             missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict)
             print(f"Missing keys: {len(missing_keys)}, unexpected: {len(unexpected_keys)}")
         # ==============================================================
-
-        
+ 
         self.model = self._configure_model(
             model=self.model,
             use_sp=use_sp,
             dit_fsdp=dit_fsdp,
             shard_fn=shard_fn,
             convert_model_dtype=convert_model_dtype)
-        
-        
         
         # ======================================================================
         self.model, _ = register_spatial_control(self.model)
