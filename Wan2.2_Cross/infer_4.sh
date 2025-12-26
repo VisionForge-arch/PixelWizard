@@ -6,7 +6,6 @@ torchrun --standalone --nproc_per_node=8 \
     --wan_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_shortcut2/checkpoint_model_000400/model.pt \
     --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_upsample_2k_shortcut2/pt \
     --frame_num=121 \
-    --use_ema \
     --sample_shift=3 \
     --dit_fsdp \
     --t5_fsdp \
