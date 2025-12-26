@@ -185,12 +185,13 @@ class WanTI2V_Upsample_Shortcut:
                 print(
                     f"Successfully loaded spatial_adapter weights (missing: {len(missing_keys)}, unexpected: {len(unexpected_keys)})"
                 )
+                print(missing_keys)
             except Exception as e:
                 print(f"Warning: Failed to load spatial_adapter weights: {e}")
         else:
             print("No spatial_adapter weights found in checkpoint")
         # ======================================================================
-         
+        exit()
          
         if use_sp:
             self.sp_size = get_world_size()
