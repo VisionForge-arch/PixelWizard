@@ -546,7 +546,7 @@ def register_spatial_control(model):
             # 虽然有点重复计算，但为了不魔改 _forward 内部代码，这是最干净的写法。
             # 只要 t 没变，逻辑就是一致的。
             kwargs['lr_latents'] = lr_latents
-            kwargs["dt"] = dt
+            kwargs["dt"] = dt_in
             return original_forward(x, t, context, seq_len, **kwargs)
         finally:
             self._current_spatial_ctx = None
