@@ -193,7 +193,6 @@ class WanTI2V_Upsample_Shortcut:
         else:
             print("No spatial_adapter weights found in checkpoint")
         # ======================================================================
-        exit()
          
         if use_sp:
             self.sp_size = get_world_size()
