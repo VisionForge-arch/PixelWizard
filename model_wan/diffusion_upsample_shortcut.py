@@ -204,7 +204,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
         """
         
         enable_shortcut = bool(getattr(self.args, "shortcut_enable", True))
-        rate_sc = float(getattr(self.args, "shortcut_rate_sc", 0.25))
+        rate_sc = float(getattr(self.args, "shortcut_rate_sc", 0.3))
         w_sc = float(getattr(self.args, "shortcut_loss_sc_weight", 1.0))
         debug_sc = bool(getattr(self.args, "shortcut_debug", False))
 
@@ -313,7 +313,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                 
                 # -------- None Uniform Sampling --------
                 t_min = int(getattr(self.args, "shortcut_t_min", 600))
-                t_max = int(getattr(self.args, "shortcut_t_max", 1000))
+                t_max = int(getattr(self.args, "shortcut_t_max", 800))
                 t_stride = int(getattr(self.args, "shortcut_t_stride", 100))  # 600,700,800,...
 
                 anchors = torch.arange(t_min, t_max + 1, t_stride, device=self.device, dtype=torch.float32)   # anchors = [600, 700, 800, 900, 1000]
@@ -342,7 +342,17 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                     dt_candidates = self._dt_idx_candidates_non_uniform(
                         num_steps=num_steps, device=self.device, t_idx_sc=t_idx_sc
                     )  # [B_sc, K]
-                    k = torch.randint(0, dt_candidates.size(1), (t_idx_sc.numel(),), device=self.device)
+                    
+                    # 构造一个衰减分布，例如 [0.4, 0.2, 0.15, 0.1, 0.05, ...]
+                    # 让模型有接近一半的时间都在练“一步跳 T”或者“两步跳 T”
+                    num_candidates = dt_candidates.size(1)
+                    probs = torch.exp(-torch.arange(num_candidates).to(self.device) * 0.7) 
+                    probs = probs / probs.sum()
+                    
+                    k = torch.multinomial(probs, t_idx_sc.numel(), replacement=True)
+                    
+                    # -- 随机采样 --
+                    #k = torch.randint(0, dt_candidates.size(1), (t_idx_sc.numel(),), device=self.device)
                     dt_idx_sc = dt_candidates[torch.arange(t_idx_sc.numel(), device=self.device), k]
                     dt_idx[sc_mask] = dt_idx_sc
                 dist.broadcast(dt_idx, src=0)
