@@ -348,7 +348,7 @@ class WanSpatialControlAdapter(nn.Module):
         )
         
         # 3. Guidance Timestep Embedding (控制强度的开关)
-        self.adapter_time_proj = nn.Sequential(
+        self.adapter_dt_proj = nn.Sequential(
             nn.Linear(freq_dim, model_dim * 2),
             nn.SiLU(),
             nn.Linear(model_dim * 2, model_dim * 2),
