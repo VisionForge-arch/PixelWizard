@@ -164,6 +164,7 @@ class WanTI2V_Upsample_Shortcut:
             # 加载主模型权重
             missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict)
             print(f"Missing keys: {len(missing_keys)}, unexpected: {len(unexpected_keys)}")
+            print(missing_keys)
         # ==============================================================
  
         self.model = self._configure_model(
