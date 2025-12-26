@@ -353,6 +353,8 @@ class WanSpatialControlAdapter(nn.Module):
             nn.SiLU(),
             nn.Linear(model_dim * 2, model_dim * 2),
         )
+        nn.init.zeros_(self.adapter_dt_proj[-1].weight)
+        nn.init.zeros_(self.adapter_dt_proj[-1].bias)
 
         # 4. [核心] Per-Block Zero Layers
         # 为主干网络的每一层 block 准备一个独立的 Zero Linear
@@ -362,7 +364,7 @@ class WanSpatialControlAdapter(nn.Module):
         ])
         
 
-    def forward(self, lr_latents, guidance_t_emb, guidance_dt_emb):
+    def forward(self, lr_latents, guidance_t_emb, guidance_dt_emb=None):
         """
         lr_latents: [B, C, F, H, W]
         t_sinusoidal_emb: [B, freq_dim] <- 这是原始的正弦位置编码
@@ -374,7 +376,8 @@ class WanSpatialControlAdapter(nn.Module):
         x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
         
         w = self.adapter_time_proj(guidance_t_emb)
-        w = w + self.adapter_dt_proj(guidance_dt_emb)
+        if guidance_dt_emb is not None:
+            w = w + self.adapter_dt_proj(guidance_dt_emb)
         scale, shift = w.chunk(2, dim=-1)                    # [B, D], [B, D]
         
         x = self.feature_norm(x)
@@ -505,7 +508,6 @@ def register_spatial_control(model):
         
         # 1. 计算基础的 Sinusoidal Embedding (公用)
         # 这段逻辑是从原模型里提取出来的，为了让 Adapter 复用
-        print(t)
         if t.dim() == 1:
             # 这里的 t 是 [Batch]
             # 扩展到 sequence 维度虽然是 WanModel 内部做的，
@@ -535,8 +537,6 @@ def register_spatial_control(model):
         # 将 LR 和 公用的 Time Freq 传入 Adapter
         # Adapter 内部会用自己的 MLP 处理这个 t_freq
         controls = self.spatial_adapter(lr_latents, t_freq, dt_freq)
-        print(f'control_shape{controls[0].shape}')
-        
         self._current_spatial_ctx = {'controls': controls}
 
 
