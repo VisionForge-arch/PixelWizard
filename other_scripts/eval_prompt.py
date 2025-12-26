@@ -50,7 +50,7 @@ def main():
     parser.add_argument(
         "--input",
         type=Path,
-        default=Path("../all_dimention_extended.txt"),
+        default=Path("../all_dimension_extended.txt"),
         help="输入文本文件路径，每行一条。",
     )
     parser.add_argument(

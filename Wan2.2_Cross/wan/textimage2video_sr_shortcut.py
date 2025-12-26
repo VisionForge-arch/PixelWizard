@@ -103,10 +103,10 @@ class WanTI2V_Upsample_Shortcut:
             device=self.device)
 
         logging.info(f"Creating WanModel from {checkpoint_dir}")
-        # from .modules.model_upsample_shortcut2 import register_spatial_control
-        # self.model = WanModel_Upsample_Shortcut2.from_pretrained(checkpoint_dir)
-        from .modules.model_upsample_shortcut import register_spatial_control
-        self.model = WanModel_Upsample_Shortcut.from_pretrained(checkpoint_dir)
+        from .modules.model_upsample_shortcut2 import register_spatial_control
+        self.model = WanModel_Upsample_Shortcut2.from_pretrained(checkpoint_dir)
+        # from .modules.model_upsample_shortcut import register_spatial_control
+        # self.model = WanModel_Upsample_Shortcut.from_pretrained(checkpoint_dir)
         self.model.enable_dt_conditioning()
         #==============load the model from the checkpoint (在 FSDP 之前加载)=============
         adapter_state_dict = None
