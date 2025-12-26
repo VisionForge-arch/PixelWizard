@@ -167,7 +167,6 @@ class WanTI2V_Upsample_Shortcut:
             print(missing_keys)
             if dist.get_rank() == 0:
                 print(adapter_state_dict.keys())
-            exit()
         # ==============================================================
  
         self.model = self._configure_model(
