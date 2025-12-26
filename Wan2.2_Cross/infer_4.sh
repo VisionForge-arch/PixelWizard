@@ -21,6 +21,7 @@ torchrun --standalone --nproc_per_node=8 \
     --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_upsample_2k_shortcut/pt3 \
     --frame_num=121 \
     --sample_shift=1 \
+    --sample_guide_scale=3 \
     --use_ema \
     --dit_fsdp \
     --t5_fsdp \
