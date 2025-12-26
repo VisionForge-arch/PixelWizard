@@ -153,10 +153,10 @@ class WanDiffusionWrapper(torch.nn.Module):
                 f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B",
             )
             
-            from wan2_long.modules.model_upsample_shortcut import register_spatial_control
-            self.model = WanModel_Upsample_Shortcut.from_pretrained(
-                f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B",
-            )
+            # from wan2_long.modules.model_upsample_shortcut import register_spatial_control
+            # self.model = WanModel_Upsample_Shortcut.from_pretrained(
+            #     f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B",
+            # )
             
             # Create dt embedding AFTER loading pretrained weights to keep diffusers/accelerate happy.
             self.model.enable_dt_conditioning()
