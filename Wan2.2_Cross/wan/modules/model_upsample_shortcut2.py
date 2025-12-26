@@ -3,18 +3,12 @@ import math
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.models.modeling_utils import ModelMixin
 
-try:
-    from .attention import flash_attention
-except:
-    from attention import flash_attention
+from .attention import flash_attention
 
 __all__ = ['WanModel_Upsample_Shortcut']
-
-
 
 
 def sinusoidal_embedding_1d(dim, position):
@@ -30,17 +24,13 @@ def sinusoidal_embedding_1d(dim, position):
     return x
 
 
-#@torch.amp.autocast('cuda', enabled=False)
+@torch.amp.autocast('cuda', enabled=False)
 def rope_params(max_seq_len, dim, theta=10000,
                 scaling: str = "none",          # "none" | "ntk" | "yarn"
                 factor: float = 8.0,            # 放大上下文的倍率，例如从4K到32K可用8.0
                 yarn_alpha: float = 0.8,        # YARN平滑指数(0.5~1.0常用)
                 yarn_short_factor: float = 1.0, # 近程段保真(=1表示近程不缩放)
                 ):
-    '''
-    生成长度为 max_seq_len、维度为 dim 的复数频率表（极坐标形式）
-    
-    '''
     assert dim % 2 == 0
     # ===== 原始频率计算 ===== theta^{-2i/d} 
     idx = torch.arange(0, dim, 2).to(torch.float64)
@@ -62,16 +52,12 @@ def rope_params(max_seq_len, dim, theta=10000,
     return freqs
 
 
-#@torch.amp.autocast('cuda', enabled=False)
+@torch.amp.autocast('cuda', enabled=False)
 def rope_apply(x, grid_sizes, freqs):
-    '''
-    先把最后一维一分为二（偶/奇），视作复数后做乘法（复乘就是二维旋转）
-    
-    '''
     n, c = x.size(2), x.size(3) // 2
 
-    # split freqs 第一段用于 frame，后两段分别用于 height/width
-    freqs = freqs.split([c - 2 * (c // 3), c // 3, c // 3], dim=1)  # 把 freqs 分成三段
+    # split freqs
+    freqs = freqs.split([c - 2 * (c // 3), c // 3, c // 3], dim=1)
 
     # loop over samples
     output = []
@@ -81,7 +67,6 @@ def rope_apply(x, grid_sizes, freqs):
         # precompute multipliers
         x_i = torch.view_as_complex(x[i, :seq_len].to(torch.float64).reshape(
             seq_len, n, -1, 2))
-        # 把三个轴的频率按广播扩展到 [F,H,W,*] 并 concat 到最后一维，形成 [seq_len, 1, (df+dh+dw)]
         freqs_i = torch.cat([
             freqs[0][:f].view(f, 1, 1, -1).expand(f, h, w, -1),
             freqs[1][:h].view(1, h, 1, -1).expand(f, h, w, -1),
@@ -95,7 +80,7 @@ def rope_apply(x, grid_sizes, freqs):
 
         # append to collection
         output.append(x_i)
-    return torch.stack(output).type_as(x)
+    return torch.stack(output).float()
 
 
 class WanRMSNorm(nn.Module):
@@ -127,7 +112,7 @@ class WanLayerNorm(nn.LayerNorm):
         Args:
             x(Tensor): Shape [B, L, C]
         """
-        return super().forward(x).type_as(x)
+        return super().forward(x.float()).type_as(x)
 
 
 class WanSelfAttention(nn.Module):
@@ -189,33 +174,19 @@ class WanSelfAttention(nn.Module):
 
 class WanCrossAttention(WanSelfAttention):
 
-    def forward(self, x, context, context_lens, crossattn_cache=None):
+    def forward(self, x, context, context_lens):
         r"""
         Args:
             x(Tensor): Shape [B, L1, C]
             context(Tensor): Shape [B, L2, C]
             context_lens(Tensor): Shape [B]
-            crossattn_cache (List[dict], *optional*): Contains the cached key and value tensors for context embedding.
-        
         """
         b, n, d = x.size(0), self.num_heads, self.head_dim
 
         # compute query, key, value
         q = self.norm_q(self.q(x)).view(b, -1, n, d)
-        
-        if crossattn_cache is not None:
-            if not crossattn_cache["is_init"]: # 未初始化就计算一次
-                crossattn_cache["is_init"] = True
-                k = self.norm_k(self.k(context)).view(b, -1, n, d)
-                v = self.v(context).view(b, -1, n, d)
-                crossattn_cache["k"] = k
-                crossattn_cache["v"] = v
-            else: # 已经初始化就使用缓存
-                k = crossattn_cache["k"]
-                v = crossattn_cache["v"]
-        else:
-            k = self.norm_k(self.k(context)).view(b, -1, n, d)
-            v = self.v(context).view(b, -1, n, d)
+        k = self.norm_k(self.k(context)).view(b, -1, n, d)
+        v = self.v(context).view(b, -1, n, d)
 
         # compute attention
         x = flash_attention(q, k, v, k_lens=context_lens)
@@ -225,12 +196,6 @@ class WanCrossAttention(WanSelfAttention):
         x = self.o(x)
         return x
 
-
-
-
-WAN_CROSSATTENTION_CLASSES = {
-    'cross_attn': WanCrossAttention,
-}
 
 class WanAttentionBlock(nn.Module):
 
@@ -253,8 +218,7 @@ class WanAttentionBlock(nn.Module):
 
         # layers
         self.norm1 = WanLayerNorm(dim, eps)
-        self.self_attn = WanSelfAttention(dim, num_heads, window_size, qk_norm,
-                                          eps)
+        self.self_attn = WanSelfAttention(dim, num_heads, window_size, qk_norm, eps)
         self.norm3 = WanLayerNorm(
             dim, eps,
             elementwise_affine=True) if cross_attn_norm else nn.Identity()
@@ -287,31 +251,31 @@ class WanAttentionBlock(nn.Module):
             grid_sizes(Tensor): Shape [B, 3], the second dimension contains (F, H, W)
             freqs(Tensor): Rope freqs, shape [1024, C / num_heads / 2]
         """
-        #assert e.dtype == torch.float32
-        #with torch.amp.autocast('cuda', dtype=torch.float32):
-        #print(f"DEBUG: modulation shape={self.modulation.unsqueeze(0).shape}, e shape={e.shape}")
-        e = (self.modulation.unsqueeze(0) + e).chunk(6, dim=2) # list 六个 [1, seq_len, 1, C]
-        #assert e[0].dtype == torch.float32
+        assert e.dtype == torch.float32
+        with torch.amp.autocast('cuda', dtype=torch.float32):
+            e = (self.modulation.unsqueeze(0) + e).chunk(6, dim=2)
+        assert e[0].dtype == torch.float32
 
         # self-attention
         y = self.self_attn(
-            self.norm1(x) * (1 + e[1].squeeze(2)) + e[0].squeeze(2),
+            self.norm1(x).float() * (1 + e[1].squeeze(2)) + e[0].squeeze(2),
             seq_lens, grid_sizes, freqs)
-        #with torch.amp.autocast('cuda', dtype=torch.float32):
-        x = x + y * e[2].squeeze(2)
+        with torch.amp.autocast('cuda', dtype=torch.float32):
+            x = x + y * e[2].squeeze(2)
 
         # cross-attention & ffn function
         def cross_attn_ffn(x, context, context_lens, e):
             x = x + self.cross_attn(self.norm3(x), context, context_lens)
+                       
             y = self.ffn(
-                self.norm2(x) * (1 + e[4].squeeze(2)) + e[3].squeeze(2))
-            #with torch.amp.autocast('cuda', dtype=torch.float32):
-            x = x + y * e[5].squeeze(2)
+                self.norm2(x).float() * (1 + e[4].squeeze(2)) + e[3].squeeze(2))
+            
+            with torch.amp.autocast('cuda', dtype=torch.float32):
+                x = x + y * e[5].squeeze(2)
             return x
 
         x = cross_attn_ffn(x, context, context_lens, e)
         return x
-
 
 
 class Head(nn.Module):
@@ -337,43 +301,14 @@ class Head(nn.Module):
             x(Tensor): Shape [B, L1, C]
             e(Tensor): Shape [B, L1, C]
         """
-        #assert e.dtype == torch.float32
-        #with torch.amp.autocast('cuda', dtype=torch.float32):
-        #print("in head, self.modulation.shape, e.shape: ", self.modulation.shape, e.shape)
-        
-        e = (self.modulation.unsqueeze(0) + e.unsqueeze(2)).chunk(2, dim=2)
-        x = (self.head(self.norm(x) * (1 + e[1].squeeze(2)) + e[0].squeeze(2)))
+        assert e.dtype == torch.float32
+        with torch.amp.autocast('cuda', dtype=torch.float32):
+            e = (self.modulation.unsqueeze(0) + e.unsqueeze(2)).chunk(2, dim=2)
+            x = (
+                self.head(
+                    self.norm(x) * (1 + e[1].squeeze(2)) + e[0].squeeze(2)))
         return x
-    
 
-class MLPProj(torch.nn.Module):
-
-    def __init__(self, in_dim, out_dim):
-        super().__init__()
-
-        self.proj = torch.nn.Sequential(
-            torch.nn.LayerNorm(in_dim), torch.nn.Linear(in_dim, in_dim),
-            torch.nn.GELU(), torch.nn.Linear(in_dim, out_dim),
-            torch.nn.LayerNorm(out_dim))
-
-    def forward(self, image_embeds):
-        clip_extra_context_tokens = self.proj(image_embeds)
-        return clip_extra_context_tokens
-
-
-class RegisterTokens(nn.Module):
-    def __init__(self, num_registers: int, dim: int):
-        super().__init__()
-        self.register_tokens = nn.Parameter(torch.randn(num_registers, dim) * 0.02)
-        self.rms_norm = WanRMSNorm(dim, eps=1e-6)
-
-    def forward(self):
-        return self.rms_norm(self.register_tokens)
-
-    def reset_parameters(self):
-        nn.init.normal_(self.register_tokens, std=0.02)
-        
-        
 
 # [新增] Scale Adapter 模块
 class WanSpatialControlAdapter(nn.Module):
@@ -411,16 +346,14 @@ class WanSpatialControlAdapter(nn.Module):
             nn.SiLU(),
             nn.Linear(model_dim * 2, model_dim * 2),
         )
-
-        # dt-aware conditioning (initialized as no-op)
-        self.adapter_dt_proj = nn.Sequential(
+        
+        # 3. Guidance Timestep Embedding (控制强度的开关)
+        self.adapter_time_proj = nn.Sequential(
             nn.Linear(freq_dim, model_dim * 2),
             nn.SiLU(),
             nn.Linear(model_dim * 2, model_dim * 2),
         )
-        nn.init.zeros_(self.adapter_dt_proj[-1].weight)
-        nn.init.zeros_(self.adapter_dt_proj[-1].bias)
-        
+
         # 4. [核心] Per-Block Zero Layers
         # 为主干网络的每一层 block 准备一个独立的 Zero Linear
         # 作用：将 Adapter 的通用特征，转化为适应第 i 层特征空间的 Condition
@@ -428,13 +361,8 @@ class WanSpatialControlAdapter(nn.Module):
             nn.Linear(model_dim, model_dim) for _ in range(num_blocks)
         ])
         
-        # 5. Zero Initialization (零初始化)
-        # 保证刚开始训练时，注入的特征全是 0，不影响主干
-        for layer in self.zero_layers:
-            nn.init.zeros_(layer.weight)
-            nn.init.zeros_(layer.bias)
 
-    def forward(self, lr_latents, guidance_t_emb, guidance_dt_emb=None):
+    def forward(self, lr_latents, guidance_t_emb, guidance_dt_emb):
         """
         lr_latents: [B, C, F, H, W]
         t_sinusoidal_emb: [B, freq_dim] <- 这是原始的正弦位置编码
@@ -445,16 +373,16 @@ class WanSpatialControlAdapter(nn.Module):
         x = self.backbone(lr_latents)  # [B, C, T, H, ]
         x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
         
-        w = self.adapter_time_proj(guidance_t_emb)           # [B, 2*D]
+        w = self.adapter_time_proj(guidance_t_emb)
         w = w + self.adapter_dt_proj(guidance_dt_emb)
         scale, shift = w.chunk(2, dim=-1)                    # [B, D], [B, D]
-
         
         x = self.feature_norm(x)
         
         # B. 注入 Guidance Timestep (控制强度)
         # 类似于把 guidance 加到 feature 上
-        #print(guidance_t_emb.shape)      #  guidance_t_emb: [B, Dim]
+        # print(guidance_t_emb.shape) # guidance_t_emb: [B, Dim]       
+        
         x = x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1) # Scale 调制，或者 add 也可以
             
         # C. 生成每一层的控制特征
@@ -491,54 +419,56 @@ def register_spatial_control(model):
             if not hasattr(model, '_current_spatial_ctx') or model._current_spatial_ctx is None:
                 return args # 不做任何修改
             
-            ctx = getattr(model, "_current_spatial_ctx", None)
-            if ctx is None:
-                ctx = getattr(model, "_spatial_ctx_cache", None)
-            if ctx is None:
-                return args
+            ctx = model._current_spatial_ctx
             # controls 是一个 list，长度等于 layer 数
             controls = ctx['controls'] 
             
             if controls is None:
                 return args
             
-            
+            # ==========================================================
             # ⭐⭐ 关键 1：只在前 num_control_blocks 层注入，后面的层不做任何事
             # if block_idx >= 10:
             #     return args
-            # if block_idx % 6 != 0:
-            #   return args
+            # if  block_idx % 6 != 0:
             if block_idx != 1:  # only inject on the first block
                 return args
-          
+             # ==========================================================
+
             # 2. 获取当前层的控制特征
             control_feat = controls[block_idx] # [B, L_ctrl, Dim]
-          
-            # ⭐⭐ 新增：按概率跳过某些样本的 LR 控制
-            # skip_prob = getattr(model, "spatial_skip_prob", 0.2)  # 0.0 表示不跳过
-            # if skip_prob > 0:
-            #     mask = ctx.get("global_skip_mask")
-            #     if mask is None:
-            #         mask = (torch.rand(control_feat.size(0), 1, 1, device=control_feat.device) >= skip_prob)
-            #         ctx["global_skip_mask"] = mask
-            #     control_feat = control_feat * mask
             
-
             x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
 
-            L_x = x.shape[1]
-            L_c = control_feat.shape[1]
+            # L_x = x.shape[1]
+            # L_c = control_feat.shape[1]
              # 对齐长度：pad 或截断到和 x 一样长
-            if L_c < L_x:
-                pad = control_feat.new_zeros(control_feat.shape[0], L_x - L_c, control_feat.shape[2])
-                control_feat = torch.cat([control_feat, pad], dim=1)
-            elif L_c > L_x:
-                control_feat = control_feat[:, :L_x, :]
+            # if L_c < L_x:
+            #     pad = control_feat.new_zeros(control_feat.shape[0], L_x - L_c, control_feat.shape[2])
+            #     control_feat = torch.cat([control_feat, pad], dim=1)
+            # elif L_c > L_x:
+            #     control_feat = control_feat[:, :L_x, :]
+            
+            # --- FIX STARTS HERE: Handle Sequence Parallelism Slicing ---
+            # If input x is smaller than control, we assume SP is active and slice control
+            if x.shape[1] != control_feat.shape[1]:
+                if torch.distributed.is_initialized():
+                    rank = torch.distributed.get_rank()
+                    # Calculate the slice for this rank
+                    # We assume the sequence is split evenly across the SP group (world_size)
+                    local_len = x.shape[1]
+                    start_idx = rank * local_len
+                    end_idx = start_idx + local_len
+                    
+                    # Slice the global control feature to match local x
+                    control_feat = control_feat[:, start_idx:end_idx, :]
+            # -----------------------------------------------------------
             
             
             # 4. [关键] 特征相加 (Feature Injection)
-            #print(x.shape)
+            # print(x.shape)
             x_new = x + control_feat.type_as(x)
+            
             # print(x_new.shape)
             # print("add successfully!!!")
             
@@ -575,13 +505,23 @@ def register_spatial_control(model):
         
         # 1. 计算基础的 Sinusoidal Embedding (公用)
         # 这段逻辑是从原模型里提取出来的，为了让 Adapter 复用
+        print(t)
         if t.dim() == 1:
-            # t: [B]
-            t_freq = sinusoidal_embedding_1d(self.freq_dim, t).type_as(x_in[0])  # [B, freq_dim]
+            # 这里的 t 是 [Batch]
+            # 扩展到 sequence 维度虽然是 WanModel 内部做的，
+            # 但为了 Adapter，我们只需要 [Batch, FreqDim] 的 embedding 即可
+            t_freq = sinusoidal_embedding_1d(self.freq_dim, t).type_as(x_in[0]) # [B, freq_dim]
+        elif t.dim() == 2 and t.shape[1] != self.freq_dim:
+            # 识别出这是被 pipeline 扩展过的 [1, SeqLen] 大张量
+            # 我们只需要取第一个值作为全局时间步
+            t_input = t[:, 0] 
+            # 重新生成正确的 [1, 256] Embedding
+            t_freq = sinusoidal_embedding_1d(self.freq_dim, t_input).type_as(x_in[0])
+        
         else:
-            # t: [B, F] (per-frame); 取首帧代表，避免传入 [B, F] 形状破坏 adapter 的线性层
-            t_freq = sinusoidal_embedding_1d(self.freq_dim, t[:, 0]).type_as(x_in[0])  # [B, freq_dim]
-
+            # 如果 t 已经是 embedding (极少情况)
+            t_freq = t
+            
         dt_in = dt if dt is not None else kwargs.get("dt", None)
         dt_freq = None
         if dt_in is not None:
@@ -590,35 +530,36 @@ def register_spatial_control(model):
             else:
                 dt_freq = sinusoidal_embedding_1d(self.freq_dim, dt_in[:, 0]).type_as(x_in[0])  # [B, freq_dim]
 
+
         # 2. 运行 Adapter 
         # 将 LR 和 公用的 Time Freq 传入 Adapter
         # Adapter 内部会用自己的 MLP 处理这个 t_freq
         controls = self.spatial_adapter(lr_latents, t_freq, dt_freq)
+        print(f'control_shape{controls[0].shape}')
         
-        #self._current_spatial_ctx = {'controls': controls}
-        ctx = {'controls': controls, 'skip_masks': {}}
+        self._current_spatial_ctx = {'controls': controls}
 
-        self._current_spatial_ctx = ctx
-        self._spatial_ctx_cache = ctx   # <- persists for checkpoint recompute
 
         try:
+            # 3. 调用原始 forward
+            # 注意：原始 forward 内部还会算一遍 time embedding，
+            # 虽然有点重复计算，但为了不魔改 _forward 内部代码，这是最干净的写法。
+            # 只要 t 没变，逻辑就是一致的。
             kwargs['lr_latents'] = lr_latents
-            if dt is not None:
-                kwargs["dt"] = dt
-            out = original_forward(x, t, context, seq_len, **kwargs)
+            kwargs["dt"] = dt
+            return original_forward(x, t, context, seq_len, **kwargs)
         finally:
-            # clear only when not using checkpointing; otherwise leave for replay
-            if not self.gradient_checkpointing:
-                self._current_spatial_ctx = None
-                self._spatial_ctx_cache = None
-        return out
+            self._current_spatial_ctx = None
 
     import types
     model.forward = types.MethodType(forward_with_spatial_control, model)
     
     return model, model.spatial_adapter
 
-class WanModel_Upsample_Shortcut2(ModelMixin, ConfigMixin):
+
+
+
+class WanModel_Upsample_Shortcut(ModelMixin, ConfigMixin):
     r"""
     Wan diffusion backbone supporting both text-to-video and image-to-video.
     """
@@ -627,7 +568,6 @@ class WanModel_Upsample_Shortcut2(ModelMixin, ConfigMixin):
         'patch_size', 'cross_attn_norm', 'qk_norm', 'text_dim', 'window_size'
     ]
     _no_split_modules = ['WanAttentionBlock']
-    _supports_gradient_checkpointing = True
 
     @register_to_config
     def __init__(self,
@@ -684,7 +624,7 @@ class WanModel_Upsample_Shortcut2(ModelMixin, ConfigMixin):
 
         super().__init__()
 
-        assert model_type in ['t2v', 'i2v', 'ti2v']
+        assert model_type in ['t2v', 'i2v', 'ti2v', 's2v']
         self.model_type = model_type
 
         self.patch_size = patch_size
@@ -728,28 +668,29 @@ class WanModel_Upsample_Shortcut2(ModelMixin, ConfigMixin):
         
         self.rope_scaling = None
         if self.rope_scaling == "yarn":
+            print("========= Using yarn rope scaling ==========")
             self.freqs = torch.cat([
                 rope_params(1024, d - 4 * (d // 6)),
-                rope_params(1024, 2 * (d // 6), scaling="yarn", factor=1.5, yarn_alpha=0.8, yarn_short_factor=1.0),
-                rope_params(1024, 2 * (d // 6), scaling="yarn", factor=1.5, yarn_alpha=0.8, yarn_short_factor=1.0)
+                #rope_params(1024, d - 4 * (d // 6), scaling="yarn", factor=2, yarn_alpha=0.75, yarn_short_factor=1.0),
+                rope_params(1024, 2 * (d // 6),
+                            scaling="yarn", factor=1.5, yarn_alpha=0.8, yarn_short_factor=1.0),
+                rope_params(1024, 2 * (d // 6),
+                            scaling="yarn", factor=1.5, yarn_alpha=0.8, yarn_short_factor=1.0)
             ], dim=1)
         else:
+            print("========= Using none rope scaling ==========")
             self.freqs = torch.cat([
                 rope_params(1024, d - 4 * (d // 6)),
                 rope_params(1024, 2 * (d // 6)),
                 rope_params(1024, 2 * (d // 6))
-            ], dim=1)         
-        
+            ], dim=1)    
 
         # initialize weights
         self.init_weights()
         
-        self.gradient_checkpointing = False
-
-        # NOTE: dt_embedding is created post-load (see enable_dt_conditioning) to avoid
-        # diffusers/accelerate meta-loading failures when pretrained weights don't include it.
+        
         self.dt_embedding = None
-
+        
     def enable_dt_conditioning(self) -> None:
         """
         Create dt embedding parameters (for shortcut step-size conditioning).
@@ -766,36 +707,16 @@ class WanModel_Upsample_Shortcut2(ModelMixin, ConfigMixin):
 
         ref = self.time_embedding[0].weight
         self.dt_embedding = dt_embedding.to(device=ref.device, dtype=ref.dtype)
-        
-    def _set_gradient_checkpointing(self, module, value=False):
-        self.gradient_checkpointing = value
-        
-    def forward(
-        self,
-        *args,
-        **kwargs
-    ):
-        # if kwargs.get('classify_mode', False) is True:
-        # kwargs.pop('classify_mode')
-        # return self._forward_classify(*args, **kwargs)
-        # else:
-        return self._forward(*args, **kwargs)
 
-    def _forward(
+    def forward(
         self,
         x,
         t,
         context,
         seq_len,
-        dt=None,
-        classify_mode=False,
-        concat_time_embeddings=False,
-        register_tokens=None,
-        cls_pred_branch=None,
-        gan_ca_blocks=None,
-        clip_fea=None,
-        y=None,
         lr_latents=None,
+        y=None,
+        dt=None,
     ):
         r"""
         Forward pass through the diffusion model
@@ -809,8 +730,6 @@ class WanModel_Upsample_Shortcut2(ModelMixin, ConfigMixin):
                 List of text embeddings each with shape [L, C]
             seq_len (`int`):
                 Maximum sequence length for positional encoding
-            clip_fea (Tensor, *optional*):
-                CLIP image features for image-to-video mode
             y (List[Tensor], *optional*):
                 Conditional video inputs for image-to-video mode, same shape as x
 
@@ -819,7 +738,7 @@ class WanModel_Upsample_Shortcut2(ModelMixin, ConfigMixin):
                 List of denoised video tensors with original input shapes [C_out, F, H / 8, W / 8]
         """
         if self.model_type == 'i2v':
-            assert clip_fea is not None and y is not None
+            assert y is not None
         # params
         device = self.patch_embedding.weight.device
         if self.freqs.device != device:
@@ -829,62 +748,43 @@ class WanModel_Upsample_Shortcut2(ModelMixin, ConfigMixin):
             x = [torch.cat([u, v], dim=0) for u, v in zip(x, y)]
 
         # embeddings
-        x = [self.patch_embedding(u.unsqueeze(0)) for u in x]  # list 1个 [1, 3072, t, h, w]
-        
+        x = [self.patch_embedding(u.unsqueeze(0)) for u in x]
         
         grid_sizes = torch.stack(
             [torch.tensor(u.shape[2:], dtype=torch.long) for u in x])
-        x = [u.flatten(2).transpose(1, 2) for u in x]         # list 1个 [1, t*h*w, 3072]
-        seq_lens = torch.tensor([u.size(1) for u in x], dtype=torch.long)  # t*h*w
-        
+        x = [u.flatten(2).transpose(1, 2) for u in x]
+        seq_lens = torch.tensor([u.size(1) for u in x], dtype=torch.long)
         assert seq_lens.max() <= seq_len
         x = torch.cat([
             torch.cat([u, u.new_zeros(1, seq_len - u.size(1), u.size(2))],
                       dim=1) for u in x
         ])
 
-        # time embeddings
+        # time embeddings & 步长 dt embeddings
+        if self.dt_embedding is None:
+            raise RuntimeError("dt was provided but dt conditioning is not enabled; call enable_dt_conditioning() after loading.")
+        
         if t.dim() == 1:
-            t = t.expand(t.size(0), seq_len)  # [B, seq_len]
-        else:
-            # support per-frame timestep: expand each frame value to its patch tokens, then pad/crop to seq_len
-            if t.shape[1] != seq_len:
-                num_frames = grid_sizes[0][0].item()
-                frame_len = seq_lens[0].item() // num_frames  # tokens per frame (unpadded length)
-                t_expanded = torch.repeat_interleave(t, frame_len, dim=1)  # [B, num_frames*frame_len]
-                if t_expanded.shape[1] < seq_len:
-                    pad = seq_len - t_expanded.shape[1]
-                    t = torch.cat([t_expanded, t_expanded[:, -1:].expand(-1, pad)], dim=1)
-                else:
-                    t = t_expanded[:, :seq_len]
-            # else: already [B, seq_len]
-        bt = t.size(0)
-        t = t.flatten()      # [B*seq_len]
-        e = self.time_embedding(
-            sinusoidal_embedding_1d(self.freq_dim, t).unflatten(0, (bt, seq_len)).type_as(x)) # [1, seqlen, 3072]
-
-        if dt is not None:
-            if self.dt_embedding is None:
-                raise RuntimeError("dt was provided but dt conditioning is not enabled; call enable_dt_conditioning() after loading.")
-            if dt.dim() == 1:
-                dt = dt.expand(dt.size(0), seq_len)  # [B, seq_len]
-            else:
-                if dt.shape[1] != seq_len:
-                    num_frames = grid_sizes[0][0].item()
-                    frame_len = seq_lens[0].item() // num_frames
-                    dt_expanded = torch.repeat_interleave(dt, frame_len, dim=1)  # [B, num_frames*frame_len]
-                    if dt_expanded.shape[1] < seq_len:
-                        pad = seq_len - dt_expanded.shape[1]
-                        dt = torch.cat([dt_expanded, dt_expanded[:, -1:].expand(-1, pad)], dim=1)
-                    else:
-                        dt = dt_expanded[:, :seq_len]
-            dt_flat = dt.flatten()
+            t = t.expand(t.size(0), seq_len)
+        if dt.dim() == 1:
+            dt = dt.expand(dt.size(0), seq_len)  # [B, seq_len]
+        with torch.amp.autocast('cuda', dtype=torch.float32):
+            bt = t.size(0)
+            
+            t = t.flatten()
+            dt = dt.flatten()
+            e = self.time_embedding(
+                sinusoidal_embedding_1d(self.freq_dim,
+                                        t).unflatten(0, (bt, seq_len)).float())
             e_dt = self.dt_embedding(
-                sinusoidal_embedding_1d(self.freq_dim, dt_flat).unflatten(0, (bt, seq_len)).type_as(x)
-            )
+                sinusoidal_embedding_1d(self.freq_dim,
+                                        dt).unflatten(0, (bt, seq_len)).float())
             e = e + e_dt
-        e0 = self.time_projection(e).unflatten(2, (6, self.dim))           # [1, 27280, 6, 3072]
+            
+            e0 = self.time_projection(e).unflatten(2, (6, self.dim))
+            assert e.dtype == torch.float32 and e0.dtype == torch.float32
 
+        
         # context
         context_lens = None
         context = self.text_embedding(
@@ -895,51 +795,27 @@ class WanModel_Upsample_Shortcut2(ModelMixin, ConfigMixin):
             ]))
 
         # arguments
-        common_kwargs = dict(
+        kwargs = dict(
             e=e0,
             seq_lens=seq_lens,
             grid_sizes=grid_sizes,
             freqs=self.freqs,
             context=context,
-            context_lens=context_lens)
+            context_lens=context_lens,
+            lr_latents=lr_latents,
+        )
 
-        def create_custom_forward(module, **module_kwargs):
-            def custom_forward(*inputs):
-                inp_x, inp_lr_context = inputs
-                return module(inp_x, lr_latents=inp_lr_context, **module_kwargs)
-            return custom_forward
+        for block in self.blocks:
+            x = block(x, **kwargs)
 
-        # TODO: Tune the number of blocks for feature extraction
-        final_x = None
-
-        gan_idx = 0
-        for ii, block in enumerate(self.blocks):
-            if torch.is_grad_enabled() and self.gradient_checkpointing:
-                x = torch.utils.checkpoint.checkpoint(
-                    create_custom_forward(block, **common_kwargs),
-                    x, 
-                    lr_latents, 
-                    use_reentrant=False,
-                )
-            else:
-                x = block(x, lr_latents=lr_latents, **common_kwargs)
-                
-                #print(f"the shape in {ii}, x.shape: {x.shape}")
-                
-        
+        # head
         x = self.head(x, e)
 
         # unpatchify
         x = self.unpatchify(x, grid_sizes)
+        return [u.float() for u in x]
 
-        if classify_mode:
-            return torch.stack(x), final_x
-
-        return torch.stack(x)
-        #return [u for u in x]
-    
-
-    def unpatchify(self, x, grid_sizes, c=None):
+    def unpatchify(self, x, grid_sizes):
         r"""
         Reconstruct video tensors from patch embeddings.
 
@@ -955,7 +831,7 @@ class WanModel_Upsample_Shortcut2(ModelMixin, ConfigMixin):
                 Reconstructed video tensors with shape [C_out, F, H / 8, W / 8]
         """
 
-        c = self.out_dim if c is None else c
+        c = self.out_dim
         out = []
         for u, v in zip(x, grid_sizes.tolist()):
             u = u[:math.prod(v)].view(*v, *self.patch_size, c)
@@ -987,84 +863,3 @@ class WanModel_Upsample_Shortcut2(ModelMixin, ConfigMixin):
 
         # init output layer
         nn.init.zeros_(self.head.head.weight)
-        
-        
-    def reinit_patch_embedding(self, new_in_dim: int, new_param_init: str = "copy"):
-        """重新构造 `patch_embedding` 以适配更大的输入通道数。
-
-        Args:
-            new_in_dim (int): 新的输入通道数（如 96）。
-            new_param_init (str): 对新增通道权重的初始化方式，支持 "copy" | "zero"。
-        """
-        old_in_dim = self.config.in_dim  # 旧的输入通道数（如 48）
-        if new_in_dim <= old_in_dim:
-            raise ValueError(
-                f"new_in_dim({new_in_dim}) 必须大于旧的 in_dim({old_in_dim})")
-
-        # 保存旧卷积权重与 bias
-        old_weight = self.patch_embedding.weight.detach().clone()
-        old_bias = self.patch_embedding.bias.detach().clone()
-
-        # 构造新的卷积层，并保持 device / dtype 与旧权重一致
-        new_conv = torch.nn.Conv3d(
-            new_in_dim,
-            old_weight.shape[0],
-            kernel_size=self.patch_size,  # 与 __init__ 保持一致
-            stride=self.patch_size,
-            bias=True,
-        ).to(old_weight.device, dtype=old_weight.dtype)
-
-        with torch.no_grad():
-            # 复制旧通道权重
-            new_conv.weight[:, :old_in_dim] = old_weight
-
-            # 处理新增通道
-            extra_c = new_in_dim - old_in_dim
-            if new_param_init == "zero":
-                new_conv.weight[:, old_in_dim:] = 0.0
-            elif new_param_init == "copy":
-                # 复制模式要求新通道数必须是旧通道数的整数倍
-                if extra_c % old_in_dim != 0:
-                    raise ValueError(
-                        f"In 'copy' mode, (new_in_dim({new_in_dim}) - old_in_dim({old_in_dim})) must be divisible by old_in_dim({old_in_dim})")
-                # 将旧权重循环填充到新增通道
-                repeat_times = extra_c // old_in_dim
-                repeated = old_weight.repeat(1, repeat_times, 1, 1, 1)
-                new_conv.weight[:, old_in_dim:] = repeated
-            else:
-                raise ValueError(f"Invalid new_param_init: {new_param_init}")
-            new_conv.bias = torch.nn.Parameter(old_bias)
-
-        # 替换并同步配置
-        self.patch_embedding = new_conv
-        self.config.in_dim = new_in_dim
-        self.in_dim = new_in_dim
-        
-        
-if __name__ == "__main__":
-    
-    
-    
-    model = WanModel_Upsample_Shortcut.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B", )
-    model, lr_layers = register_spatial_control(model)
-    
-    model.eval()
-    model.to("cuda", dtype=torch.bfloat16)
-    with torch.no_grad():
-        lr_x = torch.randn(1, 48, 13, 16, 26, device="cuda", dtype=torch.bfloat16) # [B, F, C, H, W]
-        
-        
-        noisy_image_or_video = torch.randn(1, 13, 48, 16, 26).to("cuda").to(dtype=torch.bfloat16)
-        input_timestep = torch.randint(0, 1000, (1,)).to("cuda").to(dtype=torch.bfloat16)
-        prompt_embeds = torch.randn(1, 512, 4096).to("cuda").to(dtype=torch.bfloat16)
-        seq_len = 13*8*13
-        
-        flow_pred = model(
-                    noisy_image_or_video.permute(0, 2, 1, 3, 4),  # [b, c, t, h, w]
-                    t=input_timestep, 
-                    context=prompt_embeds,
-                    seq_len=seq_len,
-                    lr_latents=lr_x # 只需要这一路输入
-                ).permute(0, 2, 1, 3, 4)
-        
-        print("flow_pred: ", flow_pred.shape)

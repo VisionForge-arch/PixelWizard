@@ -150,8 +150,17 @@ class WanModel_Trainer:
                 state_dict = state_dict["generator"]
             elif "model" in state_dict:
                 state_dict = state_dict["model"]
-            # Allow missing keys for newly added shortcut dt embeddings.
-            self.model.generator.load_state_dict(state_dict, strict=False)
+            # Allow missing keys for newly added shortcut dt embeddings / adapter dt branch.
+            incompatible = self.model.generator.load_state_dict(state_dict, strict=False)
+            if self.is_main_process and (incompatible.missing_keys or incompatible.unexpected_keys):
+                print(
+                    f"Generator ckpt load: missing_keys={len(incompatible.missing_keys)}, "
+                    f"unexpected_keys={len(incompatible.unexpected_keys)}"
+                )
+                if incompatible.missing_keys:
+                    print("  missing_keys (first 20):", incompatible.missing_keys[:20])
+                if incompatible.unexpected_keys:
+                    print("  unexpected_keys (first 20):", incompatible.unexpected_keys[:20])
             
 
         ##############################################################################################################
