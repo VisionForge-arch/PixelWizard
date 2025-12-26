@@ -361,7 +361,16 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                 dt_candidates = self._dt_idx_candidates_non_uniform(
                     num_steps=num_steps, device=self.device, t_idx_sc=t_idx_sc
                 )  # [B_sc, K]
-                k = torch.randint(0, dt_candidates.size(1), (t_idx_sc.numel(),), device=self.device)
+                
+                # 构造一个衰减分布，例如 [0.4, 0.2, 0.15, 0.1, 0.05, ...]
+                # 让模型有接近一半的时间都在练“一步跳 T”或者“两步跳 T”
+                num_candidates = dt_candidates.size(1)
+                probs = torch.exp(-torch.arange(num_candidates).to(self.device) * 0.7) 
+                probs = probs / probs.sum()
+                
+                k = torch.multinomial(probs, t_idx_sc.numel(), replacement=True)
+                
+                #k = torch.randint(0, dt_candidates.size(1), (t_idx_sc.numel(),), device=self.device)
                 dt_idx_sc = dt_candidates[torch.arange(t_idx_sc.numel(), device=self.device), k]
                 dt_idx[sc_mask] = dt_idx_sc
 
