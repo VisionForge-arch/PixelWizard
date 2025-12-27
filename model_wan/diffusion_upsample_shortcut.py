@@ -348,7 +348,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
         if cond_frames > 0 and cond_latent.shape[2:] == noisy_latents.shape[2:]:
             noisy_latents[:, :cond_frames] = cond_latent
 
-        dt_weight_power = float(getattr(self.args, "shortcut_dt_weight_power", 0.0))  # weight开关
+        dt_weight_power = float(getattr(self.args, "shortcut_dt_weight_power", 0.5))  # weight开关
         dt_weight_min = float(getattr(self.args, "shortcut_dt_weight_min", 0.1))
         dt_weight_max = float(getattr(self.args, "shortcut_dt_weight_max", 10.0))
         if dt_weight_power != 0.0:
