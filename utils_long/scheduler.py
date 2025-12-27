@@ -214,15 +214,18 @@ class FlowMatchScheduler():
         Shapes:
           - timestep: [N] or [B, T]
           - dt:      same shape as timestep (dt=0 for non-shortcut/FM)
+        Note:
+          Like `training_weight()`, this function always returns a flattened weight tensor [N].
+          If you pass [B, T], the output is [B*T] and you can `.unflatten(0, (B, T))`.
         Returns:
-          - weights: same shape as input timestep
+          - weights: [N]
         """
         if timestep.ndim == 2:
-            orig_shape = timestep.shape
             timestep = timestep.flatten(0, 1)
+        if dt.ndim == 2:
             dt = dt.flatten(0, 1)
-        else:
-            orig_shape = None
+        if dt.ndim != 1 or timestep.ndim != 1 or dt.numel() != timestep.numel():
+            raise ValueError(f"timestep and dt must have the same number of elements; got {timestep.shape=} {dt.shape=}")
 
         timestep = timestep.to(dtype=torch.float32)
         dt = dt.to(dtype=torch.float32)
@@ -253,6 +256,4 @@ class FlowMatchScheduler():
 
             weights = weights * scale
 
-        if orig_shape is not None:
-            weights = weights.unflatten(0, orig_shape)
         return weights
