@@ -279,8 +279,8 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                     # t_idx[sc_mask] = t_idx_sc
                     
                     # -------- None Uniform Sampling --------
-                    t_min = int(getattr(self.args, "shortcut_t_min", 600))
-                    t_max = int(getattr(self.args, "shortcut_t_max", 1000))
+                    t_min = int(getattr(self.args, "shortcut_t_min", 500))
+                    t_max = int(getattr(self.args, "shortcut_t_max", 800))
                     t_stride = int(getattr(self.args, "shortcut_t_stride", 100))  # 600,700,800,...
 
                     anchors = torch.arange(t_min, t_max + 1, t_stride, device=self.device, dtype=torch.float32)

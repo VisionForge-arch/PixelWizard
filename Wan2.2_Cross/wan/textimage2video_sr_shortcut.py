@@ -269,7 +269,7 @@ class WanTI2V_Upsample_Shortcut:
         t_max = float(getattr(self.config, "shortcut_t_max", 1000))
         t_stride = float(getattr(self.config, "shortcut_t_stride", 100))
         snap_t = bool(getattr(self.config, "shortcut_infer_snap_t", True))
-        snap_dt = bool(getattr(self.config, "shortcut_infer_snap_dt", True))
+        snap_dt = bool(getattr(self.config, "shortcut_infer_snap_dt", False))
 
         if snap_dt is False:
             dt_idx = dt_raw
