@@ -271,7 +271,8 @@ class WanTI2V_Upsample_Shortcut:
         snap_dt = bool(getattr(self.config, "shortcut_infer_snap_dt", True))
 
         if snap_dt is False:
-            dt_idx = dt_raw
+            dt_idx = dt_raw.round().to(torch.int64)
+            dt_idx = torch.clamp(dt_idx - (dt_idx % 2), min=2)
         else:
             # --- build GLOBAL dt candidate list from anchors (training support set) ---
             anchors = torch.arange(t_min, t_max + 1, t_stride, device=device, dtype=torch.float32)  # e.g. [600,700,800]
@@ -285,10 +286,15 @@ class WanTI2V_Upsample_Shortcut:
             dt_cands = torch.unique(dt_cands).sort().values                           # [M], global discrete dt set
 
             # --- snap dt_raw to nearest dt in global set ---
-            # distance: [B,M]
-            dist = (dt_cands.to(torch.float32)[None, :] - dt_raw[:, None]).abs()
-            best = torch.argmin(dist, dim=1)
-            dt_idx = dt_cands[best]  # [B]
+            if dt_raw.ndim == 0:
+                dist = (dt_cands.to(torch.float32) - dt_raw.to(torch.float32)).abs()
+                best = torch.argmin(dist)
+                dt_idx = dt_cands[best]
+            else:
+                # distance: [B,M]
+                dist = (dt_cands.to(torch.float32)[None, :] - dt_raw.to(torch.float32)[:, None]).abs()
+                best = torch.argmin(dist, dim=1)
+                dt_idx = dt_cands[best]  # [B]
             
         return dt_idx.to(dtype=torch.int64)
 
