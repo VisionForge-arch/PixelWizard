@@ -157,7 +157,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
         Returns:
             Tensor of shape [B_sc, K] where K = shortcut_min_dt_pow + 1.
         """
-        min_pow = int(getattr(self.args, "shortcut_min_dt_pow", 7))
+        min_pow = int(getattr(self.args, "shortcut_min_dt_pow", 5))
         assert min_pow >= 1
         if t_idx_sc.numel() == 0:
             return torch.empty((0, min_pow + 1), device=device, dtype=torch.long)
@@ -312,11 +312,11 @@ class SelfForcingWan_Upsample_SC(nn.Module):
                 # t_idx[sc_mask] = t_idx_sc
                 
                 # -------- None Uniform Sampling --------
-                t_min = int(getattr(self.args, "shortcut_t_min", 600))
+                t_min = int(getattr(self.args, "shortcut_t_min", 500))
                 t_max = int(getattr(self.args, "shortcut_t_max", 800))
                 t_stride = int(getattr(self.args, "shortcut_t_stride", 100))  # 600,700,800,...
 
-                anchors = torch.arange(t_min, t_max + 1, t_stride, device=self.device, dtype=torch.float32)   # anchors = [600, 700, 800, 900, 1000]
+                anchors = torch.arange(t_min, t_max + 1, t_stride, device=self.device, dtype=torch.float32)   # anchors = [500，600, 700, 800]
 
                 # sample anchor
                 pick = torch.randint(0, anchors.numel(), (sc_mask.sum().item(),), device=self.device)          # 随机选一个 anchor
