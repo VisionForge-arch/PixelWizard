@@ -207,9 +207,9 @@ class FlowMatchScheduler():
         Flow-matching training weights with optional dt-aware reweighting for shortcut training.
 
         Base weights come from `training_weight(timestep)` (depends only on timestep).
-        When `power != 0`, we scale weights by the sigma span over the step:
-            scale = ( |sigma(t - dt) - sigma(t)| / mean(...) ) ** power
-        This helps balance gradients across different shortcut step sizes.
+        When `power != 0`, we scale weights by the absolute sigma span over the step:
+            scale = |sigma(t - dt) - sigma(t)| ** power
+        This helps balance gradients across different shortcut step sizes without relying on batch statistics.
 
         Shapes:
           - timestep: [N] or [B, T]
@@ -249,8 +249,7 @@ class FlowMatchScheduler():
                 sigma_t = sigmas[timestep_id[dt_mask]]
                 sigma_end = sigmas[t_end_id]
                 delta_sigma = (sigma_end - sigma_t).abs().clamp(min=eps)
-                ref = delta_sigma.mean().detach().clamp(min=eps)
-                scale_dt = (delta_sigma / ref) ** power
+                scale_dt = delta_sigma ** power
                 scale_dt = scale_dt.clamp(min=w_min, max=w_max)
                 scale[dt_mask] = scale_dt
 
