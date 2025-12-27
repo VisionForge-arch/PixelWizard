@@ -192,3 +192,67 @@ class FlowMatchScheduler():
             (self.timesteps.unsqueeze(1) - timestep.unsqueeze(0)).abs(), dim=0)
         weights = self.linear_timesteps_weights[timestep_id]
         return weights
+
+    def training_weight_shortcut(
+        self,
+        timestep: torch.Tensor,
+        dt: torch.Tensor,
+        *,
+        power: float = 0.0,
+        w_min: float = 0.1,
+        w_max: float = 10.0,
+        eps: float = 1e-8,
+    ) -> torch.Tensor:
+        """
+        Flow-matching training weights with optional dt-aware reweighting for shortcut training.
+
+        Base weights come from `training_weight(timestep)` (depends only on timestep).
+        When `power != 0`, we scale weights by the sigma span over the step:
+            scale = ( |sigma(t - dt) - sigma(t)| / mean(...) ) ** power
+        This helps balance gradients across different shortcut step sizes.
+
+        Shapes:
+          - timestep: [N] or [B, T]
+          - dt:      same shape as timestep (dt=0 for non-shortcut/FM)
+        Returns:
+          - weights: same shape as input timestep
+        """
+        if timestep.ndim == 2:
+            orig_shape = timestep.shape
+            timestep = timestep.flatten(0, 1)
+            dt = dt.flatten(0, 1)
+        else:
+            orig_shape = None
+
+        timestep = timestep.to(dtype=torch.float32)
+        dt = dt.to(dtype=torch.float32)
+
+        # Move schedule tensors to device (keep dtype float32 for stable indexing math).
+        device = timestep.device
+        timesteps = self.timesteps.to(device=device, dtype=torch.float32)
+        sigmas = self.sigmas.to(device=device, dtype=torch.float32)
+        self.linear_timesteps_weights = self.linear_timesteps_weights.to(device=device, dtype=torch.float32)
+
+        timestep_id = torch.argmin((timesteps.unsqueeze(1) - timestep.unsqueeze(0)).abs(), dim=0)
+        weights = self.linear_timesteps_weights[timestep_id]
+
+        if power != 0.0:
+            scale = torch.ones_like(weights)
+            dt_mask = dt > 0
+            if dt_mask.any():
+                t_end = timestep[dt_mask] - dt[dt_mask]
+                t_end_id = torch.argmin((timesteps.unsqueeze(1) - t_end.unsqueeze(0)).abs(), dim=0)
+
+                sigma_t = sigmas[timestep_id[dt_mask]]
+                sigma_end = sigmas[t_end_id]
+                delta_sigma = (sigma_end - sigma_t).abs().clamp(min=eps)
+                ref = delta_sigma.mean().detach().clamp(min=eps)
+                scale_dt = (delta_sigma / ref) ** power
+                scale_dt = scale_dt.clamp(min=w_min, max=w_max)
+                scale[dt_mask] = scale_dt
+
+            weights = weights * scale
+
+        if orig_shape is not None:
+            weights = weights.unflatten(0, orig_shape)
+        return weights
