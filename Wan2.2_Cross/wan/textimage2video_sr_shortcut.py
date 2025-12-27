@@ -262,29 +262,35 @@ class WanTI2V_Upsample_Shortcut:
         t_cur_f = t_cur.to(dtype=torch.float32)
         t_next_f = t_next.to(dtype=torch.float32)
         dt_raw = (t_cur_f - t_next_f).abs()
+        
 
-        k = int(getattr(self.config, "shortcut_min_dt_pow", 7))
+        k = int(getattr(self.config, "shortcut_min_dt_pow", 5))
         t_min = float(getattr(self.config, "shortcut_t_min", 600))
         t_max = float(getattr(self.config, "shortcut_t_max", 1000))
         t_stride = float(getattr(self.config, "shortcut_t_stride", 100))
         snap_t = bool(getattr(self.config, "shortcut_infer_snap_t", True))
+        snap_dt = bool(getattr(self.config, "shortcut_infer_snap_dt", False))
 
-        if snap_t:
-            anchors = torch.arange(t_min, t_max + 1e-6, t_stride, device=device, dtype=torch.float32)
-            T = anchors[torch.argmin((anchors - t_cur_f).abs())]
+        if snap_dt is False:
+            dt_idx = dt_raw
         else:
-            T = t_cur_f
+            if snap_t:
+                anchors = torch.arange(t_min, t_max + 1e-6, t_stride, device=device, dtype=torch.float32)
+                T = anchors[torch.argmin((anchors - t_cur_f).abs())]
+            else:
+                T = t_cur_f
 
-        powers = torch.arange(0, k + 1, device=device, dtype=torch.long)
-        div = (2**powers).to(dtype=torch.float32)
-        dt_cands = torch.div(T, div, rounding_mode="floor").to(dtype=torch.int64)  # [K]
+            powers = torch.arange(0, k + 1, device=device, dtype=torch.long)
+            div = (2**powers).to(dtype=torch.float32)
+            dt_cands = torch.div(T, div, rounding_mode="floor").to(dtype=torch.int64)  # [K]
 
-        # ensure dt/2 is an integer-like jump and keep dt >= 2
-        dt_cands = torch.clamp(dt_cands, min=2)
-        dt_cands = dt_cands - (dt_cands % 2)
-        dt_cands = torch.clamp(dt_cands, min=2)
+            # ensure dt/2 is an integer-like jump and keep dt >= 2
+            dt_cands = torch.clamp(dt_cands, min=2)
+            dt_cands = dt_cands - (dt_cands % 2)
+            dt_cands = torch.clamp(dt_cands, min=2)
 
-        dt_idx = dt_cands[torch.argmin((dt_cands.to(torch.float32) - dt_raw).abs())]
+            dt_idx = dt_cands[torch.argmin((dt_cands.to(torch.float32) - dt_raw).abs())]
+            
         return dt_idx.to(dtype=torch.int64)
 
     def generate(self,
