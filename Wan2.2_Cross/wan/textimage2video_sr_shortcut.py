@@ -268,28 +268,27 @@ class WanTI2V_Upsample_Shortcut:
         t_min = float(getattr(self.config, "shortcut_t_min", 600))
         t_max = float(getattr(self.config, "shortcut_t_max", 1000))
         t_stride = float(getattr(self.config, "shortcut_t_stride", 100))
-        snap_t = bool(getattr(self.config, "shortcut_infer_snap_t", True))
-        snap_dt = bool(getattr(self.config, "shortcut_infer_snap_dt", False))
+        snap_dt = bool(getattr(self.config, "shortcut_infer_snap_dt", True))
 
         if snap_dt is False:
             dt_idx = dt_raw
         else:
-            if snap_t:
-                anchors = torch.arange(t_min, t_max + 1e-6, t_stride, device=device, dtype=torch.float32)
-                T = anchors[torch.argmin((anchors - t_cur_f).abs())]
-            else:
-                T = t_cur_f
+            # --- build GLOBAL dt candidate list from anchors (training support set) ---
+            anchors = torch.arange(t_min, t_max + 1, t_stride, device=device, dtype=torch.float32)  # e.g. [600,700,800]
+            powers = torch.arange(0, k + 1, device=device, dtype=torch.float32)                      # [0..k]
+            div = (2.0 ** powers)[None, :]                                                           # [1,K]
 
-            powers = torch.arange(0, k + 1, device=device, dtype=torch.long)
-            div = (2**powers).to(dtype=torch.float32)
-            dt_cands = torch.div(T, div, rounding_mode="floor").to(dtype=torch.int64)  # [K]
-
-            # ensure dt/2 is an integer-like jump and keep dt >= 2
+            dt_cands = torch.floor(anchors[:, None] / div).to(torch.long).reshape(-1)  # [A*K]
             dt_cands = torch.clamp(dt_cands, min=2)
             dt_cands = dt_cands - (dt_cands % 2)
             dt_cands = torch.clamp(dt_cands, min=2)
+            dt_cands = torch.unique(dt_cands).sort().values                           # [M], global discrete dt set
 
-            dt_idx = dt_cands[torch.argmin((dt_cands.to(torch.float32) - dt_raw).abs())]
+            # --- snap dt_raw to nearest dt in global set ---
+            # distance: [B,M]
+            dist = (dt_cands.to(torch.float32)[None, :] - dt_raw[:, None]).abs()
+            best = torch.argmin(dist, dim=1)
+            dt_idx = dt_cands[best]  # [B]
             
         return dt_idx.to(dtype=torch.int64)
 
