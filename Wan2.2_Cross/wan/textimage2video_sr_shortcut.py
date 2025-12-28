@@ -264,11 +264,11 @@ class WanTI2V_Upsample_Shortcut:
         dt_raw = (t_cur_f - t_next_f).abs()
         
 
-        k = int(getattr(self.config, "shortcut_min_dt_pow", 6))
-        t_min = float(getattr(self.config, "shortcut_t_min", 600))
-        t_max = float(getattr(self.config, "shortcut_t_max", 1000))
+        k = int(getattr(self.config, "shortcut_min_dt_pow", 5))
+        t_min = float(getattr(self.config, "shortcut_t_min", 500))
+        t_max = float(getattr(self.config, "shortcut_t_max", 800))
         t_stride = float(getattr(self.config, "shortcut_t_stride", 100))
-        snap_dt = bool(getattr(self.config, "shortcut_infer_snap_dt", True))
+        snap_dt = bool(getattr(self.config, "shortcut_infer_snap_dt", False))
 
         if snap_dt is False:
             dt_idx = dt_raw.round().to(torch.int64)
