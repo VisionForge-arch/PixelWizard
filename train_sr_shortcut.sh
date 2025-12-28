@@ -5,7 +5,7 @@ torchrun --standalone --nproc_per_node=8 \
   train_sr.py \
   --height=2144 \
   --width=3840 \
-  --num_frames=81 \
+  --num_frames=69 \
   --config_path=/root/ultrawan/configs/self_forcing_dmd_4k.yaml \
   --logdir=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/4k_shortcut \
   --generator_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_latent_up_2_time_modulation2/checkpoint_model_000800/model.pt \
