@@ -3,7 +3,6 @@ export WANDB_MODE=offline
 
 torchrun --standalone --nproc_per_node=8 \
   train_sr.py \
-  --max_pixels=3840*2144 \
   --height=2144 \
   --width=3840 \
   --config_path=/root/ultrawan/configs/self_forcing_dmd_4k.yaml \
