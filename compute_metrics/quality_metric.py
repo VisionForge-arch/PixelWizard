@@ -30,10 +30,7 @@ import torch.nn.functional as F
 import torchvision
 from torchvision.io import read_video
 
-try:
-    import lpips
-except ImportError:
-    lpips = None
+import lpips
 
 try:
     from scipy import linalg
