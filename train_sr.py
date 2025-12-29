@@ -50,7 +50,6 @@ def main():
     config.dataset_metadata_path = args.dataset_metadata_path
     config.dataset_repeat = args.dataset_repeat
     config.data_file_keys = args.data_file_keys
-    config.max_pixels = args.max_pixels
     config.height = args.height
     config.width = args.width
     config.num_frames = args.num_frames
@@ -63,6 +62,8 @@ def main():
     config.trainable_backbone = args.trainable_backbone
     config.load_generator_ckpt = args.load_generator_ckpt
     config.use_ema = args.use_ema
+    args.max_pixels = args.height * args.width
+    config.max_pixels = args.max_pixels
     
     time_part = int((config.num_frames - 1) // config.time_division_factor) + 1
     config.seq_len = int(config.height // 32) * int(config.width // 32) * time_part
