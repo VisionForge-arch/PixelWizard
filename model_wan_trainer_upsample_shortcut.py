@@ -221,7 +221,7 @@ class WanModel_Trainer:
         
         
         # ========== 瓶颈缩放 =============
-        down_factor = random.uniform(8, 32)  # 2K (2048) / 32 = 64 pixel，非常糊
+        down_factor = random.uniform(8, 16)  # 2K (2048) / 32 = 64 pixel，非常糊
         
         # 计算瓶颈尺寸
         h, w = hr_frames.shape[-2:]
@@ -235,8 +235,8 @@ class WanModel_Trainer:
         guidance = F.interpolate(tiny_frames, size=target_size, mode='bilinear', align_corners=False)
         
         # ======= 高斯模糊 =============
-        k = random.choice([7, 8, 9])
-        sigma = random.uniform(3.0, 4.0)
+        k = random.choice([7, 8, 9, 10])
+        sigma = random.uniform(3.0, 4.3)
         guidance = TF.gaussian_blur(guidance, kernel_size=k, sigma=sigma)
         
         
