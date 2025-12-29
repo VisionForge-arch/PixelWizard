@@ -90,16 +90,20 @@ def hd_mse_single(video_tchw: torch.Tensor, ks=(3, 4, 5), down_mode="bilinear", 
     return float(total)
 
 
-def load_lpips_alexnet(device="cuda",
-                       weight_path="/mnt/nas01-ak/IndividualDirs/wenxueli/Weight/alexnet-owt-7be5be79.pth"):
-    loss_fn = lpips.LPIPS(
-        net="alex", 
-        version="0.1", # 明确版本，避免因版本检测去联网
-        model_path=weight_path)
+def load_lpips_alexnet(device="cuda", weight_path="/mnt/nas01-ak/IndividualDirs/wenxueli/Weight/alexnet-owt-7be5be79.pth"):
+    loss_fn = lpips.LPIPS(net="alex", version="0.1", model_path=weight_path)
 
-    loss_fn.to(device).eval()
-    loss_fn.scaling_layer.shift = loss_fn.scaling_layer.shift.to(device)
-    loss_fn.scaling_layer.scale = loss_fn.scaling_layer.scale.to(device)
+    sc = loss_fn.scaling_layer
+    if isinstance(getattr(sc, "shift", None), torch.Tensor) and "shift" not in sc._buffers:
+        shift, scale = sc.shift, sc.scale
+        try:
+            del sc.shift; del sc.scale
+        except AttributeError:
+            pass
+        sc.register_buffer("shift", shift)
+        sc.register_buffer("scale", scale)
+
+    loss_fn = loss_fn.to(device).eval()
     return loss_fn
 
 @torch.no_grad()
