@@ -19,7 +19,6 @@ Usage:
 """
 
 import os
-os.environ['TORCH_HOME'] = '/mnt/nas01-ak/IndividualDirs/wenxueli/Weight/'
 import glob
 import argparse
 from typing import List, Tuple, Optional
