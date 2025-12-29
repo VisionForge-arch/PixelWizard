@@ -234,7 +234,7 @@ def compute_stats(feats: np.ndarray):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--gen_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/eval_100/240p_5s")
+    parser.add_argument("--gen_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/eval_100/240p_5s/decoded_video")
     parser.add_argument("--ref_dir", type=str, default=None, help="Needed for HD-FVD")
     parser.add_argument("--max_videos", type=int, default=None)
     parser.add_argument("--max_frames", type=int, default=None, help="Optional cap when loading for HD-MSE/LPIPS")
