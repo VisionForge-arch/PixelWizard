@@ -98,6 +98,8 @@ def load_lpips_alexnet(device="cuda",
         model_path=weight_path)
 
     loss_fn.to(device).eval()
+    loss_fn.scaling_layer.shift = loss_fn.scaling_layer.shift.to(device)
+    loss_fn.scaling_layer.scale = loss_fn.scaling_layer.scale.to(device)
     return loss_fn
 
 @torch.no_grad()
