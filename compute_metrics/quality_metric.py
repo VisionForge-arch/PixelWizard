@@ -19,6 +19,7 @@ Usage:
 """
 
 import os
+os.environ['TORCH_HOME'] = '/mnt/nas01-ak/IndividualDirs/wenxueli/Weight/'
 import glob
 import argparse
 from typing import List, Tuple, Optional
@@ -90,7 +91,10 @@ def hd_mse_single(video_tchw: torch.Tensor, ks=(3, 4, 5), down_mode="bilinear", 
 
 def load_lpips_alexnet(device="cuda",
                        weight_path="/mnt/nas01-ak/IndividualDirs/wenxueli/Weight/alexnet-owt-7be5be79.pth"):
-    loss_fn = lpips.LPIPS(net="alex", model_path=weight_path)
+    loss_fn = lpips.LPIPS(
+        net="alex", 
+        version="0.1", # 明确版本，避免因版本检测去联网
+        model_path=weight_path)
 
     loss_fn.eval().to(device)
     return loss_fn
