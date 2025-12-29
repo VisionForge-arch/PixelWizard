@@ -26,6 +26,7 @@ from typing import List, Tuple, Optional
 import numpy as np
 from tqdm import tqdm
 import torch
+os.environ['TORCH_HOME'] = '/mnt/nas01-ak/IndividualDirs/wenxueli/Weight/'
 print(torch.hub.get_dir())
 import torch.nn.functional as F
 import torchvision
