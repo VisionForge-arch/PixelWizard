@@ -235,7 +235,7 @@ class WanModel_Trainer:
         guidance = F.interpolate(tiny_frames, size=target_size, mode='bilinear', align_corners=False)
         
         # ======= 高斯模糊 =============
-        k = random.choice([7, 8, 9, 10])
+        k = random.choice([7, 9])
         sigma = random.uniform(3.0, 4.3)
         guidance = TF.gaussian_blur(guidance, kernel_size=k, sigma=sigma)
         
