@@ -93,10 +93,7 @@ def hd_mse_single(video_tchw: torch.Tensor, ks=(3, 4, 5), down_mode="bilinear", 
 
 def load_lpips_alexnet(device="cuda",
                        weight_path="/mnt/nas01-ak/IndividualDirs/wenxueli/Weight/alexnet-owt-7be5be79.pth"):
-    loss_fn = lpips.LPIPS(net="alex", pretrained=False)
-    
-    state_dict = torch.load(weight_path, map_location="cpu")
-    loss_fn.net.load_state_dict(state_dict, strict=True)
+    loss_fn = lpips.LPIPS(net="alex", model_path=weight_path)
 
     loss_fn.eval().to(device)
     return loss_fn
