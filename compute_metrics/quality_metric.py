@@ -115,8 +115,9 @@ def hd_lpips_single(video_tchw: torch.Tensor, lpips_fn, ks=(3, 4, 5),
     """
     T, C, H, W = video_tchw.shape
     assert C == 3, "LPIPS expects 3-channel RGB."
-
-    x = video_tchw  # [T,3,H,W] in [0,1]
+    
+    device = next(lpips_fn.parameters()).device
+    x = video_tchw.to(device=device, dtype=torch.float32)  # [T,3,H,W] in [0,1]
     x_n = x * 2.0 - 1.0
 
     total = 0.0
@@ -128,7 +129,7 @@ def hd_lpips_single(video_tchw: torch.Tensor, lpips_fn, ks=(3, 4, 5),
         xu = F.interpolate(xd, size=(H, W), mode=up_mode, align_corners=False if up_mode in ("bilinear", "bicubic") else None)
         xu_n = xu * 2.0 - 1.0
 
-        print("x_n", x_n.device, "shift", lpips_fn.scaling_layer.shift.device, "param", next(lpips_fn.parameters()).device)
+        #print("x_n", x_n.device, "shift", lpips_fn.scaling_layer.shift.device, "param", next(lpips_fn.parameters()).device)
         # batch frames
         d = lpips_fn(x_n, xu_n)  # [T,1,1,1] or [T,1]
         total += float(d.mean().item())
