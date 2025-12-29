@@ -97,7 +97,7 @@ def load_lpips_alexnet(device="cuda",
         version="0.1", # 明确版本，避免因版本检测去联网
         model_path=weight_path)
 
-    loss_fn.eval().to(device)
+    loss_fn.to(device).eval()
     return loss_fn
 
 @torch.no_grad()
