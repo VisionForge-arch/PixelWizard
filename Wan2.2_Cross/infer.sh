@@ -1,6 +1,6 @@
-export CUDA_VISIBLE_DEVICES=1,2,3,4,5,6,7
+export CUDA_VISIBLE_DEVICES=2,3,4,5,6,7
 
-torchrun --standalone --nproc_per_node=7 \
+torchrun --standalone --nproc_per_node=6 \
     generate_multiple_upsample_shortcut.py \
     --size=3840*2144 \
     --sample_steps=4 \
@@ -11,4 +11,4 @@ torchrun --standalone --nproc_per_node=7 \
     --sample_shift=5.8 \
     --dit_fsdp \
     --t5_fsdp \
-    --ulysses_size 7 \
+    --ulysses_size 6 \
