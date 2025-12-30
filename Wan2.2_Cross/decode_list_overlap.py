@@ -264,10 +264,10 @@ if __name__ == "__main__":
     parser.add_argument("--input_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/720p_upsample_first10")
     parser.add_argument("--output_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/720p_upsample_first10/decode_video")
     parser.add_argument("--vae_path", type=str, default="/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B/Wan2.2_VAE.pth")
-    parser.add_argument("--num_patches", type=int, default=2, help="分成几个patch进行decode，默认4")
+    parser.add_argument("--num_patches", type=int, default=3, help="分成几个patch进行decode，默认4")
     parser.add_argument("--patch_dim", type=str, default="w", choices=['h', 'w'], help="在哪个维度分割，h=高度，w=宽度")
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--overlap", type=int, default=4)
+    parser.add_argument("--overlap", type=int, default=3)
     args = parser.parse_args()
     
     # 创建输出目录

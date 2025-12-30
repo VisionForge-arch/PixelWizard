@@ -1,5 +1,14 @@
-torchrun --nproc_per_node=4 \
-    generate.py \
+export CUDA_VISIBLE_DEVICES=1,2,3,4,5,6,7
+
+torchrun --standalone --nproc_per_node=7 \
+    generate_multiple_upsample_shortcut.py \
+    --size=3840*2144 \
+    --sample_steps=4 \
+    --prompt_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/prompt_to_file_240p.json \
+    --wan_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/4k_shortcut/checkpoint_model_001050/model.pt \
+    --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_upsample_4k_shortcut/pt \
+    --frame_num=121 \
+    --sample_shift=5.8 \
     --dit_fsdp \
     --t5_fsdp \
-    --ulysses_size 4 \
+    --ulysses_size 7 \
