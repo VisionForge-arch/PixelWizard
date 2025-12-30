@@ -267,7 +267,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_patches", type=int, default=2, help="分成几个patch进行decode，默认4")
     parser.add_argument("--patch_dim", type=str, default="w", choices=['h', 'w'], help="在哪个维度分割，h=高度，w=宽度")
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--overlap", type=int, default=8)
+    parser.add_argument("--overlap", type=int, default=4)
     args = parser.parse_args()
     
     # 创建输出目录
