@@ -217,6 +217,25 @@ class LoadVideo(DataProcessingOperator):
     
 
 
+class LoadTorchLatent(DataProcessingOperator):
+    def __init__(self, map_location="cpu", latent_keys=("latent")):
+        self.map_location = map_location
+        self.latent_keys = tuple(latent_keys)
+
+    def __call__(self, data: str) -> torch.Tensor:
+        loaded = torch.load(data, map_location=self.map_location)
+        if isinstance(loaded, torch.Tensor):
+            return loaded
+        if isinstance(loaded, dict):
+            for k in self.latent_keys:
+                v = loaded.get(k, None)
+                if isinstance(v, torch.Tensor):
+                    return v
+        raise TypeError(
+            f"Unsupported .pt content from {data}: expected a Tensor or dict with keys {self.latent_keys} -> Tensor."
+        )
+
+
 class UnifiedDataset(torch.utils.data.Dataset):
     def __init__(
         self, 
@@ -263,6 +282,7 @@ class UnifiedDataset(torch.utils.data.Dataset):
                     gpu_id=gpu_id,
                     sampling_strategy=sampling_strategy,
                 )),
+                (("pt",), LoadTorchLatent()),
             ])),
         ])
     
@@ -361,4 +381,3 @@ if __name__ == "__main__":
         #break
         
 '''
-

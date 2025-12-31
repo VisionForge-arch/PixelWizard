@@ -12,6 +12,8 @@ import glob
 from wan.modules.vae2_2 import Wan2_2_VAE, unpatchify
 
 
+
+
 def build_spatial_blend_mask(
     patch_h,
     patch_w,
