@@ -5,7 +5,7 @@ import json
 
 # === 配置路径 ===
 prompt_txt = "/root/ultrawan/Wan2.2/prompt3.txt"                   # 每行一个 prompt
-video_dir  = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_woman/decoded_video"        # 存放 .mp4 或 .pt 文件的目录
+video_dir  = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_woman/pt"        # 存放 .mp4 或 .pt 文件的目录
 
 
 pat = re.compile(r"^ti2v-5B_448\*256_8_(?:\+?prompt_)?(?P<frag>.+?)_\d{8}_\d{6}\.(?:pt|mp4)$")
@@ -39,13 +39,15 @@ for p in prompts:
         cand = difflib.get_close_matches(np, frags, n=1, cutoff=0.75)
         if cand:
             exact = next(fn for fn, frag in file_frag_by_name.items() if frag == cand[0])
-    mapping.append({
-        "prompt": p,
-        "normalized": np,
-        "file": os.path.join(video_dir, exact) if exact else None
-    })
+    
+    if exact is not None:
+        mapping.append({
+            "prompt": p,
+            "normalized": np,
+            "file": os.path.join(video_dir, exact)
+        })
 
-out_json = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/woman_240p.json"
+out_json = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/woman_240p_pt.json"
 with open(out_json, "w", encoding="utf-8") as f:
     json.dump(mapping, f, indent=2, ensure_ascii=False)
 
