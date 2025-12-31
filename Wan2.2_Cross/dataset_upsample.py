@@ -224,19 +224,23 @@ class LoadTorchLatent(DataProcessingOperator):
             latent_keys = (latent_keys,)
         self.latent_keys = tuple(latent_keys)
 
-    def __call__(self, data: str):
+    def __call__(self, data: str) -> torch.Tensor:
         loaded = torch.load(data, map_location=self.map_location)
         if isinstance(loaded, torch.Tensor):
             return loaded
         if isinstance(loaded, (list, tuple)) and all(isinstance(x, torch.Tensor) for x in loaded):
-            return list(loaded)
+            if len(loaded) == 0:
+                raise ValueError(f"Empty latent list in {data}")
+            return loaded[0]
         if isinstance(loaded, dict):
             for k in self.latent_keys:
                 v = loaded.get(k, None)
                 if isinstance(v, torch.Tensor):
                     return v
                 if isinstance(v, (list, tuple)) and all(isinstance(x, torch.Tensor) for x in v):
-                    return list(v)
+                    if len(v) == 0:
+                        raise ValueError(f"Empty latent list for key {k!r} in {data}")
+                    return v[0]
         raise TypeError(
             f"Unsupported .pt content from {data}: expected a Tensor, a list/tuple of Tensors, "
             f"or a dict with keys {self.latent_keys} -> Tensor/list[Tensor]."
