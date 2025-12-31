@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=2,3,4,5,6,7
+export CUDA_VISIBLE_DEVICES=2,1,4,5,6,7
 
 torchrun --standalone --nproc_per_node=6 \
     generate_multiple_upsample_shortcut.py \
