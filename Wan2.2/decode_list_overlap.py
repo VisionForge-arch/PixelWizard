@@ -4,11 +4,67 @@
 用法: python decode_list.py
 """
 import argparse
+import math
 import torch
 import gc
 import os
 import glob
 from wan.modules.vae2_2 import Wan2_2_VAE, unpatchify
+
+
+
+
+def build_spatial_blend_mask(
+    patch_h,
+    patch_w,
+    *,
+    overlap_h=0,
+    overlap_w=0,
+    is_bound=(False, False, False, False),
+    device="cpu",
+    dtype=torch.float32,
+):
+    """
+    构造 2D 平滑融合 mask（用于 overlap 区域的平滑过渡）。
+
+    思路：对 patch 的边缘做余弦窗衰减（全图边界处不衰减），避免拼接缝。
+    返回 shape: (1, 1, patch_h, patch_w)，可广播到 (C, T, H, W)。
+    """
+
+    def cosine_ramp(length):
+        if length <= 0:
+            return torch.empty((0,), device=device, dtype=dtype)
+        if length == 1:
+            return torch.zeros((1,), device=device, dtype=dtype)
+        t = torch.linspace(0, 1, steps=length, device=device, dtype=dtype)
+        return 0.5 - 0.5 * torch.cos(math.pi * t)  # 0 -> 1
+
+    top, bottom, left, right = is_bound
+
+    patch_h = int(patch_h)
+    patch_w = int(patch_w)
+    overlap_h = int(min(max(overlap_h, 0), patch_h))
+    overlap_w = int(min(max(overlap_w, 0), patch_w))
+
+    mask_h = torch.ones((patch_h,), device=device, dtype=dtype)
+    mask_w = torch.ones((patch_w,), device=device, dtype=dtype)
+
+    if overlap_h > 0:
+        ramp = cosine_ramp(overlap_h)
+        if not top:
+            mask_h[:overlap_h] *= ramp
+        if not bottom:
+            mask_h[-overlap_h:] *= ramp.flip(0)
+
+    if overlap_w > 0:
+        ramp = cosine_ramp(overlap_w)
+        if not left:
+            mask_w[:overlap_w] *= ramp
+        if not right:
+            mask_w[-overlap_w:] *= ramp.flip(0)
+
+    mask = mask_h[:, None] * mask_w[None, :]
+    return mask.unsqueeze(0).unsqueeze(0)
 
 
 def decode_latent_gpu_chunked(
@@ -105,21 +161,41 @@ def decode_latent_gpu_chunked(
             final_video = torch.zeros((C_dec, T_dec, H_out, W_out), dtype=torch.float32)
             weight = torch.zeros((1, 1, H_out, W_out), dtype=torch.float32)
 
-        # ------------ 累加到 final_video + weight ------------
+        # ------------ 累加到 final_video + weight（用平滑 mask 融合 overlap）------------
         if patch_dim == 'h':
             out_h_start = h_start * scale_h
             out_h_end   = h_end * scale_h
             ph = patch_decoded.shape[2]
             assert ph == (out_h_end - out_h_start), "patch height mismatch"
-            final_video[:, :, out_h_start:out_h_end, :] += patch_decoded
-            weight[:, :, out_h_start:out_h_end, :] += 1.0
+            mask = build_spatial_blend_mask(
+                ph,
+                patch_decoded.shape[3],
+                overlap_h=overlap * scale_h,
+                overlap_w=0,
+                is_bound=(i == 0, i == num_patches - 1, True, True),
+                device=final_video.device,
+                dtype=final_video.dtype,
+            )
+            patch_decoded = patch_decoded.to(dtype=final_video.dtype)
+            final_video[:, :, out_h_start:out_h_end, :] += patch_decoded * mask
+            weight[:, :, out_h_start:out_h_end, :] += mask
         else:  # w
             out_w_start = w_start * scale_w
             out_w_end   = w_end * scale_w
             pw = patch_decoded.shape[3]
             assert pw == (out_w_end - out_w_start), "patch width mismatch"
-            final_video[:, :, :, out_w_start:out_w_end] += patch_decoded
-            weight[:, :, :, out_w_start:out_w_end] += 1.0
+            mask = build_spatial_blend_mask(
+                patch_decoded.shape[2],
+                pw,
+                overlap_h=0,
+                overlap_w=overlap * scale_w,
+                is_bound=(True, True, i == 0, i == num_patches - 1),
+                device=final_video.device,
+                dtype=final_video.dtype,
+            )
+            patch_decoded = patch_decoded.to(dtype=final_video.dtype)
+            final_video[:, :, :, out_w_start:out_w_end] += patch_decoded * mask
+            weight[:, :, :, out_w_start:out_w_end] += mask
 
         # 清理显存
         del patch_latents, patch_decoded
@@ -128,7 +204,7 @@ def decode_latent_gpu_chunked(
     
     # ------------ 归一化：对 overlap 区域做平均 ------------
     # 避免除以0（理论上不会有0，但保险）
-    weight[weight == 0] = 1.0
+    weight = weight.clamp_min(1e-6)
     final_video = final_video / weight
 
     # 保存视频
@@ -190,10 +266,10 @@ if __name__ == "__main__":
     parser.add_argument("--input_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/720p_upsample_first10")
     parser.add_argument("--output_dir", type=str, default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/720p_upsample_first10/decode_video")
     parser.add_argument("--vae_path", type=str, default="/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B/Wan2.2_VAE.pth")
-    parser.add_argument("--num_patches", type=int, default=2, help="分成几个patch进行decode，默认4")
+    parser.add_argument("--num_patches", type=int, default=3, help="分成几个patch进行decode，默认4")
     parser.add_argument("--patch_dim", type=str, default="w", choices=['h', 'w'], help="在哪个维度分割，h=高度，w=宽度")
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--overlap", type=int, default=4)
+    parser.add_argument("--overlap", type=int, default=3)
     args = parser.parse_args()
     
     # 创建输出目录
