@@ -45,7 +45,7 @@ for p in prompts:
         "file": os.path.join(video_dir, exact) if exact else None
     })
 
-out_json = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/woman_240p.json"
+out_json = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/woman_240p.json"
 with open(out_json, "w", encoding="utf-8") as f:
     json.dump(mapping, f, indent=2, ensure_ascii=False)
 
