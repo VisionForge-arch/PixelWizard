@@ -5,7 +5,7 @@ import json
 
 # === 配置路径 ===
 prompt_txt = "/root/ultrawan/Wan2.2/prompt3.txt"                   # 每行一个 prompt
-video_dir  = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_woman/decode_video"        # 存放 .mp4 或 .pt 文件的目录
+video_dir  = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_woman/decoded_video"        # 存放 .mp4 或 .pt 文件的目录
 
 
 pat = re.compile(r"^ti2v-5B_448\*256_4_(?:\+?prompt_)?(?P<frag>.+?)_\d{8}_\d{6}\.(?:pt|mp4)$")
