@@ -493,30 +493,43 @@ def generate(args):
                 
             # ========== (A) 准备 cond_latent (480p 条件) ==========
             
+            generate_resolution = SIZE_CONFIGS[resolution]
+            generate_resolution_W, generate_resolution_H = generate_resolution
+            H = int(generate_resolution_H // 16)
+            W = int(generate_resolution_W // 16)
 
-            #video_input = video_input#.permute(0, 2, 1, 3, 4)
-            B, C, T, H, W = video_input.shape
-            video_input = video_input.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W)
-            target_size = (256, 448)
-            h_t, w_t = target_size
-            video_input = F.interpolate(video_input, size=target_size, mode='bilinear', align_corners=False).reshape(B, T, C, h_t, w_t).permute(0, 2, 1, 3, 4)
-            print(video_input.shape)
-
-            with torch.no_grad():
-                cond_latent_lr = encode_to_latent(wan_ti2v, video_input)  # [B,C,T,h',w']
+            if video_input.shape[1] == 48:
+                cond_latent_lr = video_input.to(device=wan_ti2v.device, dtype=torch.float32)  # [B,C,T,h,w]
                 B, C, T, h, w = cond_latent_lr.shape
-                generate_resolution = SIZE_CONFIGS[resolution]
-                generate_resolution_W, generate_resolution_H = generate_resolution
-                H = int(generate_resolution_H // 16)
-                W = int(generate_resolution_W // 16)
+                print("cond_latent_lr(src).shape:", cond_latent_lr.shape)
 
-                print("cond_latent_lr.shape:", cond_latent_lr.shape)
-                cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)  
-                cond_latent_lr = cond_latent_lr.reshape(B*T, C, h, w)  # [B*C, T, h, w]
-                cond_latent_lr = F.interpolate(cond_latent_lr, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
-                cond_latent_lr = cond_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)  # [B*C, T, h, w]
-                #print(cond_latent.shape) # [1, 31, 48, 30, 52]
+                cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)
+                cond_latent_lr = cond_latent_lr.reshape(B * T, C, h, w)
+                cond_latent_lr = F.interpolate(cond_latent_lr, size=(H, W), mode='bilinear', align_corners=False)
+                cond_latent_lr = cond_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)
                 cond_latent_lr = cond_latent_lr.to(device=wan_ti2v.device, dtype=torch.float32)
+            else:
+                #video_input = video_input#.permute(0, 2, 1, 3, 4)
+                B, C, T, H_in, W_in = video_input.shape
+                video_input_resized = video_input.permute(0, 2, 1, 3, 4).reshape(B * T, C, H_in, W_in)
+                target_size = (256, 448)
+                h_t, w_t = target_size
+                video_input_resized = F.interpolate(
+                    video_input_resized, size=target_size, mode='bilinear', align_corners=False
+                ).reshape(B, T, C, h_t, w_t).permute(0, 2, 1, 3, 4)
+                print(video_input_resized.shape)
+
+                with torch.no_grad():
+                    cond_latent_lr = encode_to_latent(wan_ti2v, video_input_resized)  # [B,C,T,h',w']
+                    B, C, T, h, w = cond_latent_lr.shape
+
+                    print("cond_latent_lr.shape:", cond_latent_lr.shape)
+                    cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)
+                    cond_latent_lr = cond_latent_lr.reshape(B * T, C, h, w)
+                    cond_latent_lr = F.interpolate(cond_latent_lr, size=(H, W), mode='bilinear', align_corners=False)
+                    cond_latent_lr = cond_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)
+                    #print(cond_latent.shape) # [1, 31, 48, 30, 52]
+                    cond_latent_lr = cond_latent_lr.to(device=wan_ti2v.device, dtype=torch.float32)
   
  
             video = wan_ti2v.generate(
