@@ -11,6 +11,7 @@
 
 torchrun --nproc_per_node=8 \
     generate_multiple.py \
+    --base_seed=1 \
     --use_ema \
     --dit_fsdp \
     --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_woman/pt \
