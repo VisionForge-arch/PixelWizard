@@ -160,7 +160,7 @@ def _parse_args():
     parser.add_argument(
         "--save_file",
         type=str,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_5s/pt",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_woman/pt",
         help="The file to save the generated video to.")
     parser.add_argument(
         "--prompt",
@@ -298,13 +298,13 @@ def _parse_args():
     parser.add_argument(
         "--prompt_file",
         type=str,
-        default="/root/ultrawan/Wan2.2/prompt_old.txt",
+        default="/root/ultrawan/Wan2.2/prompt3.txt",
         help="The file to read the prompts from.")
     parser.add_argument(
         "--wan_ckpt",
         type=str,
         #default=None,
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p/checkpoint_model_000150/model.pt",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p/checkpoint_model_000100/model.pt",
         help="The path to the Wan checkpoint.")
     parser.add_argument("--use_ema", action="store_true", help="Whether to use EMA parameters")
     parser.add_argument("--use_lora", action="store_true", help="Whether to use LoRA parameters")
