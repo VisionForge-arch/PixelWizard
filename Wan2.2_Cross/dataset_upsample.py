@@ -218,21 +218,28 @@ class LoadVideo(DataProcessingOperator):
 
 
 class LoadTorchLatent(DataProcessingOperator):
-    def __init__(self, map_location="cpu", latent_keys=("latent")):
+    def __init__(self, map_location="cpu", latent_keys=("latent", "latents")):
         self.map_location = map_location
+        if isinstance(latent_keys, str):
+            latent_keys = (latent_keys,)
         self.latent_keys = tuple(latent_keys)
 
-    def __call__(self, data: str) -> torch.Tensor:
+    def __call__(self, data: str):
         loaded = torch.load(data, map_location=self.map_location)
         if isinstance(loaded, torch.Tensor):
             return loaded
+        if isinstance(loaded, (list, tuple)) and all(isinstance(x, torch.Tensor) for x in loaded):
+            return list(loaded)
         if isinstance(loaded, dict):
             for k in self.latent_keys:
                 v = loaded.get(k, None)
                 if isinstance(v, torch.Tensor):
                     return v
+                if isinstance(v, (list, tuple)) and all(isinstance(x, torch.Tensor) for x in v):
+                    return list(v)
         raise TypeError(
-            f"Unsupported .pt content from {data}: expected a Tensor or dict with keys {self.latent_keys} -> Tensor."
+            f"Unsupported .pt content from {data}: expected a Tensor, a list/tuple of Tensors, "
+            f"or a dict with keys {self.latent_keys} -> Tensor/list[Tensor]."
         )
 
 
