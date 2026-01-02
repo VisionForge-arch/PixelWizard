@@ -97,12 +97,8 @@ class CausalInferencePipeline(torch.nn.Module):
         num_input_frames = initial_latent.shape[1] if initial_latent is not None else 0
         num_output_frames = num_frames + num_input_frames  # add the initial latent frames
         
-        conditional_dict = self.text_encoder(
-            text_prompts=text_prompts
-        )
-        unconditional_dict = self.text_encoder(
-            text_prompts=[self.args.negative_prompt] * len(text_prompts)
-        )
+        conditional_dict = self.text_encoder(text_prompts=text_prompts)
+        unconditional_dict = self.text_encoder(text_prompts=[self.args.negative_prompt] * len(text_prompts))
         
         # print(f"clean latent' shape {clean_latent_lr.shape}")
         # print(f"noise' shape {noise.shape}")
@@ -328,8 +324,8 @@ class CausalInferencePipeline(torch.nn.Module):
                 "is_init": False
             })
             crossattn_cache_neg.append({
-                "k": torch.zeros([batch_size, 512, 12, 128], dtype=dtype, device=device),
-                "v": torch.zeros([batch_size, 512, 12, 128], dtype=dtype, device=device),
+                "k": torch.zeros([batch_size, 512, 24, 128], dtype=dtype, device=device),
+                "v": torch.zeros([batch_size, 512, 24, 128], dtype=dtype, device=device),
                 "is_init": False
             })
 

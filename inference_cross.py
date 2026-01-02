@@ -67,16 +67,48 @@ config.causal = True
 config.kv_cache_height = int(args.height // 32)
 config.kv_cache_width = int(args.width // 32)
 config.sampling_steps = args.sampling_steps
-# For causal generation, we pad the requested frames to a multiple of num_frame_per_block.
-target_frames = args.num_output_frames
-pad_frames = (-target_frames) % config.num_frame_per_block
-total_frames = target_frames + pad_frames
 
-# KV cache needs to cover the padded length; keep +1 for safety/headroom.
-config.kv_cache_time = total_frames + 1
 
-# recompute seq_len based on cache grid and padded time
-config.seq_len = int(args.height // 32) * int(args.width // 32) * total_frames
+def _align_noise_frames(
+    requested_frames: int,
+    frames_per_block: int,
+    independent_first_frame: bool,
+    has_initial_latent: bool,
+) -> int:
+    if frames_per_block <= 0:
+        raise ValueError(f"frames_per_block must be positive, got {frames_per_block}")
+    if requested_frames <= 0:
+        return 0
+    if independent_first_frame and not has_initial_latent:
+        return 1 + ((requested_frames - 1) // frames_per_block) * frames_per_block
+    return (requested_frames // frames_per_block) * frames_per_block
+
+
+# No padding: drop leftover frames to satisfy the causal block constraint.
+requested_noise_frames = args.num_output_frames
+aligned_noise_frames = _align_noise_frames(
+    requested_frames=requested_noise_frames,
+    frames_per_block=config.num_frame_per_block,
+    independent_first_frame=bool(getattr(config, "independent_first_frame", False)),
+    has_initial_latent=bool(args.i2v),
+)
+if aligned_noise_frames <= 0:
+    raise ValueError(
+        f"--num_output_frames={requested_noise_frames} cannot satisfy "
+        f"num_frame_per_block={config.num_frame_per_block} without padding; "
+        "increase --num_output_frames or change num_frame_per_block."
+    )
+if aligned_noise_frames != requested_noise_frames:
+    print(
+        f"[no-pad] Truncating requested noise frames {requested_noise_frames} -> {aligned_noise_frames} "
+        f"to satisfy num_frame_per_block={config.num_frame_per_block}."
+    )
+
+# KV cache needs to cover the (aligned) length; keep +1 for safety/headroom.
+config.kv_cache_time = aligned_noise_frames + 1
+
+# recompute seq_len based on cache grid and (aligned) time
+config.seq_len = int(args.height // 32) * int(args.width // 32) * aligned_noise_frames
 
 # Initialize pipeline
 # Few-step inference
@@ -93,6 +125,10 @@ pipeline.generator.eval()
 #     }
 #     pipeline.generator.load_state_dict(corrected_state_dict)
 
+
+# ----------------------------------------------------
+#                      加载模型权重    
+# ----------------------------------------------------
 state_dict = torch.load(args.checkpoint_path, map_location="cpu")
 if args.use_ema:
     print("------- Using EMA Weight ------")
@@ -190,6 +226,8 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
 
     cond_latent_lr = None
     initial_latent = None
+    H = int(config.height // 16)
+    W = int(config.width // 16)
 
     if args.i2v:
         # For image-to-video, batch contains image and caption
@@ -202,10 +240,6 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
         # Encode the input image as the first latent
         initial_latent = pipeline.vae.encode_to_latent(image).to(device=device, dtype=torch.bfloat16)
         initial_latent = initial_latent.repeat(args.num_samples, 1, 1, 1, 1)
-
-        sampled_noise = torch.randn(
-            [args.num_samples, args.num_output_frames - 1, 16, 60, 104], device=device, dtype=torch.bfloat16
-        )
     else:
         # For text-to-video, batch is just the text prompt
         prompt = batch["prompt"]
@@ -214,11 +248,6 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
 
         
         initial_latent = None
-        
-        H = int(config.height // 16)
-        W = int(config.width // 16)
-
-        sampled_noise = torch.randn([args.num_samples, args.num_output_frames, 48, H, W], device=device, dtype=torch.bfloat16)
         
         print(video_input.shape)
 
@@ -236,17 +265,29 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
             #cond_latent_lr = cond_latent_lr.to(device=device, dtype=torch.bfloat16)
 
     
-    # 扩散需要 3 的倍数
-    target_frames = args.num_output_frames       # 想要生成的总帧数
-    pad3 = (-target_frames) % config.num_frame_per_block                 # 0/1/2
-    total_frames = target_frames + pad3
+    # No padding: drop leftover frames to satisfy the block constraint.
+    target_frames = aligned_noise_frames
+    has_initial_latent = initial_latent is not None
+    independent_first_frame = bool(getattr(config, "independent_first_frame", False))
+    if cond_latent_lr is not None:
+        available_frames = int(cond_latent_lr.shape[2])
+        target_frames = min(target_frames, available_frames)
+        target_frames = _align_noise_frames(
+            requested_frames=target_frames,
+            frames_per_block=config.num_frame_per_block,
+            independent_first_frame=independent_first_frame,
+            has_initial_latent=has_initial_latent,
+        )
+        if target_frames <= 0:
+            print(
+                f"[no-pad] Skip sample {i}: available_frames={available_frames} cannot satisfy "
+                f"num_frame_per_block={config.num_frame_per_block} without padding."
+            )
+            continue
+        cond_latent_lr = cond_latent_lr[:, :, :target_frames].contiguous()
 
-    # cond_latent_lr 时间维补 pad3，末帧复制即可
-    if cond_latent_lr is not None and pad3:
-        cond_latent_lr = F.pad(cond_latent_lr, (0,0,0,0,0,pad3), mode="replicate")
-
-    # 噪声也用 total_frames
-    sampled_noise = torch.randn([args.num_samples, total_frames, 48, H, W], device=device, dtype=torch.bfloat16)
+    # 噪声也用 target_frames (already aligned)
+    sampled_noise = torch.randn([args.num_samples, target_frames, 48, H, W], device=device, dtype=torch.bfloat16)
     print("sampled_noise.shape:", sampled_noise.shape)
         
     # Generate 81 frames
@@ -261,7 +302,7 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
     )
     print(latents.shape)
 
-    # Remove any temporal padding we added for 3x blocks.
+    # No padding: output already matches target_frames (+ any initial_latent frames).
     num_input_frames = 0 if initial_latent is None else initial_latent.shape[1]
     target_total_frames = target_frames + num_input_frames
     latents = latents[:, :target_total_frames].contiguous()
