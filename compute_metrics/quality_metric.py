@@ -27,7 +27,7 @@ import numpy as np
 from tqdm import tqdm
 import torch
 #os.environ['TORCH_HOME'] = '/mnt/nas01-ak/IndividualDirs/wenxueli/Weight/'
-print(torch.hub.get_dir())
+#print(torch.hub.get_dir())
 import torch.nn.functional as F
 import torchvision
 from torchvision.io import read_video
