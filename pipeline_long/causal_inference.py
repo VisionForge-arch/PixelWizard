@@ -191,6 +191,18 @@ class CausalInferencePipeline(torch.nn.Module):
                 else:
                     lr_chunk = clean_latent_lr[:, :, current_start_frame:current_start_frame + current_num_frames]
 
+            # Optional AR warm-start: feed tail frames from previous output into the next chunk to improve continuity.
+            # This does not "fix" those frames; it only initializes the denoising state for the first N frames.
+            ar_tail_frames = int(getattr(self.args, "ar_tail_frames", 0) or 0)
+            # For TI2V/I2V, the conditioning "I" is a single image/frame; clamp to 1 to avoid
+            # accidentally feeding multiple tail frames.
+            model_type = getattr(getattr(self.generator, "model", None), "model_type", None)
+            if model_type in ("i2v", "ti2v"):
+                ar_tail_frames = min(ar_tail_frames, 1)
+            if ar_tail_frames > 0 and current_start_frame > 0:
+                n_tail = min(ar_tail_frames, current_num_frames, current_start_frame)
+                latents[:, :n_tail] = output[:, current_start_frame - n_tail : current_start_frame]
+
             # Step 3.1: Spatial denoising loop
             sample_scheduler = self._initialize_sample_scheduler(noise)
             for _, t in enumerate(tqdm(sample_scheduler.timesteps)):

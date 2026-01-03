@@ -38,6 +38,7 @@ parser.add_argument("--save_with_index", action="store_true", help="Whether to s
 parser.add_argument("--height", type=int, default=1440)
 parser.add_argument("--width", type=int, default=2560)
 parser.add_argument("--sampling_steps", type=int, default=5)
+parser.add_argument("--ar_tail_frames", type=int, default=0, help="AR warm-start: initialize each chunk with last N frames from previous output")
 args = parser.parse_args()
 
 # Initialize distributed inference
@@ -68,6 +69,7 @@ config.causal = True
 config.kv_cache_height = int(args.height // 32)
 config.kv_cache_width = int(args.width // 32)
 config.sampling_steps = args.sampling_steps
+config.ar_tail_frames = int(args.ar_tail_frames)
 
 
 def _align_noise_frames(
