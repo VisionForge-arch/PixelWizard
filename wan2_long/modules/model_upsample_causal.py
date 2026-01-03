@@ -471,8 +471,8 @@ class CausalWanSelfAttention(nn.Module):
                 kv_cache["sink_tokens"] = sink_tokens
 
             if local_start_index != 0:
-                recent_start = max(0, local_start_index)
-                #recent_start = max(0, local_start_index - num_new_tokens)
+                
+                recent_start = max(0, local_start_index - num_new_tokens)
                 if sink_tokens > 0:
                     recent_start = max(sink_tokens, recent_start)  # avoid duplicating sink range
                     attention_k = torch.cat(
