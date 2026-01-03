@@ -180,16 +180,7 @@ class CausalInferencePipeline(torch.nn.Module):
 
             noisy_input = noise[:, current_start_frame:current_start_frame + current_num_frames]
             latents = noisy_input
-            lr_chunk = None
-            if clean_latent_lr is not None:
-                # If the underlying model supports LR adapter pre-encoding, pass the full LR sequence
-                # and let the model slice per chunk using `current_start`.
-                # Otherwise, keep the old behavior and slice LR per chunk here for correctness.
-                adapter = getattr(getattr(self.generator, "model", None), "spatial_adapter", None)
-                if adapter is not None and hasattr(adapter, "encode"):
-                    lr_chunk = clean_latent_lr
-                else:
-                    lr_chunk = clean_latent_lr[:, :, current_start_frame:current_start_frame + current_num_frames]
+            lr_chunk = None if clean_latent_lr is None else clean_latent_lr[:, :, current_start_frame:current_start_frame + current_num_frames]
 
             # Step 3.1: Spatial denoising loop
             sample_scheduler = self._initialize_sample_scheduler(noise)

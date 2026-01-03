@@ -78,40 +78,22 @@ class WanSpatialControlAdapter(nn.Module):
             nn.init.zeros_(layer.weight)
             nn.init.zeros_(layer.bias)
 
-    def encode(self, lr_latents: torch.Tensor) -> torch.Tensor:
+    def forward(self, lr_latents, guidance_t_emb):
         """
-        Encode LR latents once using the Conv3d backbone.
-        Returns per-frame token features:
-            [B, C, F, H, W] -> [B, F, L, D]
-        where L = (H/patch_h) * (W/patch_w), D = model_dim.
-        """
-        x = self.backbone(lr_latents)  # [B, D, F, H', W']
-        b, d, f, h, w = x.shape
-        x = x.permute(0, 2, 3, 4, 1).contiguous().view(b, f, h * w, d)  # [B, F, L, D]
-        return x
-
-    def forward(self, lr_latents, guidance_t_emb, inject_blocks=None):
-        """
-        lr_latents:
-          - raw LR latents: [B, C, F, H, W]
-          - pre-encoded tokens: [B, F, L, D]
+        lr_latents: [B, C, F, H, W]
         t_sinusoidal_emb: [B, freq_dim] <- 这是原始的正弦位置编码
         """
-        if lr_latents is None:
-            return None
-
-        if lr_latents.dim() == 5:
-            x = self.encode(lr_latents)  # [B, F, L, D]
-        elif lr_latents.dim() == 4:
-            x = lr_latents  # [B, F, L, D]
-        else:
-            raise ValueError(f"Unsupported lr_latents shape: {tuple(lr_latents.shape)}")
-
-        b, f, l, d = x.shape
-        x = self.feature_norm(x).view(b, f * l, d)  # [B, SeqLen, D]
+        # A. 提取特征
+        #print(lr_latents.shape)
+        
+        x = self.backbone(lr_latents)  # [B, C, T, H, ]
+        x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
         
         w = self.adapter_time_proj(guidance_t_emb)           # [B, 2*D]
         scale, shift = w.chunk(2, dim=-1)                    # [B, D], [B, D]
+
+        
+        x = self.feature_norm(x)
         
         # B. 注入 Guidance Timestep (控制强度)
         # 类似于把 guidance 加到 feature 上
@@ -120,12 +102,7 @@ class WanSpatialControlAdapter(nn.Module):
             
         # C. 生成每一层的控制特征
         # 5. Generate Per-Layer Controls
-        if inject_blocks is None:
-            controls = [layer(x) for layer in self.zero_layers]
-        else:
-            controls = [None] * len(self.zero_layers)
-            for block_idx in inject_blocks:
-                controls[block_idx] = self.zero_layers[block_idx](x)
+        controls = [layer(x) for layer in self.zero_layers]
                 
         return controls
     
@@ -179,8 +156,6 @@ def register_spatial_control(model):
           
             # 2. 获取当前层的控制特征
             control_feat = controls[block_idx] # [B, L_ctrl, Dim]
-            if control_feat is None:
-                return args
           
             # ⭐⭐ 新增：按概率跳过某些样本的 LR 控制
             # skip_prob = getattr(model, "spatial_skip_prob", 0.2)  # 0.0 表示不跳过
@@ -250,53 +225,10 @@ def register_spatial_control(model):
             # t: [B, F] (per-frame); 取首帧代表，避免传入 [B, F] 形状破坏 adapter 的线性层
             t_freq = sinusoidal_embedding_1d(self.freq_dim, t[:, 0]).type_as(x_in[0])  # [B, freq_dim]
 
-        # 2. 运行 Adapter (encode once per chunk, then reuse across denoising steps)
-        controls = None
-        if lr_latents is not None:
-            current_start = kwargs.get("current_start", 0)
-
-            # Infer current chunk frame range from x (works for both Tensor and list-of-Tensors inputs).
-            if torch.is_tensor(x_in):
-                x_ref = x_in[0]  # [C, F, H, W]
-                chunk_frames = int(x_ref.shape[1])
-                h_lat, w_lat = int(x_ref.shape[-2]), int(x_ref.shape[-1])
-            else:
-                x_ref = x_in[0]  # [C, F, H, W]
-                chunk_frames = int(x_ref.shape[1])
-                h_lat, w_lat = int(x_ref.shape[-2]), int(x_ref.shape[-1])
-
-            frame_seqlen = (h_lat // self.patch_size[1]) * (w_lat // self.patch_size[2])
-            start_frame = int(current_start // max(1, frame_seqlen))
-            end_frame = start_frame + chunk_frames
-
-            lr_frames = int(lr_latents.shape[2]) if lr_latents.dim() == 5 else int(lr_latents.shape[1])
-            is_full_sequence = lr_frames > chunk_frames and end_frame <= lr_frames
-
-            # Cache the expensive Conv3d backbone output:
-            # - if full LR is provided, encode once and slice per chunk
-            # - if chunk LR is provided, encode once per chunk and reuse across denoising steps
-            if lr_latents.dim() == 5:
-                lr_to_encode = lr_latents
-                cache_key = (
-                    int(lr_to_encode.data_ptr()),
-                    tuple(lr_to_encode.shape),
-                    str(lr_to_encode.device),
-                    str(lr_to_encode.dtype),
-                )
-                cache = getattr(self, "_lr_adapter_encode_cache", None)
-                if cache is None or cache.get("key") != cache_key:
-                    lr_encoded_full = self.spatial_adapter.encode(lr_to_encode)
-                    self._lr_adapter_encode_cache = {"key": cache_key, "encoded": lr_encoded_full}
-                else:
-                    lr_encoded_full = cache["encoded"]
-
-                lr_encoded = lr_encoded_full[:, start_frame:end_frame] if is_full_sequence else lr_encoded_full
-            else:
-                # lr_latents already encoded: [B, F, L, D]
-                lr_encoded = lr_latents[:, start_frame:end_frame] if is_full_sequence else lr_latents
-
-            # Only compute controls for the injected blocks (hook injects block_idx==1).
-            controls = self.spatial_adapter(lr_encoded, t_freq, inject_blocks=(1,))
+        # 2. 运行 Adapter 
+        # 将 LR 和 公用的 Time Freq 传入 Adapter
+        # Adapter 内部会用自己的 MLP 处理这个 t_freq
+        controls = self.spatial_adapter(lr_latents, t_freq)
         
         #self._current_spatial_ctx = {'controls': controls}
         ctx = {'controls': controls, 'skip_masks': {}}
