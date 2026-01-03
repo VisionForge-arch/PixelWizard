@@ -84,6 +84,12 @@ class CausalInferencePipeline(torch.nn.Module):
                 (batch_size, num_output_frames, num_channels, height, width).
                 It is normalized to be in the range [0, 1].
         """
+        # Reset any per-sample caches on the underlying model (e.g. LR adapter encode cache).
+        # This avoids stale reuse across different prompts/videos.
+        model = getattr(self.generator, "model", None)
+        if model is not None and hasattr(model, "_lr_adapter_encode_cache"):
+            model._lr_adapter_encode_cache = None
+
         batch_size, num_frames, num_channels, height, width = noise.shape
         if not self.independent_first_frame or (self.independent_first_frame and initial_latent is not None):
             # If the first frame is independent and the first frame is provided, then the number of frames in the
@@ -153,6 +159,9 @@ class CausalInferencePipeline(torch.nn.Module):
                 self.crossattn_cache_neg[block_index]["is_init"] = False
             # reset kv cache
             for block_index in range(len(self.kv_cache_pos)):
+                # Clear any custom metadata stored in cache dicts (e.g. sink tokens).
+                self.kv_cache_pos[block_index].pop("sink_tokens", None)
+                self.kv_cache_neg[block_index].pop("sink_tokens", None)
                 self.kv_cache_pos[block_index]["global_end_index"] = torch.tensor(
                     [0], dtype=torch.long, device=noise.device)
                 self.kv_cache_pos[block_index]["local_end_index"] = torch.tensor(
