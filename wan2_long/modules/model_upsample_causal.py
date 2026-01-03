@@ -173,14 +173,31 @@ class CausalWanSelfAttention(nn.Module):
             kv_cache["k"][:, local_start_index:local_end_index] = roped_key
             kv_cache["v"][:, local_start_index:local_end_index] = v
 
-            # attention_k = kv_cache["k"][:, :local_end_index]
-            # attention_v = kv_cache["v"][:, :local_end_index]
-            if local_start_index !=0:
-                attention_k = kv_cache["k"][:, local_start_index - num_new_tokens:local_end_index]
-                attention_v = kv_cache["v"][:, local_start_index - num_new_tokens:local_end_index]
+            # Multi-segment slicing: keep the first chunk as an attention "sink".
+            # We cache the sink length per sample (kv_cache is reset by setting global/local_end_index to 0).
+            sink_tokens = int(kv_cache.get("sink_tokens", 0)) if isinstance(kv_cache, dict) else 0
+            if sink_tokens <= 0 and kv_cache["global_end_index"].item() == 0:
+                sink_tokens = int(num_new_tokens)
+                kv_cache["sink_tokens"] = sink_tokens
+
+            if local_start_index != 0:
+                recent_start = max(0, local_start_index - num_new_tokens)
+                if sink_tokens > 0:
+                    recent_start = max(sink_tokens, recent_start)  # avoid duplicating sink range
+                    attention_k = torch.cat(
+                        [kv_cache["k"][:, :sink_tokens], kv_cache["k"][:, recent_start:local_end_index]],
+                        dim=1,
+                    )
+                    attention_v = torch.cat(
+                        [kv_cache["v"][:, :sink_tokens], kv_cache["v"][:, recent_start:local_end_index]],
+                        dim=1,
+                    )
+                else:
+                    attention_k = kv_cache["k"][:, recent_start:local_end_index]
+                    attention_v = kv_cache["v"][:, recent_start:local_end_index]
             else:
-                attention_k = kv_cache["k"][:, local_start_index:local_end_index]
-                attention_v = kv_cache["v"][:, local_start_index:local_end_index]
+                attention_k = kv_cache["k"][:, :local_end_index]
+                attention_v = kv_cache["v"][:, :local_end_index]
             
             x = attention(
                 roped_query,
