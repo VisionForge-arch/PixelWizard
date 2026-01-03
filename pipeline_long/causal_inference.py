@@ -191,8 +191,11 @@ class CausalInferencePipeline(torch.nn.Module):
                 else:
                     lr_chunk = clean_latent_lr[:, :, current_start_frame:current_start_frame + current_num_frames]
 
+            # Step 3.1: Spatial denoising loop
+            sample_scheduler = self._initialize_sample_scheduler(noise)
+
             # Optional AR warm-start: feed tail frames from previous output into the next chunk to improve continuity.
-            # This does not "fix" those frames; it only initializes the denoising state for the first N frames.
+            # Important: we must re-noise the copied tail to match the starting sigma, otherwise it can diverge.
             ar_tail_frames = int(getattr(self.args, "ar_tail_frames", 0) or 0)
             # For TI2V/I2V, the conditioning "I" is a single image/frame; clamp to 1 to avoid
             # accidentally feeding multiple tail frames.
@@ -201,10 +204,15 @@ class CausalInferencePipeline(torch.nn.Module):
                 ar_tail_frames = min(ar_tail_frames, 1)
             if ar_tail_frames > 0 and current_start_frame > 0:
                 n_tail = min(ar_tail_frames, current_num_frames, current_start_frame)
-                latents[:, :n_tail] = output[:, current_start_frame - n_tail : current_start_frame]
-
-            # Step 3.1: Spatial denoising loop
-            sample_scheduler = self._initialize_sample_scheduler(noise)
+                prev_tail = output[:, current_start_frame - n_tail : current_start_frame]
+                start_t = sample_scheduler.timesteps[0].to(device=noise.device, dtype=torch.float32)
+                start_t = start_t.expand(batch_size)
+                # Reuse the already-sampled noise for those frames to keep determinism.
+                latents[:, :n_tail] = sample_scheduler.add_noise(
+                    original_samples=prev_tail,
+                    noise=latents[:, :n_tail],
+                    timesteps=start_t,
+                )
             for _, t in enumerate(tqdm(sample_scheduler.timesteps)):
                 latent_model_input = latents
                 timestep = t * torch.ones(
