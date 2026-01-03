@@ -145,12 +145,8 @@ class CausalWanSelfAttention(nn.Module):
         else:
             frame_seqlen = math.prod(grid_sizes[0][1:]).item()
             current_start_frame = current_start // frame_seqlen
-            roped_query = causal_rope_apply(
-                q, grid_sizes, freqs, start_frame=current_start_frame
-            ).type_as(v)
-            roped_key = causal_rope_apply(
-                k, grid_sizes, freqs, start_frame=current_start_frame
-            ).type_as(v)
+            roped_query = causal_rope_apply(q, grid_sizes, freqs, start_frame=current_start_frame).type_as(v)
+            roped_key = causal_rope_apply(k, grid_sizes, freqs, start_frame=current_start_frame).type_as(v)
 
             current_end = current_start + roped_query.shape[1]  # 这里补上
 
@@ -182,6 +178,9 @@ class CausalWanSelfAttention(nn.Module):
             if local_start_index !=0:
                 attention_k = kv_cache["k"][:, local_start_index - num_new_tokens:local_end_index]
                 attention_v = kv_cache["v"][:, local_start_index - num_new_tokens:local_end_index]
+            else:
+                attention_k = kv_cache["k"][:, local_start_index:local_end_index]
+                attention_v = kv_cache["v"][:, local_start_index:local_end_index]
             
             x = attention(
                 roped_query,
