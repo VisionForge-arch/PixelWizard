@@ -105,6 +105,9 @@ class CausalWanSelfAttention(nn.Module):
             return q, k, v
 
         q, k, v = qkv_fn(x)
+        
+        
+        kv_cache = None
 
         if kv_cache is None:
             roped_query = rope_apply(q, grid_sizes, freqs).type_as(v)
