@@ -179,9 +179,9 @@ class CausalWanSelfAttention(nn.Module):
 
             # attention_k = kv_cache["k"][:, :local_end_index]
             # attention_v = kv_cache["v"][:, :local_end_index]
-            
-            attention_k = kv_cache["k"][:, local_start_index - num_new_tokens:local_end_index]
-            attention_v = kv_cache["v"][:, local_start_index - num_new_tokens:local_end_index]
+            if local_start_index !=0:
+                attention_k = kv_cache["k"][:, local_start_index - num_new_tokens:local_end_index]
+                attention_v = kv_cache["v"][:, local_start_index - num_new_tokens:local_end_index]
             
             x = attention(
                 roped_query,
