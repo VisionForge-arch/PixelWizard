@@ -310,6 +310,8 @@ class CausalInferencePipeline(torch.nn.Module):
         height_chunks = getattr(self.args, "kv_cache_height", 45)
         width_chunks = getattr(self.args, "kv_cache_width", 80)
         time_chunks = getattr(self.args, "kv_cache_time", 33)
+        
+        time_chunks = 9
         kv_cache_size = height_chunks * width_chunks * time_chunks
 
         for _ in range(self.num_transformer_blocks):
