@@ -244,8 +244,6 @@ class WanModel_Trainer:
         options = ['detailed_description', 'brief_description', 'summarized_description']
         text_prompts = batch[random.choice(options)]
         
-        #text_prompts = batch["detailed_description"]
-
         # 转换PIL图像列表为tensor格式
         frames = batch["clip_id"].to(device=self.device, dtype=self.dtype)
         
@@ -297,8 +295,7 @@ class WanModel_Trainer:
         # Extract the conditional infos
         with torch.no_grad():
             # 'promot_embeds': [B, 512, 4096]
-            conditional_dict = self.model.text_encoder(text_prompts=text_prompts)
-            
+            conditional_dict = self.model.text_encoder(text_prompts=text_prompts) 
             
             uncond_proba = getattr(self.config, "uncond_proba", 0.1)
             if uncond_proba > 0:
