@@ -205,14 +205,6 @@ class WanModel_Trainer:
         guidance = TF.gaussian_blur(guidance, kernel_size=k, sigma=sigma)
         
         
-        # ======= 噪声破坏 =============
-        aug_level = 0.0
-        if random.random() < 0.5:
-            # 这里的噪声是为了破坏“像素级对应关系”，强迫模型关注语义
-            aug_level = random.uniform(0.0, 0.1) # 0.1 已经很大了
-            noise = torch.randn_like(guidance) * aug_level
-            guidance = guidance + noise
-    
         return guidance
     
     
@@ -240,13 +232,6 @@ class WanModel_Trainer:
         guidance = TF.gaussian_blur(guidance, kernel_size=k, sigma=sigma)
         
         
-        # ======= 噪声破坏 =============
-        aug_level = 0.0
-        if random.random() < 0.5:
-            # 这里的噪声是为了破坏“像素级对应关系”，强迫模型关注语义
-            aug_level = random.uniform(0.0, 0.1) # 0.1 已经很大了
-            noise = torch.randn_like(guidance) * aug_level
-            guidance = guidance + noise
     
         return guidance
     
@@ -293,7 +278,13 @@ class WanModel_Trainer:
             clean_latent_lr = F.interpolate(clean_latent_lr, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
             clean_latent_lr = clean_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4).contiguous()  # [B, C, T, H, W]
             
-                    
+            # ======= 噪声破坏 =============
+            aug_level = 0.0
+            if random.random() < 0.5:
+                # 这里的噪声是为了破坏“像素级对应关系”，强迫模型关注语义
+                aug_level = random.uniform(0.0, 0.1) # 0.1 已经很大了
+                noise = torch.randn_like(guidance) * aug_level
+                guidance = guidance + noise
             # print(f"frames.shape: {frames.shape}, clean_latent.shape: {clean_latent.shape}")
             # print(f"frames_480p.shape: {frames_480p.shape}, clean_latent_lr.shape: {clean_latent_lr.shape}")
                 

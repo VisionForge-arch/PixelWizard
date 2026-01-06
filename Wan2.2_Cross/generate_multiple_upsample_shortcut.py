@@ -530,6 +530,9 @@ def generate(args):
                     cond_latent_lr = cond_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)
                     #print(cond_latent.shape) # [1, 31, 48, 30, 52]
                     cond_latent_lr = cond_latent_lr.to(device=wan_ti2v.device, dtype=torch.float32)
+                    
+                    noise = torch.randn_like(cond_latent_lr) * 0.1
+                    cond_latent_lr = cond_latent_lr + noise
   
  
             video = wan_ti2v.generate(
