@@ -268,10 +268,12 @@ class WanModel_Trainer:
             
             B, T, C, H, W   = clean_latent.shape
             _, _, _, h, w   = clean_latent_lr.shape
+            up_H = int(H * 0.5)
+            up_W = int(W * 0.5)
 
             clean_latent_lr = clean_latent_lr.reshape(B*T, C, h, w)  # [B*T, C, h, w]
-            clean_latent_lr = F.interpolate(clean_latent_lr, size=(H, W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
-            clean_latent_lr = clean_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4).contiguous()  # [B, C, T, H, W]
+            clean_latent_lr = F.interpolate(clean_latent_lr, size=(up_H, up_W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
+            clean_latent_lr = clean_latent_lr.reshape(B, T, C, up_H, up_W).permute(0, 2, 1, 3, 4).contiguous()  # [B, C, T, H, W]
             
             # ======= 噪声破坏 =============
             aug_level = 0.0

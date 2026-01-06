@@ -382,23 +382,23 @@ class WanSpatialControlAdapter(nn.Module):
                  model_dim,       # Transformer Hidden Dim (e.g., 1536)
                  patch_size,      # (1, 2, 2)
                  num_blocks,      # 主干网络的层数，我们需要为每一层准备一个 ZeroLayer
+                 control_block_indices=(1,),  # 实际需要注入的 block 索引
                  freq_dim=256 # 你的 guidance timestep 维度
                  ):
         super().__init__()
         self.model_dim = model_dim
         self.num_blocks = num_blocks
         self.freq_dim = freq_dim
+        self.control_block_indices = tuple(int(i) for i in control_block_indices)
         
         # 1. 特征提取器 (简单的 3D CNN 提取结构)
         mid_dim = model_dim // 4
         self.backbone = nn.Sequential(
-            nn.Conv3d(in_dim, mid_dim, kernel_size=patch_size, stride=patch_size),
+            nn.Conv3d(in_dim, mid_dim, kernel_size=1, stride=1, padding=0),
             nn.GroupNorm(16, mid_dim),
             nn.SiLU(),
-            nn.Conv3d(mid_dim, model_dim, kernel_size=3, padding=1),
+            nn.Conv3d(mid_dim, model_dim, kernel_size=3, stride=1, padding=1),
             nn.SiLU(),
-            # 这里可以加深网络，或者用 ResNet Block
-            
         )
         # --- 2. Feature Normalization (关键) ---
         # 在 Flatten 之后、进入 ZeroLinear 之前，做一个 LayerNorm
@@ -407,30 +407,29 @@ class WanSpatialControlAdapter(nn.Module):
 
         # 3. Guidance Timestep Embedding (控制强度的开关)
         self.adapter_time_proj = nn.Sequential(
-            nn.Linear(freq_dim, model_dim * 2),
+            nn.Linear(freq_dim, model_dim),
             nn.SiLU(),
-            nn.Linear(model_dim * 2, model_dim * 2),
+            nn.Linear(model_dim, model_dim),
         )
 
         # dt-aware conditioning (initialized as no-op)
         self.adapter_dt_proj = nn.Sequential(
-            nn.Linear(freq_dim, model_dim * 2),
+            nn.Linear(freq_dim, model_dim),
             nn.SiLU(),
-            nn.Linear(model_dim * 2, model_dim * 2),
+            nn.Linear(model_dim, model_dim),
         )
         nn.init.zeros_(self.adapter_dt_proj[-1].weight)
         nn.init.zeros_(self.adapter_dt_proj[-1].bias)
         
         # 4. [核心] Per-Block Zero Layers
-        # 为主干网络的每一层 block 准备一个独立的 Zero Linear
-        # 作用：将 Adapter 的通用特征，转化为适应第 i 层特征空间的 Condition
-        self.zero_layers = nn.ModuleList([
-            nn.Linear(model_dim, model_dim) for _ in range(num_blocks)
-        ])
+        # 只为需要注入的 block 创建零初始化线性层，避免无用参数
+        self.zero_layers = nn.ModuleDict({
+            str(i): nn.Linear(model_dim, model_dim) for i in self.control_block_indices
+        })
         
         # 5. Zero Initialization (零初始化)
         # 保证刚开始训练时，注入的特征全是 0，不影响主干
-        for layer in self.zero_layers:
+        for layer in self.zero_layers.values():
             nn.init.zeros_(layer.weight)
             nn.init.zeros_(layer.bias)
 
@@ -439,27 +438,22 @@ class WanSpatialControlAdapter(nn.Module):
         lr_latents: [B, C, F, H, W]
         t_sinusoidal_emb: [B, freq_dim] <- 这是原始的正弦位置编码
         """
-        # A. 提取特征
-        #print(lr_latents.shape)
-        
+        # A. 提取特征  
         x = self.backbone(lr_latents)  # [B, C, T, H, ]
         x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
         
-        w = self.adapter_time_proj(guidance_t_emb)           # [B, 2*D]
+        w = self.adapter_time_proj(guidance_t_emb)           # [B, D]
         w = w + self.adapter_dt_proj(guidance_dt_emb)
-        scale, shift = w.chunk(2, dim=-1)                    # [B, D], [B, D]
-
+        scale = w                   # [B, D]
+        scale = torch.tanh(scale) 
         
         x = self.feature_norm(x)
         
-        # B. 注入 Guidance Timestep (控制强度)
-        # 类似于把 guidance 加到 feature 上
-        #print(guidance_t_emb.shape)      #  guidance_t_emb: [B, Dim]
-        x = x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1) # Scale 调制，或者 add 也可以
+        # B. 注入 Guidance Timestep (控制强度)。 类似于把 guidance 加到 feature 上
+        x = x * (1 + scale.unsqueeze(1)) # + shift.unsqueeze(1) # Scale 调制，或者 add 也可以
             
-        # C. 生成每一层的控制特征
-        # 5. Generate Per-Layer Controls
-        controls = [layer(x) for layer in self.zero_layers]
+        # C. 生成每一层的控制特征  Generate Per-Layer Controls
+        controls = {int(i): self.zero_layers[str(i)](x) for i in self.control_block_indices}
                 
         return controls
     
@@ -470,6 +464,7 @@ def register_spatial_control(model):
         model_dim=model.dim,
         patch_size=model.patch_size,
         num_blocks=len(model.blocks),
+        control_block_indices=getattr(model, "spatial_control_blocks", (1,)),
         freq_dim=model.freq_dim
     ).to(model.patch_embedding.weight.device)
     
@@ -496,49 +491,32 @@ def register_spatial_control(model):
                 ctx = getattr(model, "_spatial_ctx_cache", None)
             if ctx is None:
                 return args
-            # controls 是一个 list，长度等于 layer 数
-            controls = ctx['controls'] 
+            controls = ctx.get('controls')
             
             if controls is None:
                 return args
             
-            
-            # ⭐⭐ 关键 1：只在前 num_control_blocks 层注入，后面的层不做任何事
-            # if block_idx >= 10:
-            #     return args
-            # if block_idx % 6 != 0:
-            #   return args
-            if block_idx != 1:  # only inject on the first block
+            control_feat = controls.get(block_idx)
+            if control_feat is None:
                 return args
-          
-            # 2. 获取当前层的控制特征
-            control_feat = controls[block_idx] # [B, L_ctrl, Dim]
-          
-            # ⭐⭐ 新增：按概率跳过某些样本的 LR 控制
-            # skip_prob = getattr(model, "spatial_skip_prob", 0.2)  # 0.0 表示不跳过
-            # if skip_prob > 0:
-            #     mask = ctx.get("global_skip_mask")
-            #     if mask is None:
-            #         mask = (torch.rand(control_feat.size(0), 1, 1, device=control_feat.device) >= skip_prob)
-            #         ctx["global_skip_mask"] = mask
-            #     control_feat = control_feat * mask
-            
 
             x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
+            
+            seq_lens = args[2].to(device=x.device)  # [B] (unpadded token length)
 
-            L_x = x.shape[1]
-            L_c = control_feat.shape[1]
-             # 对齐长度：pad 或截断到和 x 一样长
-            if L_c < L_x:
-                pad = control_feat.new_zeros(control_feat.shape[0], L_x - L_c, control_feat.shape[2])
-                control_feat = torch.cat([control_feat, pad], dim=1)
-            elif L_c > L_x:
-                control_feat = control_feat[:, :L_x, :]
-            
-            
-            # 4. [关键] 特征相加 (Feature Injection)
-            #print(x.shape)
-            x_new = x + control_feat.type_as(x)
+            # IMPORTANT: do NOT pad/truncate on sequence length; it will cause spatial/temporal misalignment.
+            # Only inject when tokenization is aligned (same flatten/padding convention).
+            if control_feat.shape[1] != x.shape[1]:
+                if getattr(model, "spatial_control_strict_alignment", False):
+                    raise RuntimeError(
+                        f"Spatial control token length mismatch: x={x.shape} vs control={control_feat.shape}. "
+                        "Padding/truncation is unsafe; ensure control uses the same tokenization as x."
+                    )
+                return args
+
+            # Only inject on valid (unpadded) tokens.
+            valid_mask = (torch.arange(x.shape[1], device=x.device)[None, :] < seq_lens[:, None]).unsqueeze(-1)
+            x_new = x + (control_feat.type_as(x) * valid_mask)
             # print(x_new.shape)
             # print("add successfully!!!")
             

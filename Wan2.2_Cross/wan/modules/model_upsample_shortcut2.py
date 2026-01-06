@@ -317,12 +317,14 @@ class WanSpatialControlAdapter(nn.Module):
                  model_dim,       # Transformer Hidden Dim (e.g., 1536)
                  patch_size,      # (1, 2, 2)
                  num_blocks,      # 主干网络的层数，我们需要为每一层准备一个 ZeroLayer
+                 control_block_indices=(1,),  # 实际需要注入的 block 索引
                  freq_dim=256 # 你的 guidance timestep 维度
                  ):
         super().__init__()
         self.model_dim = model_dim
         self.num_blocks = num_blocks
         self.freq_dim = freq_dim
+        self.control_block_indices = tuple(int(i) for i in control_block_indices)
         
         # 1. 特征提取器 (简单的 3D CNN 提取结构)
         mid_dim = model_dim // 4
@@ -357,11 +359,10 @@ class WanSpatialControlAdapter(nn.Module):
         nn.init.zeros_(self.adapter_dt_proj[-1].bias)
 
         # 4. [核心] Per-Block Zero Layers
-        # 为主干网络的每一层 block 准备一个独立的 Zero Linear
-        # 作用：将 Adapter 的通用特征，转化为适应第 i 层特征空间的 Condition
-        self.zero_layers = nn.ModuleList([
-            nn.Linear(model_dim, model_dim) for _ in range(num_blocks)
-        ])
+        # 只为需要注入的 block 创建零初始化线性层，避免无用参数
+        self.zero_layers = nn.ModuleDict({
+            str(i): nn.Linear(model_dim, model_dim) for i in self.control_block_indices
+        })
         
 
     def forward(self, lr_latents, guidance_t_emb, guidance_dt_emb=None):
@@ -388,10 +389,8 @@ class WanSpatialControlAdapter(nn.Module):
         
         x = x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1) # Scale 调制，或者 add 也可以
             
-        # C. 生成每一层的控制特征
-        # 5. Generate Per-Layer Controls
-        controls = [layer(x) for layer in self.zero_layers]
-                
+        # C. 只生成需要注入的控制特征（按 block_idx）
+        controls = {int(i): self.zero_layers[str(i)](x) for i in self.control_block_indices}
         return controls
     
 def register_spatial_control(model):
@@ -401,6 +400,7 @@ def register_spatial_control(model):
         model_dim=model.dim,
         patch_size=model.patch_size,
         num_blocks=len(model.blocks),
+        control_block_indices=getattr(model, "spatial_control_blocks", (1,)),
         freq_dim=model.freq_dim
     ).to(model.patch_embedding.weight.device)
     
@@ -423,25 +423,18 @@ def register_spatial_control(model):
                 return args # 不做任何修改
             
             ctx = model._current_spatial_ctx
-            # controls 是一个 list，长度等于 layer 数
-            controls = ctx['controls'] 
+            controls = ctx.get('controls')
             
             if controls is None:
                 return args
             
-            # ==========================================================
-            # ⭐⭐ 关键 1：只在前 num_control_blocks 层注入，后面的层不做任何事
-            # if block_idx >= 10:
-            #     return args
-            # if  block_idx % 6 != 0:
-            if block_idx != 1:  # only inject on the first block
+            # 只在指定的 block 注入
+            control_feat = controls.get(block_idx)
+            if control_feat is None:
                 return args
-             # ==========================================================
-
-            # 2. 获取当前层的控制特征
-            control_feat = controls[block_idx] # [B, L_ctrl, Dim]
             
             x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
+            seq_lens = args[2]  # [B] (unpadded token length)
 
             # L_x = x.shape[1]
             # L_c = control_feat.shape[1]
@@ -465,12 +458,20 @@ def register_spatial_control(model):
                     
                     # Slice the global control feature to match local x
                     control_feat = control_feat[:, start_idx:end_idx, :]
+                else:
+                    if getattr(model, "spatial_control_strict_alignment", False):
+                        raise RuntimeError(
+                            f"Spatial control token length mismatch: x={x.shape} vs control={control_feat.shape}. "
+                            "Padding/truncation is unsafe; ensure control uses the same tokenization as x."
+                        )
+                    return args
             # -----------------------------------------------------------
             
             
             # 4. [关键] 特征相加 (Feature Injection)
             # print(x.shape)
-            x_new = x + control_feat.type_as(x)
+            valid_mask = (torch.arange(x.shape[1], device=x.device)[None, :] < seq_lens[:, None]).unsqueeze(-1)
+            x_new = x + (control_feat.type_as(x) * valid_mask)
             
             # print(x_new.shape)
             # print("add successfully!!!")
