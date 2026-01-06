@@ -502,6 +502,13 @@ def register_spatial_control(model):
 
             x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
 
+            B, L, D = x.shape
+            Lc = control_feat.shape[1]
+            
+            if Lc < L:
+                pad = control_feat.new_zeros(B, L - Lc, D)
+                control_feat = torch.cat([control_feat, pad], dim=1)
+            
             x_new = x + (control_feat.type_as(x))
             # print(x_new.shape)
             # print("add successfully!!!")
