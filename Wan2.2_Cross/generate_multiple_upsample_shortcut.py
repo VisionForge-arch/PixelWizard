@@ -535,7 +535,7 @@ def generate(args):
                     
                     
                     
-                    noise = torch.randn_like(cond_latent_lr) * 0.2
+                    noise = torch.randn_like(cond_latent_lr) * 0.5
                     cond_latent_lr = cond_latent_lr + noise
   
  
