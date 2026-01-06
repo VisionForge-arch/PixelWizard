@@ -510,7 +510,7 @@ def generate(args):
                 
                 
                 # ======= 高斯模糊 =============
-                k = random.choice([3])
+                k = random.choice([7])
                 sigma = 3.0
                 guidance = TF.gaussian_blur(cond_latent_lr, kernel_size=k, sigma=sigma)
                 
