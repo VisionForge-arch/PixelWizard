@@ -204,7 +204,6 @@ class WanModel_Trainer:
         sigma = random.uniform(3.0, 5.0)
         guidance = TF.gaussian_blur(guidance, kernel_size=k, sigma=sigma)
         
-        
         return guidance
     
     
@@ -229,9 +228,7 @@ class WanModel_Trainer:
         # ======= 高斯模糊 =============
         k = random.choice([7, 9])
         sigma = random.uniform(3.0, 4.3)
-        guidance = TF.gaussian_blur(guidance, kernel_size=k, sigma=sigma)
-        
-        
+        guidance = TF.gaussian_blur(guidance, kernel_size=k, sigma=sigma)  
     
         return guidance
     
