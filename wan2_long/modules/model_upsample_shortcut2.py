@@ -501,22 +501,8 @@ def register_spatial_control(model):
                 return args
 
             x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
-            
-            seq_lens = args[2].to(device=x.device)  # [B] (unpadded token length)
 
-            # IMPORTANT: do NOT pad/truncate on sequence length; it will cause spatial/temporal misalignment.
-            # Only inject when tokenization is aligned (same flatten/padding convention).
-            if control_feat.shape[1] != x.shape[1]:
-                if getattr(model, "spatial_control_strict_alignment", False):
-                    raise RuntimeError(
-                        f"Spatial control token length mismatch: x={x.shape} vs control={control_feat.shape}. "
-                        "Padding/truncation is unsafe; ensure control uses the same tokenization as x."
-                    )
-                return args
-
-            # Only inject on valid (unpadded) tokens.
-            valid_mask = (torch.arange(x.shape[1], device=x.device)[None, :] < seq_lens[:, None]).unsqueeze(-1)
-            x_new = x + (control_feat.type_as(x) * valid_mask)
+            x_new = x + (control_feat.type_as(x))
             # print(x_new.shape)
             # print("add successfully!!!")
             
