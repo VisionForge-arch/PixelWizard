@@ -14,6 +14,7 @@ import random
 import torch
 import torch.distributed as dist
 import torch.nn.functional as F
+import torchvision.transforms.functional as TF
 from PIL import Image
 import json
 
@@ -506,6 +507,15 @@ def generate(args):
                 cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)
                 cond_latent_lr = cond_latent_lr.reshape(B * T, C, h, w)
                 cond_latent_lr = F.interpolate(cond_latent_lr, size=(H, W), mode='bilinear', align_corners=False)
+                
+                
+                # ======= 高斯模糊 =============
+                k = random.choice([3])
+                sigma = 3.0
+                guidance = TF.gaussian_blur(guidance, kernel_size=k, sigma=sigma)
+                
+                
+                
                 cond_latent_lr = cond_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)
                 cond_latent_lr = cond_latent_lr.to(device=wan_ti2v.device, dtype=torch.float32)
                 

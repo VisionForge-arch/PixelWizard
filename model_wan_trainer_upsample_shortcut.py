@@ -283,8 +283,8 @@ class WanModel_Trainer:
             if random.random() < 0.5:
                 # 这里的噪声是为了破坏“像素级对应关系”，强迫模型关注语义
                 aug_level = random.uniform(0.0, 0.1) # 0.1 已经很大了
-                noise = torch.randn_like(guidance) * aug_level
-                guidance = guidance + noise
+                noise = torch.randn_like(clean_latent_lr) * aug_level
+                clean_latent_lr = clean_latent_lr + noise
             # print(f"frames.shape: {frames.shape}, clean_latent.shape: {clean_latent.shape}")
             # print(f"frames_480p.shape: {frames_480p.shape}, clean_latent_lr.shape: {clean_latent_lr.shape}")
                 
