@@ -12,7 +12,7 @@ try:
 except:
     from attention import flash_attention
 
-__all__ = ['WanModel_Upsample_Shortcut']
+__all__ = ['WanModel_Upsample_Shortcut2']
 
 
 

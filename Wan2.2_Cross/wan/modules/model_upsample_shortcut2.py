@@ -8,7 +8,7 @@ from diffusers.models.modeling_utils import ModelMixin
 
 from .attention import flash_attention
 
-__all__ = ['WanModel_Upsample_Shortcut']
+__all__ = ['WanModel_Upsample_Shortcut2']
 
 
 def sinusoidal_embedding_1d(dim, position):
