@@ -208,7 +208,7 @@ class WanModel_Trainer:
     
     
     
-    def random_degrade2(self, hr_frames, target_size=(480, 832)):
+    def random_degrade_down(self, hr_frames, target_size=(480, 832)):
         
         
         # ========== 瓶颈缩放 =============
@@ -220,7 +220,7 @@ class WanModel_Trainer:
         bottleneck_w = int(w / down_factor)
         
         # 1. 缩下去 (使用 area 或 bilinear 保证平滑，不要由 bicubic 产生伪影)
-        tiny_frames = F.interpolate(hr_frames, size=(bottleneck_h, bottleneck_w), mode='area')
+        tiny_frames = F.interpolate(hr_frames, size=(bottleneck_h, bottleneck_w), mode='bilinear')
         
         # 2. 拉回 480p (使用 bilinear 保持模糊感，bicubic 会尝试锐化，不好)
         guidance = F.interpolate(tiny_frames, size=target_size, mode='bilinear', align_corners=False)
@@ -232,6 +232,14 @@ class WanModel_Trainer:
     
         return guidance
     
+    def random_degrade_stage2(self, clean_latent_lr):
+          
+        # ======= 噪声破坏 =============
+        aug_level = random.uniform(0.0, 0.1) # 0.1 已经很大了
+        noise = torch.randn_like(clean_latent_lr) * aug_level
+        clean_latent_lr = clean_latent_lr + noise
+    
+        return clean_latent_lr
     
 
     def train_one_step(self, batch):
@@ -273,18 +281,12 @@ class WanModel_Trainer:
 
             clean_latent_lr = clean_latent_lr.reshape(B*T, C, h, w)  # [B*T, C, h, w]
             clean_latent_lr = F.interpolate(clean_latent_lr, size=(up_H, up_W), mode='bilinear', align_corners=False)  # 可加 antialias=True（若版本支持）
+            
+            clean_latent_lr = self.random_degrade_stage2(clean_latent_lr)
+            
             clean_latent_lr = clean_latent_lr.reshape(B, T, C, up_H, up_W).permute(0, 2, 1, 3, 4).contiguous()  # [B, C, T, H, W]
             
-            # ======= 噪声破坏 =============
-            aug_level = 0.0
-            if random.random() < 0.5:
-                # 这里的噪声是为了破坏“像素级对应关系”，强迫模型关注语义
-                aug_level = random.uniform(0.0, 0.1) # 0.1 已经很大了
-                noise = torch.randn_like(clean_latent_lr) * aug_level
-                clean_latent_lr = clean_latent_lr + noise
-            # print(f"frames.shape: {frames.shape}, clean_latent.shape: {clean_latent.shape}")
-            # print(f"frames_480p.shape: {frames_480p.shape}, clean_latent_lr.shape: {clean_latent_lr.shape}")
-                
+
         # VAE编码完成后立即释放frames显存
         del frames
         del frames_480p
