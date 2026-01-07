@@ -496,8 +496,8 @@ def generate(args):
             
             generate_resolution = SIZE_CONFIGS[resolution]
             generate_resolution_W, generate_resolution_H = generate_resolution
-            H = int(generate_resolution_H // 16)
-            W = int(generate_resolution_W // 16)
+            H_lr = int(generate_resolution_H // 32)
+            W_lr = int(generate_resolution_W // 32)
 
             if video_input.shape[1] == 48:
                 cond_latent_lr = video_input.to(device=wan_ti2v.device, dtype=torch.float32)  # [B,C,T,h,w]
@@ -506,14 +506,16 @@ def generate(args):
 
                 cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)
                 cond_latent_lr = cond_latent_lr.reshape(B * T, C, h, w)
-                cond_latent_lr = F.interpolate(cond_latent_lr, size=(H, W), mode='bilinear', align_corners=False)
+                
+                
+                cond_latent_lr = F.interpolate(cond_latent_lr, size=(H_lr, W_lr), mode='bilinear', align_corners=False)
                 
                 # ======= 高斯模糊 =============
                 # k = random.choice([5])
                 # sigma = 3.0
                 # cond_latent_lr= TF.gaussian_blur(cond_latent_lr, kernel_size=k, sigma=sigma)
                 
-                cond_latent_lr = cond_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)
+                cond_latent_lr = cond_latent_lr.reshape(B, T, C, H_lr, W_lr).permute(0, 2, 1, 3, 4)
                 cond_latent_lr = cond_latent_lr.to(device=wan_ti2v.device, dtype=torch.float32)
                 
                 # noise = torch.randn_like(cond_latent_lr) * 0.1
@@ -539,15 +541,11 @@ def generate(args):
                     print("cond_latent_lr.shape:", cond_latent_lr.shape)
                     cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)
                     cond_latent_lr = cond_latent_lr.reshape(B * T, C, h, w)
-                    cond_latent_lr = F.interpolate(cond_latent_lr, size=(H, W), mode='bilinear', align_corners=False)
-                    cond_latent_lr = cond_latent_lr.reshape(B, T, C, H, W).permute(0, 2, 1, 3, 4)
+                    cond_latent_lr = F.interpolate(cond_latent_lr, size=(H_lr, W_lr), mode='bilinear', align_corners=False)
+                    cond_latent_lr = cond_latent_lr.reshape(B, T, C, H_lr, W_lr).permute(0, 2, 1, 3, 4)
                     #print(cond_latent.shape) # [1, 31, 48, 30, 52]
                     cond_latent_lr = cond_latent_lr.to(device=wan_ti2v.device, dtype=torch.float32)
-                    
-                    
-                    
 
-  
  
             video = wan_ti2v.generate(
                     current_prompt,
