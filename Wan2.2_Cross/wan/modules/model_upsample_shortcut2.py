@@ -344,16 +344,16 @@ class WanSpatialControlAdapter(nn.Module):
 
         # 3. Guidance Timestep Embedding (控制强度的开关)
         self.adapter_time_proj = nn.Sequential(
-            nn.Linear(freq_dim, model_dim * 2),
+            nn.Linear(freq_dim, model_dim),
             nn.SiLU(),
-            nn.Linear(model_dim * 2, model_dim * 2),
+            nn.Linear(model_dim, model_dim),
         )
         
         # 3. Guidance Timestep Embedding (控制强度的开关)
         self.adapter_dt_proj = nn.Sequential(
-            nn.Linear(freq_dim, model_dim * 2),
+            nn.Linear(freq_dim, model_dim),
             nn.SiLU(),
-            nn.Linear(model_dim * 2, model_dim * 2),
+            nn.Linear(model_dim, model_dim),
         )
         nn.init.zeros_(self.adapter_dt_proj[-1].weight)
         nn.init.zeros_(self.adapter_dt_proj[-1].bias)
@@ -377,9 +377,9 @@ class WanSpatialControlAdapter(nn.Module):
         x = x.flatten(2).transpose(1, 2) # [B, SeqLen, Dim]
         
         w = self.adapter_time_proj(guidance_t_emb)
-        if guidance_dt_emb is not None:
-            w = w + self.adapter_dt_proj(guidance_dt_emb)
-        scale, shift = w.chunk(2, dim=-1)                    # [B, D], [B, D]
+        w = w + self.adapter_dt_proj(guidance_dt_emb)
+        scale = w         # [B, D], [B, D]
+        scale = torch.tanh(scale) 
         
         x = self.feature_norm(x)
         
@@ -387,7 +387,7 @@ class WanSpatialControlAdapter(nn.Module):
         # 类似于把 guidance 加到 feature 上
         # print(guidance_t_emb.shape) # guidance_t_emb: [B, Dim]       
         
-        x = x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1) # Scale 调制，或者 add 也可以
+        x = x * (1 + scale.unsqueeze(1))
             
         # C. 只生成需要注入的控制特征（按 block_idx）
         controls = {int(i): self.zero_layers[str(i)](x) for i in self.control_block_indices}
@@ -422,7 +422,12 @@ def register_spatial_control(model):
             if not hasattr(model, '_current_spatial_ctx') or model._current_spatial_ctx is None:
                 return args # 不做任何修改
             
-            ctx = model._current_spatial_ctx
+            ctx = getattr(model, "_current_spatial_ctx", None)
+            if ctx is None:
+                ctx = getattr(model, "_spatial_ctx_cache", None)
+            if ctx is None:
+                return args
+            
             controls = ctx.get('controls')
             
             if controls is None:
@@ -435,15 +440,6 @@ def register_spatial_control(model):
             
             x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
             seq_lens = args[2]  # [B] (unpadded token length)
-
-            # L_x = x.shape[1]
-            # L_c = control_feat.shape[1]
-             # 对齐长度：pad 或截断到和 x 一样长
-            # if L_c < L_x:
-            #     pad = control_feat.new_zeros(control_feat.shape[0], L_x - L_c, control_feat.shape[2])
-            #     control_feat = torch.cat([control_feat, pad], dim=1)
-            # elif L_c > L_x:
-            #     control_feat = control_feat[:, :L_x, :]
             
             # --- FIX STARTS HERE: Handle Sequence Parallelism Slicing ---
             # If input x is smaller than control, we assume SP is active and slice control
@@ -467,15 +463,10 @@ def register_spatial_control(model):
                     return args
             # -----------------------------------------------------------
             
-            
             # 4. [关键] 特征相加 (Feature Injection)
             # print(x.shape)
-            valid_mask = (torch.arange(x.shape[1], device=x.device)[None, :] < seq_lens[:, None]).unsqueeze(-1)
-            x_new = x + (control_feat.type_as(x) * valid_mask)
-            
-            # print(x_new.shape)
-            # print("add successfully!!!")
-            
+            x_new = x + (control_feat.type_as(x))
+        
             # 5. 重新打包 args
             # Tuple 是不可变的，所以要新建一个
             new_args = (x_new,) + args[1:]

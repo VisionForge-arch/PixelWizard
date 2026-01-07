@@ -253,8 +253,7 @@ class WanAttentionBlock(nn.Module):
 
         # layers
         self.norm1 = WanLayerNorm(dim, eps)
-        self.self_attn = WanSelfAttention(dim, num_heads, window_size, qk_norm,
-                                          eps)
+        self.self_attn = WanSelfAttention(dim, num_heads, window_size, qk_norm, eps)
         self.norm3 = WanLayerNorm(
             dim, eps,
             elementwise_affine=True) if cross_attn_norm else nn.Identity()
@@ -510,9 +509,7 @@ def register_spatial_control(model):
                 control_feat = torch.cat([control_feat, pad], dim=1)
             
             x_new = x + (control_feat.type_as(x))
-            # print(x_new.shape)
-            # print("add successfully!!!")
-            
+
             # 5. 重新打包 args
             # Tuple 是不可变的，所以要新建一个
             new_args = (x_new,) + args[1:]
