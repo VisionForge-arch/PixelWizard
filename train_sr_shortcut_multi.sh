@@ -1,6 +1,6 @@
 export WANDB_MODE=offline
 # 在所有节点都设置这些变量
-export MASTER_ADDR=10.44.140.186  # 主节点 IP
+export MASTER_ADDR=10.44.139.204  # 主节点 IP
 export MASTER_PORT=29500            # 通讯端口
 export NNODES=2                          # 总节点数
 
