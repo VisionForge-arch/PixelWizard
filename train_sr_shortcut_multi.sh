@@ -1,5 +1,4 @@
-export WANDB_MODE=offline
-export WANDB_SERVICE=disabled
+export WANDB_MODE=disabled
 # 在所有节点都设置这些变量
 export MASTER_ADDR=10.44.139.204  # 主节点 IP
 export MASTER_PORT=29500            # 通讯端口
