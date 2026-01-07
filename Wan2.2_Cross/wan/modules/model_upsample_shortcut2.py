@@ -437,7 +437,6 @@ def register_spatial_control(model):
                 return args
             
             x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
-            seq_lens = args[2]  # [B] (unpadded token length)
             
             # --- FIX STARTS HERE: Handle Sequence Parallelism Slicing ---
             # If input x is smaller than control, we assume SP is active and slice control
