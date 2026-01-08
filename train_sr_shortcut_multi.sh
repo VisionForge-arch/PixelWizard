@@ -1,5 +1,4 @@
 export WANDB_MODE=disabled
-unset WANDB_SERVICE
 # 在所有节点都设置这些变量
 export MASTER_ADDR=10.44.142.56  # 主节点 IP
 export MASTER_PORT=29500            # 通讯端口
@@ -20,7 +19,7 @@ torchrun \
   --generator_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/4k_shortcut_new/checkpoint_model_000500/model.pt \
   --trainable_backbone \
   --shortcut \
-  --load_generator_ckpt \
+  # --load_generator_ckpt \
 
 
 # torchrun --standalone --nproc_per_node=8 \
