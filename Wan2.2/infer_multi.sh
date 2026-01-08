@@ -25,7 +25,7 @@
 torchrun --nproc_per_node=8 \
     generate_multiple.py \
     --sample_steps=50 \
-    --base_seed=1 \
+    --base_seed=0 \
     --use_ema \
     --dit_fsdp \
     --prompt_file=/root/ultrawan/Wan2.2/prompt_env.txt \
