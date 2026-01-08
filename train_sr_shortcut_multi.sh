@@ -1,6 +1,7 @@
 export WANDB_MODE=disabled
+unset WANDB_SERVICE
 # 在所有节点都设置这些变量
-export MASTER_ADDR=10.44.139.204  # 主节点 IP
+export MASTER_ADDR=10.44.142.56  # 主节点 IP
 export MASTER_PORT=29500            # 通讯端口
 export NNODES=2                          # 总节点数
 
@@ -13,10 +14,10 @@ torchrun \
   train_sr.py \
   --height=2144 \
   --width=3840 \
-  --num_frames=69 \
+  --num_frames=81 \
   --config_path=/root/ultrawan/configs/self_forcing_dmd_4k.yaml \
-  --logdir=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/4k_shortcut_new \
-  --generator_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_shortcut_new/checkpoint_model_001900/model.pt \
+  --logdir=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/4k_shortcut_new2 \
+  --generator_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/4k_shortcut_new/checkpoint_model_000500/model.pt \
   --trainable_backbone \
   --shortcut \
   --load_generator_ckpt \
