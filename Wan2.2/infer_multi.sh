@@ -11,11 +11,11 @@
 
 torchrun --nproc_per_node=8 \
     generate_multiple.py \
-    --sample_steps=40 \
+    --sample_steps=30 \
     --base_seed=1 \
     --use_ema \
     --dit_fsdp \
-    --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_woman/pt_40 \
+    --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_woman/pt_30 \
     --wan_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p/checkpoint_model_000100/model.pt \
     --size=448*256 \
     --t5_fsdp \
