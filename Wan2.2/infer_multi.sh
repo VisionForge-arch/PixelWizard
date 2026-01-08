@@ -24,7 +24,7 @@
 
 torchrun --nproc_per_node=8 \
     generate_multiple.py \
-    --sample_steps=20 \
+    --sample_steps=50 \
     --base_seed=1 \
     --use_ema \
     --dit_fsdp \
