@@ -172,12 +172,12 @@ class WanModel_Trainer:
 
         # ============ SAVE ============
         self.output_path = config.logdir
-        if self.is_main_process:
-            wandb.init(
-                project="self_forcing_long",
-                name="self_forcing_long", 
-                config=dict(config)
-            )
+        # if self.is_main_process:
+        #     wandb.init(
+        #         project="self_forcing_long",
+        #         name="self_forcing_long", 
+        #         config=dict(config)
+        #     )
         self.previous_time = None
         
 
@@ -380,7 +380,7 @@ class WanModel_Trainer:
                     wandb_loss_dict["loss_sc"] = generator_log_dict["loss_sc"].mean().item()
                 if "shortcut_num_sc" in generator_log_dict:
                     wandb_loss_dict["shortcut_num_sc"] = generator_log_dict["shortcut_num_sc"].mean().item()
-                wandb.log(wandb_loss_dict, step=self.step)
+                #wandb.log(wandb_loss_dict, step=self.step)
             
             # ======
             if self.is_main_process:
