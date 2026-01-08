@@ -70,7 +70,7 @@ class WanModel_Trainer:
             dataset,
             batch_size=config.batch_size,
             sampler=sampler,
-            num_workers=8)
+            num_workers=2)
         
         if dist.get_rank() == 0:
             print("DATASET SIZE %d" % len(dataset))
@@ -404,7 +404,7 @@ class WanModel_Trainer:
                 if self.previous_time is None:
                     self.previous_time = current_time
                 else:
-                    wandb.log({"per iteration time": current_time - self.previous_time}, step=self.step)
+                    #wandb.log({"per iteration time": current_time - self.previous_time}, step=self.step)
                     self.previous_time = current_time
                 
         
