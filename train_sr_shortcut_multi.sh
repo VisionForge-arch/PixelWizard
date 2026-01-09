@@ -19,7 +19,7 @@ torchrun \
   --generator_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/4k_shortcut_new/checkpoint_model_000500/model.pt \
   --trainable_backbone \
   --shortcut \
-  # --load_generator_ckpt \
+  --load_generator_ckpt \
 
 
 # torchrun --standalone --nproc_per_node=8 \
