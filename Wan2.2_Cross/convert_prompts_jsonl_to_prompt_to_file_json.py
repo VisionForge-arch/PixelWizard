@@ -78,7 +78,7 @@ def main():
     )
     parser.add_argument(
         "--add-normalized",
-        default=True, 
+        default=False, 
         help="Also add 'normalized' field like prompt_match.py does.",
     )
     parser.add_argument(
