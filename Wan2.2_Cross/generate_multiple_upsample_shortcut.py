@@ -381,7 +381,7 @@ def generate(args):
         assert args.ulysses_size == world_size, f"The number of ulysses_size should be equal to the world size."
         init_distributed_group()
         
-    if args.eval_bench: 
+    if args.eval_bench is False: 
         # 读取prompt文件
         prompt_file = args.prompt_file
         with open(prompt_file, "r", encoding="utf-8") as f:
@@ -404,7 +404,7 @@ def generate(args):
         prompts_and_files = []
         for item in pairs:
             p = item.get("text", "").strip()
-            file_id = item.get("file", None)
+            file_id = item.get("id", None)
             file_id = file_id + ".pt"
             file_name = "/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/240p_5s/pt"
             file_path = os.path.join(file_name, file_id)
