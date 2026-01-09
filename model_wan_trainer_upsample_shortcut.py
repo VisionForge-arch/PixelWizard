@@ -182,11 +182,11 @@ class WanModel_Trainer:
         
 
 
-    def random_degrade(self, hr_frames, target_size=(480, 832)):
+    def random_degrade_2k(self, hr_frames, target_size=(480, 832)):
         
         
         # ========== 瓶颈缩放 =============
-        down_factor = random.uniform(8, 32)  # 2K (2048) / 32 = 64 pixel，非常糊
+        down_factor = random.uniform(7, 8)  # 2K (2048) / 32 = 64 pixel，非常糊
         
         # 计算瓶颈尺寸
         h, w = hr_frames.shape[-2:]
@@ -200,19 +200,19 @@ class WanModel_Trainer:
         guidance = F.interpolate(tiny_frames, size=target_size, mode='bilinear', align_corners=False)
         
         # ======= 高斯模糊 =============
-        k = random.choice([7, 9, 11])
-        sigma = random.uniform(3.0, 5.0)
+        k = random.choice([7, 9])
+        sigma = random.uniform(3.0, 4.0)
         guidance = TF.gaussian_blur(guidance, kernel_size=k, sigma=sigma)
         
         return guidance
     
     
     
-    def random_degrade2(self, hr_frames, target_size=(480, 832)):
+    def random_degrade_4k(self, hr_frames, target_size=(480, 832)):
         
         
         # ========== 瓶颈缩放 =============
-        down_factor = random.uniform(8, 16)  # 2K (2048) / 32 = 64 pixel，非常糊
+        down_factor = random.uniform(10, 16)  #
         
         # 计算瓶颈尺寸
         h, w = hr_frames.shape[-2:]
@@ -227,7 +227,7 @@ class WanModel_Trainer:
         
         # ======= 高斯模糊 =============
         k = random.choice([7, 9])
-        sigma = random.uniform(3.0, 4.3)
+        sigma = random.uniform(3.0, 4.0)
         guidance = TF.gaussian_blur(guidance, kernel_size=k, sigma=sigma)  
     
         return guidance
@@ -263,7 +263,13 @@ class WanModel_Trainer:
      
         degrade_size = (256, 448)
         h_d, w_d = degrade_size
-        frames_480p = self.random_degrade2(frames_lr, target_size=degrade_size)  # 低质引导再退化
+        
+        if H == 1440:
+            frames_480p = self.random_degrade_2k(frames_lr, target_size=degrade_size)  # 低质引导再退化
+        elif H == 2144: 
+            frames_480p = self.random_degrade_4k(frames_lr, target_size=degrade_size)  # 低质引导再退化
+        
+        
         frames_480p = frames_480p.reshape(B, T, C, h_d, w_d).permute(0, 2, 1, 3, 4)   # [b, C, T, h, w]
         
         
