@@ -380,10 +380,16 @@ def generate(args):
     if args.ulysses_size > 1:
         assert args.ulysses_size == world_size, f"The number of ulysses_size should be equal to the world size."
         init_distributed_group()
-        
+    
+    
+    
+    # ------------- 读json/jsonl文件 -------- 
+    # 一般是用于配对pt和orompt的
+    
+    prompt_file = args.prompt_file
     if args.eval_bench is False: 
         # 读取prompt文件
-        prompt_file = args.prompt_file
+        
         with open(prompt_file, "r", encoding="utf-8") as f:
             pairs = json.load(f) 
         
@@ -410,6 +416,8 @@ def generate(args):
                     file_name = "/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/240p_5s/pt"
                     file_path = os.path.join(file_name, file_id)
                     prompts_and_files.append((p, file_path))
+                    
+        logging.info(f"从 {prompt_file} 读取了 {len(prompts_and_files)} 条 prompts")
     
     # 定义要使用的分辨率
     #resolutions = ['1920*1056', '2560*1440', '3840*2144']
