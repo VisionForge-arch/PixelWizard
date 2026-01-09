@@ -412,7 +412,7 @@ def generate(args):
                 p = item.get("text", "").strip()
                 file_id = item.get("id", None)
                 if file_id and p:
-                    file_id = file_id + ".pt"
+                    file_id = str(file_id) + ".pt"
                     file_name = "/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/240p_5s/pt"
                     file_path = os.path.join(file_name, file_id)
                     prompts_and_files.append((p, file_path))
