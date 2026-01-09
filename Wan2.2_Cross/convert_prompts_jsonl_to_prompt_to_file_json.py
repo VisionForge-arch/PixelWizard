@@ -63,7 +63,6 @@ def main():
     parser.add_argument(
         "-o",
         default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/eval_100_match_240.json",
-        required=True,
         help="Output JSON path (list of objects).",
     )
     parser.add_argument(
