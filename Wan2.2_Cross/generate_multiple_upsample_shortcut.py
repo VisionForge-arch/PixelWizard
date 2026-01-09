@@ -510,7 +510,7 @@ def generate(args):
                 cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)
                 cond_latent_lr = cond_latent_lr.reshape(B * T, C, h, w)
                 
-                cond_latent_lr = F.interpolate(cond_latent_lr, size=(int(h//1.5), int(w//1.5)), mode='bilinear', align_corners=False)
+                cond_latent_lr = F.interpolate(cond_latent_lr, size=(int(h//1.2), int(w//1.2)), mode='bilinear', align_corners=False)
                 
                 cond_latent_lr = F.interpolate(cond_latent_lr, size=(H_lr, W_lr), mode='bilinear', align_corners=False)
                 
