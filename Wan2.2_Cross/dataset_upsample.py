@@ -308,12 +308,21 @@ class UnifiedDataset(torch.utils.data.Dataset):
                 elif isinstance(item.get("prompt", None), str):
                     item["prompt"] = item["prompt"].strip()
 
-                if "file" not in item:
-                    for k in ("video_path", "path", "file_path", "filepath", "clip_id"):
+                if "file" not in item or item.get("file", None) in (None, ""):
+                    source_key = None
+                    for k in ("video_path", "path", "file_path", "filepath", "clip_id", "id"):
                         v = item.get(k, None)
-                        if v is not None:
+                        if v is not None and v != "":
                             item["file"] = v
+                            source_key = k
                             break
+                    if "file" in item and item["file"] is not None:
+                        file_str = str(item["file"]).strip()
+                        if source_key in ("clip_id", "id"):
+                            base = os.path.basename(file_str)
+                            if "." not in base:
+                                file_str = f"{file_str}.pt"
+                        item["file"] = file_str
         self.data = metadata
         
     
