@@ -295,6 +295,25 @@ class UnifiedDataset(torch.utils.data.Dataset):
                             raise ValueError(
                                 f"Invalid JSON/JSONL in {metadata_path} at line {line_no}"
                             ) from e
+        if isinstance(metadata, list):
+            for item in metadata:
+                if not isinstance(item, dict):
+                    continue
+                if "prompt" not in item:
+                    for k in ("text", "caption", "detailed_description", "description"):
+                        v = item.get(k, None)
+                        if isinstance(v, str) and v.strip():
+                            item["prompt"] = v.strip()
+                            break
+                elif isinstance(item.get("prompt", None), str):
+                    item["prompt"] = item["prompt"].strip()
+
+                if "file" not in item:
+                    for k in ("video_path", "path", "file_path", "filepath", "clip_id"):
+                        v = item.get(k, None)
+                        if v is not None:
+                            item["file"] = v
+                            break
         self.data = metadata
         
     
