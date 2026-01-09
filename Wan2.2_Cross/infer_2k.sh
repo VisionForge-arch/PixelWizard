@@ -1,6 +1,7 @@
 export CUDA_VISIBLE_DEVICES=2,1,4,5,6,7
 torchrun --standalone --nproc_per_node=6 \
     generate_multiple_upsample_shortcut.py \
+    --use_ema \
     --size=2560*1440 \
     --sample_steps=4 \
     --prompt_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/woman_240p_pt_20.json \
