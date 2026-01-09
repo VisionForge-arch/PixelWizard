@@ -266,8 +266,35 @@ class UnifiedDataset(torch.utils.data.Dataset):
     
     
     def load_metadata(self, metadata_path):
-        with open(metadata_path, "r") as f:
-            metadata = json.load(f)
+        with open(metadata_path, "r", encoding="utf-8") as f:
+            if str(metadata_path).endswith(".jsonl"):
+                metadata = []
+                for line_no, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        metadata.append(json.loads(line))
+                    except json.JSONDecodeError as e:
+                        raise ValueError(
+                            f"Invalid JSONL in {metadata_path} at line {line_no}"
+                        ) from e
+            else:
+                try:
+                    metadata = json.load(f)
+                except json.JSONDecodeError:
+                    f.seek(0)
+                    metadata = []
+                    for line_no, line in enumerate(f, 1):
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            metadata.append(json.loads(line))
+                        except json.JSONDecodeError as e:
+                            raise ValueError(
+                                f"Invalid JSON/JSONL in {metadata_path} at line {line_no}"
+                            ) from e
         self.data = metadata
         
     
