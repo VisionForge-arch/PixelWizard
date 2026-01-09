@@ -405,16 +405,18 @@ def generate(args):
         with open(prompt_file, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
-                if not line:  # 跳过空行
+                if not line: # 跳过空行
                     continue
-                item = json.loads(line)  # 注意是 loads 不是 load
-                p = item.get("text", "").strip()
-                file_id = item.get("id", None)
+                item = json.loads(line) # 注意是 loads 不是 load
+                # 统一 schema
+                p = item.get("prompt", item.get("text", "")).strip()
+                file_id = item.get("file_id", item.get("id"))
+                
                 if file_id and p:
                     file_id = str(file_id) + ".pt"
                     file_name = "/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/240p_5s/pt"
                     file_path = os.path.join(file_name, file_id)
-                    prompts_and_files.append((p, file_path))
+                prompts_and_files.append((p, file_path))
                     
     logging.info(f"从 {prompt_file} 读取了 {len(prompts_and_files)} 条 prompts")
     
