@@ -18,11 +18,10 @@ torchrun --standalone --nproc_per_node=8 \
   train_sr.py \
   --height=1440 \
   --width=2560 \
-  --num_frames=81 \
+  --num_frames=121 \
   --config_path=/root/ultrawan/configs/self_forcing_dmd.yaml \
   --logdir=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_shortcut_new2 \
   --generator_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_shortcut_new/checkpoint_model_002100/model.pt \
   --trainable_backbone \
   --shortcut \
   --load_generator_ckpt \
-  --use_ema \
