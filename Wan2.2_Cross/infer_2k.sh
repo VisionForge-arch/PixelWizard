@@ -15,10 +15,10 @@ export CUDA_VISIBLE_DEVICES=2,1,4,5,6,7
 
 
 torchrun --standalone --nproc_per_node=6 \
-    generate_multiple_upsample_shortcut_shu.py \
-    --size=1056*1920 \
+    generate_multiple_upsample_shortcut.py \
+    --size=2560*1440 \
     --sample_steps=4 \
-    --prompt_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/env_240p_pt_20.json \
+    --prompt_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/env_240p_pt.json \
     --wan_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_shortcut_new/checkpoint_model_002100/model.pt \
     --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_upsample_2k_shortcut2/pt_env_20 \
     --frame_num=121 \
