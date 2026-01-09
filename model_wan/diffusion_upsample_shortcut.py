@@ -204,7 +204,7 @@ class SelfForcingWan_Upsample_SC(nn.Module):
         """
         
         enable_shortcut = bool(getattr(self.args, "shortcut_enable", True))
-        rate_sc = float(getattr(self.args, "shortcut_rate_sc", 0.3))
+        rate_sc = float(getattr(self.args, "shortcut_rate_sc", 0.2))
         w_sc = float(getattr(self.args, "shortcut_loss_sc_weight", 1.0))
         debug_sc = bool(getattr(self.args, "shortcut_debug", False))
 
