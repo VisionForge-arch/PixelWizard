@@ -313,6 +313,7 @@ def _parse_args():
         default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_shortcut2/checkpoint_model_000400/model.pt",
         help="The path to the Wan checkpoint.")
     parser.add_argument("--use_ema", action="store_true", help="Whether to use EMA parameters")
+    parser.add_argument("--eval_bench", action="store_true", help="Whether to eval benchmark")
     args = parser.parse_args()
     _validate_args(args)
 
@@ -380,20 +381,36 @@ def generate(args):
         assert args.ulysses_size == world_size, f"The number of ulysses_size should be equal to the world size."
         init_distributed_group()
         
+    if args.eval_bench: 
+        # 读取prompt文件
+        prompt_file = args.prompt_file
+        with open(prompt_file, "r", encoding="utf-8") as f:
+            pairs = json.load(f) 
         
-    # 读取prompt文件
-    prompt_file = args.prompt_file
-    with open(prompt_file, "r", encoding="utf-8") as f:
-        pairs = json.load(f) 
-    
-    prompts_and_files = []
-    for item in pairs:
-        p = item.get("prompt", "").strip()
-        fp = item.get("file", None)
-        if p:
-            prompts_and_files.append((p, fp))
+        prompts_and_files = []
+        for item in pairs:
+            p = item.get("prompt", "").strip()
+            fp = item.get("file", None)
+            if p:
+                prompts_and_files.append((p, fp))
 
-    logging.info(f"从 {prompt_file} 读取了 {len(prompts_and_files)} 条 prompts")
+        logging.info(f"从 {prompt_file} 读取了 {len(prompts_and_files)} 条 prompts")
+    
+    else: 
+        prompt_file = args.prompt_file
+        with open(prompt_file, "r", encoding="utf-8") as f:
+            pairs = json.load(f) 
+            
+        prompts_and_files = []
+        for item in pairs:
+            p = item.get("text", "").strip()
+            file_id = item.get("file", None)
+            file_id = file_id + ".pt"
+            file_name = "/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/240p_5s/pt"
+            file_path = os.path.join(file_name, file_id)
+            prompts_and_files.append((p, file_path))
+        
+            logging.info(f"从 {prompt_file} 读取了 {len(prompts_and_files)} 条 prompts")
     
     
     # 定义要使用的分辨率
