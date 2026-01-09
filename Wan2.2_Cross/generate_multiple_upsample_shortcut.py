@@ -313,7 +313,6 @@ def _parse_args():
         default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_shortcut2/checkpoint_model_000400/model.pt",
         help="The path to the Wan checkpoint.")
     parser.add_argument("--use_ema", action="store_true", help="Whether to use EMA parameters")
-    parser.add_argument("--eval_bench", action="store_true", help="Whether to eval benchmark")
     args = parser.parse_args()
     _validate_args(args)
 
@@ -388,36 +387,16 @@ def generate(args):
     
     prompt_file = args.prompt_file
     prompts_and_files = []
-    
-    if args.eval_bench is False: 
-        # 读取prompt文件
         
-        with open(prompt_file, "r", encoding="utf-8") as f:
-            pairs = json.load(f) 
-        
-        for item in pairs:
-            p = item.get("prompt", "").strip()
-            fp = item.get("file", None)
-            if p:
-                prompts_and_files.append((p, fp))
+    with open(prompt_file, "r", encoding="utf-8") as f:
+        pairs = json.load(f) 
     
-    else: 
-        with open(prompt_file, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line: # 跳过空行
-                    continue
-                item = json.loads(line) # 注意是 loads 不是 load
-                # 统一 schema
-                p = item.get("prompt", item.get("text", "")).strip()
-                file_id = item.get("file_id", item.get("id"))
-                
-                if file_id and p:
-                    file_id = str(file_id) + ".pt"
-                    file_name = "/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/240p_5s/pt"
-                    file_path = os.path.join(file_name, file_id)
-                prompts_and_files.append((p, file_path))
-                    
+    for item in pairs:
+        p = item.get("prompt", "").strip()
+        fp = item.get("file", None)
+        if p:
+            prompts_and_files.append((p, fp))
+    
     logging.info(f"从 {prompt_file} 读取了 {len(prompts_and_files)} 条 prompts")
     
     # 定义要使用的分辨率
