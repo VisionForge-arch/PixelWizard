@@ -397,21 +397,19 @@ def generate(args):
         logging.info(f"从 {prompt_file} 读取了 {len(prompts_and_files)} 条 prompts")
     
     else: 
-        prompt_file = args.prompt_file
         with open(prompt_file, "r", encoding="utf-8") as f:
-            pairs = json.load(f) 
-            
-        prompts_and_files = []
-        for item in pairs:
-            p = item.get("text", "").strip()
-            file_id = item.get("id", None)
-            file_id = file_id + ".pt"
-            file_name = "/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/240p_5s/pt"
-            file_path = os.path.join(file_name, file_id)
-            prompts_and_files.append((p, file_path))
-        
-            logging.info(f"从 {prompt_file} 读取了 {len(prompts_and_files)} 条 prompts")
-    
+            for line in f:
+                line = line.strip()
+                if not line:  # 跳过空行
+                    continue
+                item = json.loads(line)  # 注意是 loads 不是 load
+                p = item.get("text", "").strip()
+                file_id = item.get("id", None)
+                if file_id and p:
+                    file_id = file_id + ".pt"
+                    file_name = "/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/240p_5s/pt"
+                    file_path = os.path.join(file_name, file_id)
+                    prompts_and_files.append((p, file_path))
     
     # 定义要使用的分辨率
     #resolutions = ['1920*1056', '2560*1440', '3840*2144']
