@@ -510,20 +510,15 @@ def generate(args):
                 cond_latent_lr = cond_latent_lr.permute(0, 2, 1, 3, 4)
                 cond_latent_lr = cond_latent_lr.reshape(B * T, C, h, w)
                 
-                cond_latent_lr = F.interpolate(cond_latent_lr, size=(int(h//2), int(w//2)), mode='bilinear', align_corners=False)
+                cond_latent_lr = F.interpolate(cond_latent_lr, size=(int(h//1.5), int(w//1.5)), mode='bilinear', align_corners=False)
                 
                 cond_latent_lr = F.interpolate(cond_latent_lr, size=(H_lr, W_lr), mode='bilinear', align_corners=False)
-                
-                # ======= 高斯模糊 =============
-                # k = random.choice([5])
-                # sigma = 3.0
-                # cond_latent_lr= TF.gaussian_blur(cond_latent_lr, kernel_size=k, sigma=sigma)
                 
                 cond_latent_lr = cond_latent_lr.reshape(B, T, C, H_lr, W_lr).permute(0, 2, 1, 3, 4)
                 cond_latent_lr = cond_latent_lr.to(device=wan_ti2v.device, dtype=torch.float32)
                 
-                noise = torch.randn_like(cond_latent_lr) * 0.1
-                cond_latent_lr = cond_latent_lr + noise
+                # noise = torch.randn_like(cond_latent_lr) * 0.1
+                # cond_latent_lr = cond_latent_lr + noise
                 
             else:
                 #video_input = video_input#.permute(0, 2, 1, 3, 4)
