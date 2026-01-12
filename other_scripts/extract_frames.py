@@ -34,7 +34,7 @@ def extract_frames(video_path, out_dir, img_ext="jpg"):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--video_dir", type=str, 
+    parser.add_argument("--video", type=str, 
                         default="/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/4k_shortcut_100/decoded/16.mp4",
                         help="Directory containing video files")
     parser.add_argument("--out_dir", type=str, 
@@ -47,15 +47,21 @@ def main():
 
     os.makedirs(args.out_dir, exist_ok=True)
 
-    for name in sorted(os.listdir(args.video_dir)):
-        if not name.lower().endswith((".mp4", ".avi", ".mov", ".mkv")):
-            continue
+    # for name in sorted(os.listdir(args.video_dir)):
+    #     if not name.lower().endswith((".mp4", ".avi", ".mov", ".mkv")):
+    #         continue
 
-        video_path = os.path.join(args.video_dir, name)
-        video_name = os.path.splitext(name)[0]
-        out_subdir = os.path.join(args.out_dir, video_name)
+    #     video_path = os.path.join(args.video_dir, name)
+    #     video_name = os.path.splitext(name)[0]
+    #     out_subdir = os.path.join(args.out_dir, video_name)
 
-        extract_frames(video_path, out_subdir, args.ext)
+    #     extract_frames(video_path, out_subdir, args.ext)
+    
+    video_path = args.video
+    video_name = os.path.splitext(os.path.basename(video_path))[0]
+    out_subdir = os.path.join(args.out_dir, video_name)
+
+    extract_frames(video_path, out_subdir, args.ext)
 
 
 if __name__ == "__main__":
