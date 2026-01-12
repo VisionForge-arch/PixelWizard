@@ -35,6 +35,10 @@ parser.add_argument("--save_with_index", action="store_true", help="Whether to s
 parser.add_argument("--no_sleep", action="store_true", help="Whether to save the video using the index or prompt as the filename")
 args = parser.parse_args()
 
+if args.no_sleep is False:
+    exit()
+    
+
 # Initialize distributed inference
 if "LOCAL_RANK" in os.environ:
     dist.init_process_group(backend='nccl')
