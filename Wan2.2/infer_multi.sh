@@ -29,8 +29,8 @@ torchrun --nproc_per_node=8 \
     --use_ema \
     --dit_fsdp \
     --prompt_file=/root/ultrawan/Wan2.2/prompt_env.txt \
-    --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_env/pt \
+    --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_env/pt_square \
     --wan_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p/checkpoint_model_000100/model.pt \
-    --size=225*256 \
+    --size=256*256 \
     --t5_fsdp \
     --ulysses_size 8 \
