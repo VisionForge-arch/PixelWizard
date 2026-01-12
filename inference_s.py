@@ -14,8 +14,8 @@ from torch.utils.data.distributed import DistributedSampler
 from pipeline_long import (
     CausalInferencePipeline,
 )
-from utils.dataset import TextDataset, TextImagePairDataset
-from utils.misc import set_seed
+from dataset_upsample import UnifiedDataset
+from utils_long.misc import set_seed
 
 from demo_utils.memory import gpu, get_cuda_free_memory_gb, DynamicSwapInstaller
 
@@ -92,19 +92,25 @@ pipeline.generator.to(device=gpu)
 pipeline.vae.to(device=gpu)
 
 
-# Create dataset
-if args.i2v:
-    assert not dist.is_initialized(), "I2V does not support distributed inference yet"
-    transform = transforms.Compose([
-        transforms.Resize((480, 832)),
-        transforms.ToTensor(),
-        transforms.Normalize([0.5], [0.5])
-    ])
-    dataset = TextImagePairDataset(args.data_path, transform=transform)
-else:
-    dataset = TextDataset(prompt_path=args.data_path, extended_prompt_path=args.extended_prompt_path)
+dataset = UnifiedDataset(
+    base_path=None,
+    metadata_path=args.prompt_file,
+    repeat=1,
+    data_file_keys=("file",),
+    main_data_operator=UnifiedDataset.default_video_operator(
+        base_path=None,
+        max_pixels=448*256,
+        height=256,
+        width=448,
+        height_division_factor=16,
+        width_division_factor=16,
+        num_frames=121,
+        time_division_factor=4,
+        time_division_remainder=1,
+    ),
+)
+print("len(dataset):", len(dataset))
 num_prompts = len(dataset)
-print(f"Number of prompts: {num_prompts}")
 
 if dist.is_initialized():
     sampler = DistributedSampler(dataset, shuffle=False, drop_last=True)
