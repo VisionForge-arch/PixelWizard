@@ -562,15 +562,17 @@ def generate(args):
 
             
             if rank == 0:
-                formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-                formatted_prompt = current_prompt.replace(" ", "_").replace("/", "_")[:50]
-                file_name = f"{args.task}_{resolution.replace('*','x') if sys.platform=='win32' else resolution}_{args.ulysses_size}_{formatted_prompt}_{formatted_time}.pt"
+                
+                file_name = f"{str(prompt_idx)}.pt"
+                #formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+                #formatted_prompt = current_prompt.replace(" ", "_").replace("/", "_")[:50]
+                #file_name = f"{args.task}_{resolution.replace('*','x') if sys.platform=='win32' else resolution}_{args.ulysses_size}_{formatted_prompt}_{formatted_time}.pt"
                 args.save_file = os.path.join(output_dir, file_name)
                 
                 logging.info(f"Saving latent to {args.save_file}")
                 torch.save({
                     'latent': video,
-                    'prompt': args.prompt,
+                    'prompt': prompt,
                     'seed': args.base_seed,
                     'size': resolution,
                     'frame_num': args.frame_num,
