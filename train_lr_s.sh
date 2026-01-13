@@ -16,12 +16,10 @@
 
 
 export WANDB_MODE=offline
-
-sleep 30d
+export CUDA_VISIBLE_DEVICES=1
 
 torchrun \
   --nproc_per_node=8 \
   train_lr.py \
   --load_generator_ckpt \
-  --use_ema 
 

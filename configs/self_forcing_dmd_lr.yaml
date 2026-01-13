@@ -11,7 +11,7 @@ denoising_step_list:
 warp_denoising_step: true # need to remove - 0 in denoising_step_list if warp_denoising_step is true
 ts_schedule: false
 num_train_timestep: 1000
-timestep_shift: 4.3
+timestep_shift: 4.0
 guidance_scale: 3.0
 denoising_loss_type: flow
 mixed_precision: true
@@ -47,7 +47,7 @@ gradient_checkpointing: true
 num_frame_per_block: 3
 load_raw_video: false
 model_kwargs:
-  timestep_shift: 4.3
+  timestep_shift: 4.0
 use_lora: False
 lora_r: 64
 lora_alpha: 64
