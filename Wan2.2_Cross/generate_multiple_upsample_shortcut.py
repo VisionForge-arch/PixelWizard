@@ -562,8 +562,7 @@ def generate(args):
 
             
             if rank == 0:
-                formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-                file_name = f"{str(prompt_idx)}_{formatted_time}.pt"
+                file_name = f"{str(prompt_idx)}.pt"
                 #formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
                 #formatted_prompt = current_prompt.replace(" ", "_").replace("/", "_")[:50]
                 #file_name = f"{args.task}_{resolution.replace('*','x') if sys.platform=='win32' else resolution}_{args.ulysses_size}_{formatted_prompt}_{formatted_time}.pt"
