@@ -8,7 +8,7 @@ for SEED in 0 1 2 3 4
 do
     echo "Running with base_seed=${SEED}"
 
-    torchrun --nproc_per_node=6 \
+    torchrun --standalone --nproc_per_node=6\
         generate_multiple2.py \
         --prompt_file=${PROMPE_FILE}$ \
         --size=448*256 \
