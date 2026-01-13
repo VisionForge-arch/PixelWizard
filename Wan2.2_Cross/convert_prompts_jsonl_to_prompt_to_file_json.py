@@ -57,18 +57,18 @@ def main():
     parser.add_argument(
         "-i",
         "--input",
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/prompts.jsonl",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/prompt_vbench.jsonl",
         help="Input JSONL path, one JSON object per line.",
     )
     parser.add_argument(
         "-o",
         "--output",
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/eval_100_match_240.json",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/eval_vbench_match_240.json",
         help="Output JSON path (list of objects).",
     )
     parser.add_argument(
         "--pt-dir",
-        default="/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/240p_5s/pt",
+        default="/mnt/nas01-ak/IndividualDirs/wenxueli/eval_vbench/240p_5s/seed_0/pt",
         help="Directory to build file path from id/clip_id when 'file' is missing.",
     )
     parser.add_argument(
