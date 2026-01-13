@@ -19,7 +19,7 @@ export WANDB_MODE=offline
 export CUDA_VISIBLE_DEVICES=1
 
 torchrun \
-  --nproc_per_node=8 \
+  --nproc_per_node=1 \
   train_lr.py \
   --load_generator_ckpt \
 
