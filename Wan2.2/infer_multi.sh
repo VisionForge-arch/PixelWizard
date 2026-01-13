@@ -22,7 +22,7 @@
 #     --ulysses_size 8 \
 
 
-torchrun --nproc_per_node=8 \
+torchrun --standalone --nproc_per_node=8 \
     generate_multiple.py \
     --sample_steps=50 \
     --base_seed=1 \
