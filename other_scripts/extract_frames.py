@@ -35,7 +35,7 @@ def extract_frames(video_path, out_dir, img_ext="jpg"):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--video", type=str, 
-                        default="/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/2k_shortcut_100/1.mp4",
+                        default="/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/2k_shortcut_100/decoded_video/1.mp4",
                         help="Directory containing video files")
     parser.add_argument("--out_dir", type=str, 
                         default="/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/4k_shortcut_100/frames/2k_motor",
