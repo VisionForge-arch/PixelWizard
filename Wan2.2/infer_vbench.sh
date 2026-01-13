@@ -2,6 +2,7 @@
 
 CKPT=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p/checkpoint_model_000100/model.pt
 OUT_ROOT=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/eval_vbench/240p_5s
+PROMPE_FILE=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/prompt_vbench.jsonl
 
 for SEED in 0 1 2 3 4
 do
@@ -9,6 +10,7 @@ do
 
     torchrun --nproc_per_node=8 \
         generate_multiple2.py \
+        --prompt_file=${PROMPE_FILE}$ \
         --size=448*256 \
         --save_file=${OUT_ROOT}/seed_${SEED}/pt \
         --wan_ckpt=${CKPT} \
