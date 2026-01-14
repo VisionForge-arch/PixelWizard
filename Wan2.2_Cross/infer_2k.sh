@@ -3,13 +3,14 @@ torchrun --standalone --nproc_per_node=6 \
     generate_multiple_upsample_shortcut.py \
     --size=2560*1440 \
     --sample_steps=4 \
-    --prompt_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/eval_100_match_240.json \
+    --prompt_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/eval_vbench_match_240.json \
     --wan_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_shortcut_new2/checkpoint_model_001300/model.pt \
-    --save_file=/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/2k_shortcut_100/pt \
+    --save_file=/mnt/nas01-ak/IndividualDirs/wenxueli/eval_vbench/2k_shortcut_100/pt \
     --frame_num=121 \
     --sample_shift=5.5 \
     --dit_fsdp \
     --t5_fsdp \
+    --offload_model=False \
     --ulysses_size 6 \
 
 
