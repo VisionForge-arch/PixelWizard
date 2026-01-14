@@ -29,9 +29,10 @@ torchrun --standalone --nproc_per_node=6 \
     --base_seed=1 \
     --use_ema \
     --dit_fsdp \
-    --prompt_file=/root/ultrawan/Wan2.2/prompt2.txt \
-    --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_woman_tx/pt_1 \
+    --prompt_file=/root/ultrawan/Wan2.2/prompt4.txt \
+    --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_niren/pt_1 \
     --wan_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p/checkpoint_model_000100/model.pt \
     --size=448*256 \
     --t5_fsdp \
+    --offload_model=False \
     --ulysses_size 6 \
