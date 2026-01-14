@@ -138,7 +138,7 @@ def _parse_args():
     parser.add_argument(
         "--offload_model",
         type=str2bool,
-        default=None,
+        default=False,
         help="Whether to offload the model to CPU after each model forward, reducing GPU memory usage."
     )
     parser.add_argument(
