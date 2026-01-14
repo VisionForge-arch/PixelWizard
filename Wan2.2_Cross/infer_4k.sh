@@ -36,4 +36,5 @@ torchrun --standalone --nproc_per_node=6 \
     --sample_shift=5.8 \
     --dit_fsdp \
     --t5_fsdp \
+    --offload_model=False \
     --ulysses_size 6 \
