@@ -63,12 +63,12 @@ def main():
     parser.add_argument(
         "-o",
         "--output",
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/eval_vbench_match_240.json",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/eval_vbench_match_240_1.json",
         help="Output JSON path (list of objects).",
     )
     parser.add_argument(
         "--pt-dir",
-        default="/mnt/nas01-ak/IndividualDirs/wenxueli/eval_vbench/240p_5s/seed_0/pt",
+        default="/mnt/nas01-ak/IndividualDirs/wenxueli/eval_vbench/240p_5s/seed_1/pt",
         help="Directory to build file path from id/clip_id when 'file' is missing.",
     )
     parser.add_argument(
