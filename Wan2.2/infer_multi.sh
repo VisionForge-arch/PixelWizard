@@ -26,7 +26,7 @@ export CUDA_VISIBLE_DEVICES=2,3,4,5,6,7
 torchrun --standalone --nproc_per_node=6 \
     generate_multiple.py \
     --sample_steps=50 \
-    --base_seed=0 \
+    --base_seed=9 \
     --use_ema \
     --dit_fsdp \
     --prompt_file=/root/ultrawan/Wan2.2/prompt4.txt \
