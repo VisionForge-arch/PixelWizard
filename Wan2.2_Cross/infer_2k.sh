@@ -52,7 +52,6 @@ torchrun --standalone --nproc_per_node=6 \
     --frame_num=121 \
     --sample_shift=5.5 \
     --sample_guide_scale=7.5 \
-    --use_ema \
     --dit_fsdp \
     --t5_fsdp \
     --offload_model=False \
