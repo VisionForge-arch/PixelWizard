@@ -11,10 +11,14 @@ def init_distributed_group():
 
 
 def get_rank():
+    if not dist.is_available() or not dist.is_initialized():
+        return 0
     return dist.get_rank()
 
 
 def get_world_size():
+    if not dist.is_available() or not dist.is_initialized():
+        return 1
     return dist.get_world_size()
 
 
@@ -32,17 +36,17 @@ def all_to_all(x, scatter_dim, gather_dim, group=None, **kwargs):
 
 
 def all_gather(tensor):
-    world_size = dist.get_world_size()
+    world_size = get_world_size()
     if world_size == 1:
         return [tensor]
     tensor_list = [torch.empty_like(tensor) for _ in range(world_size)]
-    torch.distributed.all_gather(tensor_list, tensor)
+    dist.all_gather(tensor_list, tensor)
     return tensor_list
 
 
 def gather_forward(input, dim):
     # skip if world_size == 1
-    world_size = dist.get_world_size()
+    world_size = get_world_size()
     if world_size == 1:
         return input
 

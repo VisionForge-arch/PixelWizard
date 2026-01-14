@@ -165,7 +165,8 @@ class WanTI2V_Upsample_Shortcut:
             missing_keys, unexpected_keys = self.model.load_state_dict(generator_state_dict)
             print(f"Missing keys: {len(missing_keys)}, unexpected: {len(unexpected_keys)}")
             print(missing_keys)
-            if dist.get_rank() == 0:
+            # Support non-distributed single-process execution.
+            if (not dist.is_initialized()) or dist.get_rank() == 0:
                 print(adapter_state_dict.keys())
         # ==============================================================
  
