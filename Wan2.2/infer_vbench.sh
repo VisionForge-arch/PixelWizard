@@ -14,7 +14,6 @@ do
         --size=448*256 \
         --save_file=${OUT_ROOT}/seed_${SEED}/pt \
         --wan_ckpt=${CKPT} \
-        --use_ema \
         --dit_fsdp \
         --t5_fsdp \
         --ulysses_size 6 \
