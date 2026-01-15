@@ -270,6 +270,7 @@ if __name__ == "__main__":
     parser.add_argument("--patch_dim", type=str, default="w", choices=['h', 'w'], help="在哪个维度分割，h=高度，w=宽度")
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--overlap", type=int, default=3)
+    parser.add_argument("--id", type=int, default=None)
     args = parser.parse_args()
     
     # 创建输出目录
@@ -288,6 +289,10 @@ if __name__ == "__main__":
     
     # 遍历所有pt文件
     for idx, pt_file in enumerate(pt_files, 1):
+        if (args.id is not None) and (idx < args.id):
+            continue
+        
+        
         print(f"\n{'='*60}")
         print(f"处理 {idx}/{len(pt_files)}: {os.path.basename(pt_file)}")
         print(f"{'='*60}")
