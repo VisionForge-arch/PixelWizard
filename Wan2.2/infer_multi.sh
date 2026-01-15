@@ -34,5 +34,6 @@ torchrun --standalone --nproc_per_node=6 \
     --wan_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p/checkpoint_model_000100/model.pt \
     --size=448*256 \
     --t5_fsdp \
+    --sample_guide_scale=7.5 \
     --offload_model=False \
     --ulysses_size 6 \
