@@ -14,8 +14,8 @@ export CUDA_VISIBLE_DEVICES=2,3,4,5,6,7
 torchrun --standalone --nproc_per_node=6 \
     generate_multiple2.py \
     --size=448*256 \
-    --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/eval_100/240p_5s/pt_new_3000 \
-    --wan_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p_new/checkpoint_model_003000/model.pt \
+    --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/eval_100/240p_5s/pt_new_5000 \
+    --wan_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p_new/checkpoint_model_005000/model.pt \
     --sample_shift=4.5 \
     --dit_fsdp \
     --t5_fsdp \
