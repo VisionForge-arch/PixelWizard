@@ -11,7 +11,7 @@ export CUDA_VISIBLE_DEVICES=2,3,4,5,6,7
 #     --ulysses_size 8 \
 
 
-torchrun --nproc_per_node=6 \
+torchrun --standalone --nproc_per_node=6 \
     generate_multiple2.py \
     --size=448*256 \
     --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/eval_100/240p_5s/pt_new \
