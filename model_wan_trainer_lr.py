@@ -182,7 +182,8 @@ class WanModel_Trainer:
         text_prompts = batch[random.choice(options)]
     
         # 转换PIL图像列表为tensor格式
-        frames = batch['video_path'].to(device=self.device, dtype=self.dtype)
+        #frames = batch['video_path'].to(device=self.device, dtype=self.dtype)
+        frames = batch["clip_id"].to(device=self.device, dtype=self.dtype)
         
         # vae编码
         with torch.no_grad():
