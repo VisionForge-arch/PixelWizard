@@ -177,7 +177,9 @@ class WanModel_Trainer:
             torch.cuda.empty_cache()
             
         # Step 1: Get the next batch of text prompts
-        text_prompts = batch['caption']
+        #text_prompts = batch['caption']
+        options = ['detailed_description', 'brief_description', 'summarized_description']
+        text_prompts = batch[random.choice(options)]
     
         # 转换PIL图像列表为tensor格式
         frames = batch['video_path'].to(device=self.device, dtype=self.dtype)
