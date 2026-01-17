@@ -70,7 +70,7 @@ def main():
     )
     parser.add_argument(
         "--pt-dir",
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/eval_100/240p_5s/pt_new_8000",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/eval_100/240p_5s/pt_new_5000",
         #default="/mnt/nas01-ak/IndividualDirs/wenxueli/eval_vbench/240p_5s/seed_1/pt",
         help="Directory to build file path from id/clip_id when 'file' is missing.",
     )
