@@ -4,11 +4,11 @@ import difflib
 import json
 
 # === 配置路径 ===
-prompt_txt = "/root/ultrawan/Wan2.2/prompt_env.txt"                   # 每行一个 prompt
-video_dir  = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_env/pt"        # 存放 .mp4 或 .pt 文件的目录
+prompt_txt = "/root/ultrawan/extracted_texts"                   # 每行一个 prompt
+video_dir  = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/eval_100/240p_5s/pt_new"        # 存放 .mp4 或 .pt 文件的目录
 
 
-pat = re.compile(r"^ti2v-5B_448\*256_8_(?:\+?prompt_)?(?P<frag>.+?)_\d{8}_\d{6}\.(?:pt|mp4)$")
+pat = re.compile(r"^ti2v-5B_448\*256_6_(?:\+?prompt_)?(?P<frag>.+?)_\d{8}_\d{6}\.(?:pt|mp4)$")
 
 def normalize(p: str) -> str:
     # 和你保存时完全一致：只做空格与斜杠替换，然后截断 50
@@ -47,7 +47,7 @@ for p in prompts:
             "file": os.path.join(video_dir, exact)
         })
 
-out_json = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/env_240p_pt.json"
+out_json = "/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/eval_100_match_240_new.json"
 with open(out_json, "w", encoding="utf-8") as f:
     json.dump(mapping, f, indent=2, ensure_ascii=False)
 
