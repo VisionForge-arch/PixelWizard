@@ -15,7 +15,7 @@ torchrun --standalone --nproc_per_node=6 \
     generate_multiple2.py \
     --size=448*256 \
     --save_file=/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/eval_100/240p_5s/pt_new_seed10 \
-    --wan_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p_new/checkpoint_model_001800/model.pt \
+    --wan_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p_new/checkpoint_model_005000/model.pt \
     --base_seed=10 \
     --sample_shift=4.3 \
     --dit_fsdp \
