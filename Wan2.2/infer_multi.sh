@@ -26,7 +26,6 @@ export CUDA_VISIBLE_DEVICES=2,3,4,5,6,7
 torchrun --standalone --nproc_per_node=6 \
     generate_multiple.py \
     --sample_steps=50 \
-    --base_seed=10 \
     --dit_fsdp \
     --prompt_file=/root/ultrawan/Wan2.2/prompt4.txt \
     --save_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/480p_base/240p_niren/pt_1 \
