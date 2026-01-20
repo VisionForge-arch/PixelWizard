@@ -65,13 +65,13 @@ def main():
         "-o",
         "--output",
         #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/eval_100_match_240_new_8000.json",
-        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/eval_vbench_match_240_1.json",
+        default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/eval_vbench_match_240_2.json",
         help="Output JSON path (list of objects).",
     )
     parser.add_argument(
         "--pt-dir",
         #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/outputs_ultra/eval_100/240p_5s/pt_new_5000",
-        default="/mnt/nas01-ak/IndividualDirs/wenxueli/eval_vbench/240p_5s_2/seed_1/pt",
+        default="/mnt/nas01-ak/IndividualDirs/wenxueli/eval_vbench/240p_5s_2/seed_2/pt",
         help="Directory to build file path from id/clip_id when 'file' is missing.",
     )
     parser.add_argument(
