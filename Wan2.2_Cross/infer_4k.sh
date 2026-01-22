@@ -44,10 +44,10 @@ export CUDA_VISIBLE_DEVICES=1,2,3,4,5,6
 torchrun --standalone --nproc_per_node=6 \
     generate_multiple_upsample_shortcut.py \
     --size=3840*2144 \
-    --sample_steps=8 \
+    --sample_steps=2 \
     --prompt_file=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/prompts/eval_100_match_240_new.json \
     --wan_ckpt=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/4k_shortcut_new2/checkpoint_model_001150/model.pt \
-    --save_file=/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/4k_shortcut_100_new/pt_8step \
+    --save_file=/mnt/nas01-ak/IndividualDirs/wenxueli/eval_100/4k_shortcut_100_new/pt_2step \
     --frame_num=121 \
     --sample_shift=5.8 \
     --dit_fsdp \
