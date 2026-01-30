@@ -42,7 +42,7 @@ def rope_params(max_seq_len, dim, theta=10000,
     
     '''
     assert dim % 2 == 0
-    # ===== 原始频率计算 ===== theta^{-2i/d} 
+    # ===== 原始频率 ===== theta^{-2i/d} 
     idx = torch.arange(0, dim, 2).to(torch.float64)
     base = 1.0 / torch.pow(theta, idx.div(dim))
     
@@ -56,7 +56,7 @@ def rope_params(max_seq_len, dim, theta=10000,
         yarn_scale[half:] = (factor ** (t[half:] ** yarn_alpha))**(-1)
         base = base * yarn_scale
     
-    # ---- 相位矩阵 ----
+    # ===== 相位矩阵 =====
     freqs = torch.outer(torch.arange(max_seq_len), base)  # [max_seq_len, dim//2]
     freqs = torch.polar(torch.ones_like(freqs), freqs)
     return freqs
@@ -66,7 +66,6 @@ def rope_params(max_seq_len, dim, theta=10000,
 def rope_apply(x, grid_sizes, freqs):
     '''
     先把最后一维一分为二（偶/奇），视作复数后做乘法（复乘就是二维旋转）
-    
     '''
     n, c = x.size(2), x.size(3) // 2
 
@@ -204,13 +203,13 @@ class WanCrossAttention(WanSelfAttention):
         q = self.norm_q(self.q(x)).view(b, -1, n, d)
         
         if crossattn_cache is not None:
-            if not crossattn_cache["is_init"]: # 未初始化就计算一次
+            if not crossattn_cache["is_init"]: 
                 crossattn_cache["is_init"] = True
                 k = self.norm_k(self.k(context)).view(b, -1, n, d)
                 v = self.v(context).view(b, -1, n, d)
                 crossattn_cache["k"] = k
                 crossattn_cache["v"] = v
-            else: # 已经初始化就使用缓存
+            else: 
                 k = crossattn_cache["k"]
                 v = crossattn_cache["v"]
         else:
@@ -382,7 +381,7 @@ class WanSpatialControlAdapter(nn.Module):
                  patch_size,      # (1, 2, 2)
                  num_blocks,      # 主干网络的层数，我们需要为每一层准备一个 ZeroLayer
                  control_block_indices=(1,),  # 实际需要注入的 block 索引
-                 freq_dim=256 # 你的 guidance timestep 维度
+                 freq_dim=256     # guidance timestep 维度
                  ):
         super().__init__()
         self.model_dim = model_dim
@@ -390,7 +389,6 @@ class WanSpatialControlAdapter(nn.Module):
         self.freq_dim = freq_dim
         self.control_block_indices = tuple(int(i) for i in control_block_indices)
         
-        # 1. 特征提取器 (简单的 3D CNN 提取结构)
         mid_dim = model_dim // 4
         self.backbone = nn.Sequential(
             nn.Conv3d(in_dim, mid_dim, kernel_size=1, stride=1, padding=0),
@@ -399,12 +397,10 @@ class WanSpatialControlAdapter(nn.Module):
             nn.Conv3d(mid_dim, model_dim, kernel_size=3, stride=1, padding=1),
             nn.SiLU(),
         )
-        # --- 2. Feature Normalization (关键) ---
-        # 在 Flatten 之后、进入 ZeroLinear 之前，做一个 LayerNorm
-        # 确保输入给 ZeroLayers 的特征是标准分布的
+        # --- 2. Feature Normalization ---
         self.feature_norm = nn.LayerNorm(model_dim, eps=1e-6)
 
-        # 3. Guidance Timestep Embedding (控制强度的开关)
+        # 3. Guidance Timestep Embedding 
         self.adapter_time_proj = nn.Sequential(
             nn.Linear(freq_dim, model_dim),
             nn.SiLU(),
@@ -421,7 +417,6 @@ class WanSpatialControlAdapter(nn.Module):
         nn.init.zeros_(self.adapter_dt_proj[-1].bias)
         
         # 4. [核心] Per-Block Zero Layers
-        # 只为需要注入的 block 创建零初始化线性层，避免无用参数
         self.zero_layers = nn.ModuleDict({
             str(i): nn.Linear(model_dim, model_dim) for i in self.control_block_indices
         })
@@ -469,11 +464,10 @@ def register_spatial_control(model):
     
     model.spatial_adapter = adapter
     
-    # 存储 Hook 的 handle，方便后续清理
     model._spatial_hooks = []
 
     # =======================================================
-    # 定义 Hook 函数工厂
+    # 定义 Hook 
     # =======================================================
     def create_block_hook(block_idx):
         def pre_forward_hook(module, args):
@@ -499,7 +493,7 @@ def register_spatial_control(model):
             if control_feat is None:
                 return args
 
-            x = args[0] # [B, L_x, Dim] (如果是 List 或者是 Tensor，WanModel 里中间层通常是 Tensor)
+            x = args[0] # [B, L_x, Dim]
 
             B, L, D = x.shape
             Lc = control_feat.shape[1]
@@ -536,13 +530,12 @@ def register_spatial_control(model):
     original_forward = model.forward
 
     def forward_with_spatial_control(self, x, t, context, seq_len, lr_latents=None, dt=None, **kwargs):
-        # 处理 I2V 的拼接逻辑 (如果原模型有)
+        # 处理 I2V 的拼接逻辑 
         x_in = x
         if kwargs.get('y') is not None:
              x_in = [torch.cat([u, v], dim=0) for u, v in zip(x, kwargs['y'])]
         
         # 1. 计算基础的 Sinusoidal Embedding (公用)
-        # 这段逻辑是从原模型里提取出来的，为了让 Adapter 复用
         if t.dim() == 1:
             # t: [B]
             t_freq = sinusoidal_embedding_1d(self.freq_dim, t).type_as(x_in[0])  # [B, freq_dim]
@@ -559,8 +552,7 @@ def register_spatial_control(model):
                 dt_freq = sinusoidal_embedding_1d(self.freq_dim, dt_in[:, 0]).type_as(x_in[0])  # [B, freq_dim]
 
         # 2. 运行 Adapter 
-        # 将 LR 和 公用的 Time Freq 传入 Adapter
-        # Adapter 内部会用自己的 MLP 处理这个 t_freq
+        # 将 LR 和 公用的 Time Freq 传入 Adapter, Adapter 内部会用自己的 MLP 处理这个 t_freq
         controls = self.spatial_adapter(lr_latents, t_freq, dt_freq)
         
         #self._current_spatial_ctx = {'controls': controls}
@@ -1013,7 +1005,7 @@ if __name__ == "__main__":
     
     
     
-    model = WanModel_Upsample_Shortcut.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B", )
+    model = WanModel_Upsample_Shortcut2.from_pretrained(f"/mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B", )
     model, lr_layers = register_spatial_control(model)
     
     model.eval()

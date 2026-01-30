@@ -56,7 +56,7 @@ def rope_params(max_seq_len, dim, theta=10000,
         yarn_scale[half:] = (factor ** (t[half:] ** yarn_alpha))**(-1)
         base = base * yarn_scale
     
-    # ---- 相位矩阵 ----
+    # ==== 相位矩阵 ====
     freqs = torch.outer(torch.arange(max_seq_len), base)  # [max_seq_len, dim//2]
     freqs = torch.polar(torch.ones_like(freqs), freqs)
     return freqs
@@ -375,14 +375,13 @@ class RegisterTokens(nn.Module):
         
         
 
-# [新增] Scale Adapter 模块
 class WanSpatialControlAdapter(nn.Module):
     def __init__(self, 
-                 in_dim,          # LR Latent Channels (e.g., 16)
-                 model_dim,       # Transformer Hidden Dim (e.g., 1536)
+                 in_dim,          # LR Latent Channels 
+                 model_dim,       # Transformer Hidden Dim 
                  patch_size,      # (1, 2, 2)
-                 num_blocks,      # 主干网络的层数，我们需要为每一层准备一个 ZeroLayer
-                 freq_dim=256 # 你的 guidance timestep 维度
+                 num_blocks,      # 为每一层准备一个 ZeroLayer
+                 freq_dim=256     # guidance timestep 维度
                  ):
         super().__init__()
         self.model_dim = model_dim
