@@ -15,12 +15,14 @@
 #   --use_ema   
 
 
-export WANDB_MODE=offline
-export CUDA_VISIBLE_DEVICES=3
+# export WANDB_MODE=offline
+# export CUDA_VISIBLE_DEVICES=3
 
-torchrun \
-  --nproc_per_node=1 \
-  train_lr.py \
-  --logdir=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p_s \
-  --load_generator_ckpt \
+# torchrun \
+#   --nproc_per_node=1 \
+#   train_lr.py \
+#   --logdir=/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p_s \
+#   --load_generator_ckpt \
 
+
+sleep 10d
