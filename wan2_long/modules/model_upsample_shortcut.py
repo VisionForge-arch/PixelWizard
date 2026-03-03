@@ -204,13 +204,13 @@ class WanCrossAttention(WanSelfAttention):
         q = self.norm_q(self.q(x)).view(b, -1, n, d)
         
         if crossattn_cache is not None:
-            if not crossattn_cache["is_init"]: # 未初始化就计算一次
+            if not crossattn_cache["is_init"]: 
                 crossattn_cache["is_init"] = True
                 k = self.norm_k(self.k(context)).view(b, -1, n, d)
                 v = self.v(context).view(b, -1, n, d)
                 crossattn_cache["k"] = k
                 crossattn_cache["v"] = v
-            else: # 已经初始化就使用缓存
+            else:
                 k = crossattn_cache["k"]
                 v = crossattn_cache["v"]
         else:
