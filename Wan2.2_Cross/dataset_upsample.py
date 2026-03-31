@@ -65,6 +65,10 @@ class ToAbsolutePath(DataProcessingOperator):
         self.base_path = base_path
         
     def __call__(self, data):
+        if data is None:
+            return data
+        if os.path.isabs(data):
+            return data
         if self.base_path is not None:
             return os.path.join(self.base_path, data)
         else:

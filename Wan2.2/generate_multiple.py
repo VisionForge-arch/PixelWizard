@@ -1,5 +1,6 @@
 # Copyright 2024-2025 The Alibaba Wan Team Authors. All rights reserved.
 import argparse
+import json
 import logging
 import os
 #os.environ['CUDA_VISIBLE_DEVICES'] = '1'
@@ -306,6 +307,21 @@ def _parse_args():
         default=None,
         #default="/mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p/checkpoint_model_000100/model.pt",
         help="The path to the Wan checkpoint.")
+    parser.add_argument(
+        "--manifest_file",
+        type=str,
+        default=None,
+        help="Optional JSON manifest file that records prompt-to-latent mappings for downstream pipeline stages.")
+    parser.add_argument(
+        "--save_latent",
+        type=str2bool,
+        default=True,
+        help="Whether to save stage-1 latent .pt files.")
+    parser.add_argument(
+        "--save_video",
+        type=str2bool,
+        default=False,
+        help="Whether to decode and save stage-1 videos as .mp4 files.")
     parser.add_argument("--use_ema", action="store_true", help="Whether to use EMA parameters")
     parser.add_argument("--use_lora", action="store_true", help="Whether to use LoRA parameters")
     args = parser.parse_args()
@@ -326,12 +342,31 @@ def _init_logging(rank):
         logging.basicConfig(level=logging.ERROR)
 
 
+def _write_manifest(manifest_file, records):
+    manifest_dir = os.path.dirname(os.path.abspath(manifest_file))
+    if manifest_dir:
+        os.makedirs(manifest_dir, exist_ok=True)
+    tmp_manifest = f"{manifest_file}.tmp"
+    with open(tmp_manifest, "w", encoding="utf-8") as f:
+        json.dump(records, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_manifest, manifest_file)
+
+
+def _choose_stage1_input_file(latent_path, video_path):
+    if latent_path is not None:
+        return latent_path
+    return video_path
+
+
 def generate(args):
     rank = int(os.getenv("RANK", 0))
     world_size = int(os.getenv("WORLD_SIZE", 1))
     local_rank = int(os.getenv("LOCAL_RANK", 0))
     device = local_rank
     _init_logging(rank)
+
+    if not args.save_latent and not args.save_video:
+        raise ValueError("At least one of --save_latent or --save_video must be True.")
 
     if args.offload_model is None:
         args.offload_model = False if world_size > 1 else True
@@ -372,6 +407,11 @@ def generate(args):
     output_dir = args.save_file 
     os.makedirs(output_dir, exist_ok=True)
     logging.info(f"输出将保存到: {output_dir}")
+
+    manifest_records = []
+    if rank == 0 and args.manifest_file:
+        logging.info(f"Stage-1 manifest 将写入: {args.manifest_file}")
+        _write_manifest(args.manifest_file, manifest_records)
     
 
     cfg = WAN_CONFIGS[args.task]
@@ -460,17 +500,49 @@ def generate(args):
             if rank == 0:
                 formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
                 formatted_prompt = current_prompt.replace(" ", "_").replace("/", "_")[:50]
-                file_name = f"{args.task}_{resolution.replace('*','x') if sys.platform=='win32' else resolution}_{args.ulysses_size}_{formatted_prompt}_{formatted_time}.pt"
-                args.save_file = os.path.join(output_dir, file_name)
-                
-                logging.info(f"Saving latent to {args.save_file}")
-                torch.save({
-                    'latent': video,
-                    'prompt': args.prompt,
-                    'seed': args.base_seed,
-                    'size': resolution,
-                    'frame_num': args.frame_num,
-                }, args.save_file)
+                file_stem = f"{args.task}_{resolution.replace('*','x') if sys.platform=='win32' else resolution}_{args.ulysses_size}_{formatted_prompt}_{formatted_time}"
+                latent_path = None
+                video_path = None
+
+                if args.save_latent:
+                    latent_path = os.path.join(output_dir, f"{file_stem}.pt")
+                    logging.info(f"Saving latent to {latent_path}")
+                    torch.save({
+                        'latent': video,
+                        'prompt': current_prompt,
+                        'seed': current_seed,
+                        'size': resolution,
+                        'frame_num': args.frame_num,
+                    }, latent_path)
+
+                if args.save_video:
+                    video_path = os.path.join(output_dir, f"{file_stem}.mp4")
+                    logging.info(f"Decoding and saving video to {video_path}")
+                    decoded_videos = wan_ti2v.vae.decode(video)
+                    decoded_video = decoded_videos[0]
+                    save_video(
+                        tensor=decoded_video[None],
+                        save_file=video_path,
+                        fps=cfg.sample_fps,
+                        nrow=1,
+                        normalize=True,
+                        value_range=(-1, 1))
+                    del decoded_video
+                    del decoded_videos
+
+                if args.manifest_file:
+                    manifest_records.append({
+                        'prompt': current_prompt,
+                        'file': os.path.abspath(_choose_stage1_input_file(latent_path, video_path)),
+                        'latent_file': os.path.abspath(latent_path) if latent_path else None,
+                        'video_file': os.path.abspath(video_path) if video_path else None,
+                        'input_type': 'latent' if latent_path else 'video',
+                        'seed': current_seed,
+                        'size': resolution,
+                        'frame_num': args.frame_num,
+                        'prompt_index': prompt_idx,
+                    })
+                    _write_manifest(args.manifest_file, manifest_records)
                 #logging.info(f"Latent shape: {video.shape}")
                 logging.info(f"Latent saved successfully!")
             del video

@@ -17,6 +17,7 @@ import torch.nn.functional as F
 import torchvision.transforms.functional as TF
 from PIL import Image
 import json
+from pathlib import Path
 
 import wan
 from wan.configs import MAX_AREA_CONFIGS, SIZE_CONFIGS, SUPPORTED_SIZES, WAN_CONFIGS
@@ -422,13 +423,15 @@ def generate(args):
         args.base_seed = base_seed[0]
         
     
+    dataset_base_path = str(Path(args.prompt_file).expanduser().resolve().parent)
+
     dataset = UnifiedDataset(
-            base_path=None,
+            base_path=dataset_base_path,
             metadata_path=args.prompt_file,
             repeat=1,
             data_file_keys=("file",),
             main_data_operator=UnifiedDataset.default_video_operator(
-                base_path=None,
+                base_path=dataset_base_path,
                 max_pixels=448*256,
                 height=256,
                 width=448,
@@ -566,16 +569,16 @@ def generate(args):
                 #formatted_time = datetime.now().strftime("%Y%m%d_%H%M%S")
                 #formatted_prompt = current_prompt.replace(" ", "_").replace("/", "_")[:50]
                 #file_name = f"{args.task}_{resolution.replace('*','x') if sys.platform=='win32' else resolution}_{args.ulysses_size}_{formatted_prompt}_{formatted_time}.pt"
-                args.save_file = os.path.join(output_dir, file_name)
+                save_path = os.path.join(output_dir, file_name)
                 
-                logging.info(f"Saving latent to {args.save_file}")
+                logging.info(f"Saving latent to {save_path}")
                 torch.save({
                     'latent': video,
                     'prompt': prompt,
-                    'seed': args.base_seed,
+                    'seed': current_seed,
                     'size': resolution,
                     'frame_num': args.frame_num,
-                }, args.save_file)
+                }, save_path)
                 #logging.info(f"Latent shape: {video.shape}")
                 logging.info(f"Latent saved successfully!")
             del video
