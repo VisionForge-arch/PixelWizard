@@ -48,8 +48,7 @@ torchrun --nproc_per_node=8 generate.py \
     --prompt_file prompts.txt \
     --save_dir outputs/sr_2k \
     --video_dir outputs/videos_2k \
-    --sr_size 2560*1440 \
-    --sr_steps 4 \
+    --resolution 2k \
     --dit_fsdp --t5_fsdp --ulysses_size 8
 
 # 4K output
@@ -59,10 +58,11 @@ torchrun --nproc_per_node=8 generate.py \
     --prompt_file prompts.txt \
     --save_dir outputs/sr_4k \
     --video_dir outputs/videos_4k \
-    --sr_size 3840*2144 \
-    --sr_steps 5 --sr_shift 5.8 \
+    --resolution 4k \
     --dit_fsdp --t5_fsdp --ulysses_size 8
 ```
+
+`--resolution 2k` uses fixed LR `448x256`, SR `2560x1440`, 4 SR steps, and shift `5.5`. `--resolution 4k` uses fixed LR `448x256`, SR `3840x2144`, 5 SR steps, and shift `5.8`.
 
 By default, `generate.py` uses `./Wan2.2-TI2V-5B/Wan2.2_VAE.pth` for decode. Override it with `--vae_path` if your VAE checkpoint lives elsewhere.
 

@@ -10,7 +10,7 @@ Usage:
       --prompt_file prompts.txt \                                                                                                                                  
       --save_dir outputs/sr \                                                                                                                                      
       --video_dir outputs/videos \                                                                                                                                 
-      --sr_size 2560*1440          
+      --resolution 2k
 
     torchrun --nproc_per_node=8 generate.py \
         --ckpt_dir ./Wan2.2-TI2V-5B \
@@ -18,7 +18,7 @@ Usage:
         --prompt_file prompts.txt \
         --save_dir outputs/sr \
         --video_dir outputs/videos \
-        --sr_size 2560*1440
+        --resolution 2k
 """
 import argparse
 import gc
@@ -43,6 +43,22 @@ from wan.modules.vae2_2 import Wan2_2_VAE
 from wan.utils.utils import str2bool
 
 
+LR_SIZE = "448*256"
+
+RESOLUTION_CONFIGS = {
+    "2k": {
+        "sr_size": "2560*1440",
+        "sr_steps": 4,
+        "sr_shift": 5.5,
+    },
+    "4k": {
+        "sr_size": "3840*2144",
+        "sr_steps": 5,
+        "sr_shift": 5.8,
+    },
+}
+
+
 def _parse_args():
     parser = argparse.ArgumentParser(
         description="Unified LR → SR video generation pipeline")
@@ -53,12 +69,15 @@ def _parse_args():
                         help="Path to Wan2.2-TI2V-5B checkpoint directory")
     parser.add_argument("--frame_num", type=int, default=121,
                         help="Number of frames (should be 4n+1)")
-    parser.add_argument("--prompt_file", type=str, required=True,
+    parser.add_argument("--prompt_file", type=str, default="prompts/demo.txt",
                         help="Prompt file: .txt (one per line) or .jsonl ({id, text})")
     parser.add_argument("--save_dir", type=str, required=True,
                         help="Directory to save output SR .pt files")
     parser.add_argument("--video_dir", type=str, default=None,
                         help="Directory to save decoded .mp4 videos (default: sibling videos/ directory)")
+    parser.add_argument("--resolution", type=str, default="2k",
+                        choices=list(RESOLUTION_CONFIGS.keys()),
+                        help="Output resolution preset. 2k = 2560x1440, 4k = 3840x2144")
     parser.add_argument("--ulysses_size", type=int, default=1)
     parser.add_argument("--t5_fsdp", action="store_true")
     parser.add_argument("--dit_fsdp", action="store_true")
@@ -68,9 +87,6 @@ def _parse_args():
     parser.add_argument("--base_seed", type=int, default=0,
                         help="Random seed (-1 for random)")
     # --- stage I ---
-    parser.add_argument("--lr_size", type=str, default="448*256",
-                        choices=list(SIZE_CONFIGS.keys()),
-                        help="LR generation resolution")
     parser.add_argument("--lr_steps", type=int, default=50,
                         help="LR diffusion sampling steps")
     parser.add_argument("--lr_shift", type=float, default=None,
@@ -81,13 +97,6 @@ def _parse_args():
     # --- stage II ---
     parser.add_argument("--sr_ckpt", type=str, required=True,
                         help="Path to Stage II   checkpoint (.pt)")
-    parser.add_argument("--sr_size", type=str, default="2560*1440",
-                        choices=list(SIZE_CONFIGS.keys()),
-                        help="Target Stage II resolution")
-    parser.add_argument("--sr_steps", type=int, default=4,
-                        help="SR sampling steps (recommanded: 4-5)")
-    parser.add_argument("--sr_shift", type=float, default=5.5,
-                        help="SR flow matching shift")
     parser.add_argument("--sr_guide_scale", type=float, default=None)
     parser.add_argument("--sr_solver", type=str, default='unipc',
                         choices=['unipc', 'dpm++'])
@@ -109,6 +118,11 @@ def _parse_args():
 
     args = parser.parse_args()
     args.base_seed = args.base_seed if args.base_seed >= 0 else random.randint(0, sys.maxsize)
+    preset = RESOLUTION_CONFIGS[args.resolution]
+    args.lr_size = LR_SIZE
+    args.sr_size = preset["sr_size"]
+    args.sr_steps = preset["sr_steps"]
+    args.sr_shift = preset["sr_shift"]
     return args
 
 
@@ -194,6 +208,10 @@ def generate(args):
         args.base_seed = base_seed[0]
 
     os.makedirs(args.save_dir, exist_ok=True)
+    logging.info(
+        f"Resolution preset: {args.resolution} "
+        f"(LR={args.lr_size}, SR={args.sr_size}, "
+        f"SR steps={args.sr_steps}, SR shift={args.sr_shift})")
 
     # ================================================================
     # Phase 1: LR latent generation
