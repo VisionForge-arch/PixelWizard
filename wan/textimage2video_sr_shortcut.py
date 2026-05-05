@@ -19,7 +19,6 @@ from tqdm import tqdm
 from .distributed.fsdp import shard_model
 from .distributed.sequence_parallel import sp_attn_forward, sp_dit_forward
 from .distributed.util import get_world_size
-from .modules.model_upsample_shortcut import WanModel_Upsample_Shortcut
 from .modules.model_upsample_shortcut2 import WanModel_Upsample_Shortcut2
 from .modules.t5 import T5EncoderModel
 from .modules.vae2_2 import Wan2_2_VAE
