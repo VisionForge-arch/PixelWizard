@@ -4,18 +4,12 @@ import os
 
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
-from .wan_i2v_A14B import i2v_A14B
-from .wan_s2v_14B import s2v_14B
-from .wan_t2v_A14B import t2v_A14B
+
 from .wan_ti2v_5B import ti2v_5B
-from .wan_animate_14B import animate_14B
+
 
 WAN_CONFIGS = {
-    't2v-A14B': t2v_A14B,
-    'i2v-A14B': i2v_A14B,
     'ti2v-5B': ti2v_5B,
-    'animate-14B': animate_14B,
-    's2v-14B': s2v_14B,
 }
 
 SIZE_CONFIGS = {
