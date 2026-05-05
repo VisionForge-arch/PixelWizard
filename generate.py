@@ -72,7 +72,7 @@ def _parse_args():
                         help="Path to Wan2.2-TI2V-5B checkpoint directory")
     parser.add_argument("--frame_num", type=int, default=121,
                         help="Number of frames (should be 4n+1)")
-    parser.add_argument("--prompt_file", type=str, default="prompts/demo.txt",
+    parser.add_argument("--prompt_file", type=str, default="prompts/demos.txt",
                         help="Prompt file: .txt (one per line) or .jsonl ({id, text})")
     parser.add_argument("--save_dir", type=str, required=True,
                         help="Directory to save output SR .pt files")
@@ -131,6 +131,12 @@ def _parse_args():
 
 def _load_prompts(prompt_file):
     """Load prompts from .txt (one per line) or .jsonl ({id, text})."""
+    if not os.path.exists(prompt_file):
+        raise FileNotFoundError(
+            f"Prompt file not found: {prompt_file}. "
+            "Create a text file with one prompt per line, or pass --prompt_file /path/to/prompts.txt."
+        )
+
     prompts = []
     with open(prompt_file, 'r', encoding='utf-8') as f:
         first_line = f.readline().strip()
@@ -150,6 +156,8 @@ def _load_prompts(prompt_file):
                 line = line.strip()
                 if line:
                     prompts.append({'id': str(i), 'text': line})
+    if not prompts:
+        raise ValueError(f"Prompt file is empty: {prompt_file}")
     return prompts
 
 def _interpolate_cond_latent(latent, H_lr, W_lr):
