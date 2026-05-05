@@ -56,7 +56,7 @@ RESOLUTION_CONFIGS = {
     },
     "4k": {
         "sr_size": "3840*2144",
-        "sr_steps": 5,
+        "sr_steps": 4,
         "sr_shift": 5.8,
     },
 }
