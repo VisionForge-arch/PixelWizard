@@ -1,0 +1,12 @@
+torch>=2.4.0
+torchvision>=0.19.0
+diffusers>=0.31.0
+transformers>=4.49.0
+accelerate>=1.1.1
+flash_attn
+einops
+decord
+numpy>=1.23.5,<2
+imageio[ffmpeg]
+tqdm
+peft

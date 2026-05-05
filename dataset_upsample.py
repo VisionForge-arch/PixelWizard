@@ -65,6 +65,10 @@ class ToAbsolutePath(DataProcessingOperator):
         self.base_path = base_path
         
     def __call__(self, data):
+        if data is None:
+            return data
+        if os.path.isabs(data):
+            return data
         if self.base_path is not None:
             return os.path.join(self.base_path, data)
         else:
@@ -217,6 +221,36 @@ class LoadVideo(DataProcessingOperator):
     
 
 
+class LoadTorchLatent(DataProcessingOperator):
+    def __init__(self, map_location="cpu", latent_keys=("latent", "latents")):
+        self.map_location = map_location
+        if isinstance(latent_keys, str):
+            latent_keys = (latent_keys,)
+        self.latent_keys = tuple(latent_keys)
+
+    def __call__(self, data: str) -> torch.Tensor:
+        loaded = torch.load(data, map_location=self.map_location)
+        if isinstance(loaded, torch.Tensor):
+            return loaded
+        if isinstance(loaded, (list, tuple)) and all(isinstance(x, torch.Tensor) for x in loaded):
+            if len(loaded) == 0:
+                raise ValueError(f"Empty latent list in {data}")
+            return loaded[0]
+        if isinstance(loaded, dict):
+            for k in self.latent_keys:
+                v = loaded.get(k, None)
+                if isinstance(v, torch.Tensor):
+                    return v
+                if isinstance(v, (list, tuple)) and all(isinstance(x, torch.Tensor) for x in v):
+                    if len(v) == 0:
+                        raise ValueError(f"Empty latent list for key {k!r} in {data}")
+                    return v[0]
+        raise TypeError(
+            f"Unsupported .pt content from {data}: expected a Tensor, a list/tuple of Tensors, "
+            f"or a dict with keys {self.latent_keys} -> Tensor/list[Tensor]."
+        )
+
+
 class UnifiedDataset(torch.utils.data.Dataset):
     def __init__(
         self, 
@@ -265,6 +299,34 @@ class UnifiedDataset(torch.utils.data.Dataset):
                             raise ValueError(
                                 f"Invalid JSON/JSONL in {metadata_path} at line {line_no}"
                             ) from e
+        if isinstance(metadata, list):
+            for item in metadata:
+                if not isinstance(item, dict):
+                    continue
+                if "prompt" not in item:
+                    for k in ("text", "caption", "detailed_description", "description"):
+                        v = item.get(k, None)
+                        if isinstance(v, str) and v.strip():
+                            item["prompt"] = v.strip()
+                            break
+                elif isinstance(item.get("prompt", None), str):
+                    item["prompt"] = item["prompt"].strip()
+
+                if "file" not in item or item.get("file", None) in (None, ""):
+                    source_key = None
+                    for k in ("video_path", "path", "file_path", "filepath", "clip_id", "id"):
+                        v = item.get(k, None)
+                        if v is not None and v != "":
+                            item["file"] = v
+                            source_key = k
+                            break
+                    if "file" in item and item["file"] is not None:
+                        file_str = str(item["file"]).strip()
+                        if source_key in ("clip_id", "id"):
+                            base = os.path.basename(file_str)
+                            if "." not in base:
+                                file_str = f"{file_str}.pt"
+                        item["file"] = file_str
         self.data = metadata
         
     
@@ -290,6 +352,7 @@ class UnifiedDataset(torch.utils.data.Dataset):
                     gpu_id=gpu_id,
                     sampling_strategy=sampling_strategy,
                 )),
+                (("pt",), LoadTorchLatent()),
             ])),
         ])
     
@@ -316,7 +379,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_base_path", type=str, default=None)
-    parser.add_argument("--dataset_metadata_path", type=str, default="/root/ultrawan/Wan2.2/prompt_to_file.json")
+    parser.add_argument("--dataset_metadata_path", type=str, required=True)
     parser.add_argument("--dataset_repeat", type=int, default=1)
     parser.add_argument("--data_file_keys", type=str, default=("file",))
     parser.add_argument("--max_pixels", type=int, default=832*480)
@@ -326,8 +389,8 @@ if __name__ == "__main__":
     parser.add_argument("--time_division_factor", type=int, default=4)
     parser.add_argument("--time_division_remainder", type=int, default=1)
     parser.add_argument("--use_gpu", type=bool, default=True)
-    parser.add_argument("--config_path", type=str, default="/root/ultrawan/configs/self_forcing_dmd.yaml")
-    parser.add_argument("--logdir", type=str, default="/root/ultrawan//logs/self_forcing_dmd")
+    parser.add_argument("--config_path", type=str, default=None)
+    parser.add_argument("--logdir", type=str, default=None)
     
     
     args = parser.parse_args()
@@ -356,35 +419,3 @@ if __name__ == "__main__":
         print(data["prompt"])
         print(data["file"].shape)
         break
-    # for data in dataset:
-    #     print(data['detailed_description'])
-    #     print(data['clip_id'])
-    #     break
-'''
-    
-    from omegaconf import OmegaConf
-    config = OmegaConf.load(args.config_path)
-    default_config = OmegaConf.load("/hpc2hdd/home/htian395/Wenxue/Self-Forcing-Long/configs/default_config.yaml")
-    config = OmegaConf.merge(default_config, config)
-
-    # get the filename of config_path
-    config_name = os.path.basename(args.config_path).split(".")[0]
-    config.config_name = config_name
-    config.logdir = args.logdir
-
-
-    
-    # init model
-    from model_wan_trainer import WanModel_Trainer
-    model_trainer = WanModel_Trainer(config)
-    
-    
-    
-    for data in tqdm(dataloader):
-        generator_log_dict = model_trainer.train(data)
-        print(generator_log_dict)
-        #print(data['detailed_description'])
-        #print(data['clip_id'])
-        #break
-        
-'''
