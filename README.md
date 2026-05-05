@@ -70,6 +70,8 @@ By default, `generate.py` uses `./Wan2.2-TI2V-5B/Wan2.2_VAE.pth` for decode. Ove
 
 `--lr_ckpt` is optional. If omitted, LR generation uses the base Wan2.2 weights from `--ckpt_dir`; pass it when you have a fine-tuned LR checkpoint.
 
+`generate.py` processes prompts one by one: LR latent → SR latent → decoded video, then moves to the next prompt. The default `--model_load_mode auto` keeps models resident with CPU offload on single-process runs, and reloads LR/SR per prompt for distributed runs to avoid holding both FSDP model stacks at once. You can force either behavior with `--model_load_mode resident` or `--model_load_mode reload`.
+
 The `--num_patches`, `--patch_dim`, and `--overlap` options control spatial chunking during decode to avoid OOM on high-resolution latents. The overlap region uses cosine-ramp blending to avoid seam artifacts.
 
 ## Resolutions

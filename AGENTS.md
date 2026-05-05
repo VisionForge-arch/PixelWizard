@@ -45,6 +45,8 @@ torchrun --nproc_per_node=8 generate.py \
 - `generate.py --resolution 2k` maps to fixed LR `448x256`, SR `2560x1440`, 4 SR steps, shift `5.5`
 - `generate.py --resolution 4k` maps to fixed LR `448x256`, SR `3840x2144`, 5 SR steps, shift `5.8`
 - `--lr_ckpt` loads optional fine-tuned LR weights; omitting it uses base weights from `--ckpt_dir`
+- Prompts are processed one at a time: LR → SR → decode, then the next prompt
+- `--model_load_mode auto` uses resident models with CPU offload for single-process runs, and reloads models per prompt for distributed runs
 - SR uses **shortcut distillation**: a spatial adapter (3D CNN) injects LR features into the DiT backbone via forward hooks, with dt (step-size) conditioning for variable-step sampling
 - `decode.py` splits high-res latents spatially into patches, decodes each independently, and blends overlap regions with cosine-ramp masks to avoid seam artifacts
 - Distributed inference uses PyTorch FSDP + DeepSpeed Ulysses sequence parallelism

@@ -87,6 +87,9 @@ def _parse_args():
     parser.add_argument("--t5_cpu", action="store_true")
     parser.add_argument("--convert_model_dtype", action="store_true", default=True)
     parser.add_argument("--offload_model", type=str2bool, default=None)
+    parser.add_argument("--model_load_mode", type=str, default="auto",
+                        choices=["auto", "resident", "reload"],
+                        help="auto: resident+offload on single process, reload per prompt for distributed")
     parser.add_argument("--base_seed", type=int, default=0,
                         help="Random seed (-1 for random)")
     # --- stage I ---
@@ -178,6 +181,79 @@ def _interpolate_cond_latent(latent, H_lr, W_lr):
     return x
 
 
+def _clear_cuda():
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    gc.collect()
+
+
+def _offload_unused_t2v_vae(model):
+    """The generation path only needs VAE shape metadata, not VAE weights."""
+    vae = getattr(model, "vae", None)
+    if vae is None:
+        return
+    if hasattr(vae, "model"):
+        vae.model.cpu()
+    if hasattr(vae, "scale"):
+        vae.scale = [
+            x.cpu() if isinstance(x, torch.Tensor) else x
+            for x in vae.scale
+        ]
+    vae.device = torch.device("cpu")
+    _clear_cuda()
+
+
+def _build_lr_model(args, lr_cfg, device, rank):
+    model = wan.WanTI2V(
+        config=lr_cfg,
+        checkpoint_dir=args.ckpt_dir,
+        device_id=device,
+        rank=rank,
+        t5_fsdp=args.t5_fsdp,
+        dit_fsdp=args.dit_fsdp,
+        use_sp=(args.ulysses_size > 1),
+        t5_cpu=args.t5_cpu,
+        convert_model_dtype=args.convert_model_dtype,
+        wan_ckpt=args.lr_ckpt,
+    )
+    _offload_unused_t2v_vae(model)
+    return model
+
+
+def _build_sr_model(args, cfg, device, rank):
+    model = wan.WanTI2V_Upsample_Shortcut(
+        config=cfg,
+        checkpoint_dir=args.ckpt_dir,
+        device_id=device,
+        rank=rank,
+        t5_fsdp=args.t5_fsdp,
+        dit_fsdp=args.dit_fsdp,
+        use_sp=(args.ulysses_size > 1),
+        t5_cpu=args.t5_cpu,
+        convert_model_dtype=args.convert_model_dtype,
+        wan_ckpt=args.sr_ckpt,
+    )
+    _offload_unused_t2v_vae(model)
+    return model
+
+
+def _decode_one(sr_path, output_path, vae_path, args):
+    vae = Wan2_2_VAE(vae_pth=vae_path, device=args.decode_device)
+    try:
+        decode_latent_gpu_chunked(
+            sr_path,
+            output_path,
+            vae,
+            num_patches=args.num_patches,
+            device=args.decode_device,
+            patch_dim=args.patch_dim,
+            overlap=args.overlap,
+        )
+    finally:
+        del vae
+        _clear_cuda()
+
+
 def generate(args):
     rank = int(os.getenv("RANK", 0))
     world_size = int(os.getenv("WORLD_SIZE", 1))
@@ -218,192 +294,174 @@ def generate(args):
         dist.broadcast_object_list(base_seed, src=0)
         args.base_seed = base_seed[0]
 
-    os.makedirs(args.save_dir, exist_ok=True)
-    logging.info(
-        f"Resolution preset: {args.resolution} "
-        f"(LR={args.lr_size}, SR={args.sr_size}, "
-        f"SR steps={args.sr_steps}, SR shift={args.sr_shift})")
-    logging.info(f"LR checkpoint: {args.lr_ckpt or 'base weights from ckpt_dir'}")
-    logging.info(f"SR checkpoint: {args.sr_ckpt}")
-
-    # ================================================================
-    # Phase 1: LR latent generation
-    # ================================================================
     lr_cfg = WAN_CONFIGS[args.task]
     lr_size = SIZE_CONFIGS[args.lr_size]
-
     lr_shift = args.lr_shift if args.lr_shift is not None else lr_cfg.sample_shift
     lr_guide_scale = args.lr_guide_scale if args.lr_guide_scale is not None else lr_cfg.sample_guide_scale
-
-    lr_prompts = _load_prompts(args.prompt_file)
-    logging.info(f"Loaded {len(lr_prompts)} prompts from {args.prompt_file}")
-
-    logging.info("Phase 1: Loading LR model (WanTI2V)...")
-    lr_model = wan.WanTI2V(
-        config=lr_cfg,
-        checkpoint_dir=args.ckpt_dir,
-        device_id=device,
-        rank=rank,
-        t5_fsdp=args.t5_fsdp,
-        dit_fsdp=args.dit_fsdp,
-        use_sp=(args.ulysses_size > 1),
-        t5_cpu=args.t5_cpu,
-        convert_model_dtype=args.convert_model_dtype,
-        wan_ckpt=args.lr_ckpt,
-    )
-
-    logging.info("Phase 1: Generating LR latents...")
-    lr_latents = []
-    for prompt_idx, prompt_obj in enumerate(lr_prompts, 1):
-        if rank == 0:
-            logging.info(
-                f"  LR {prompt_idx}/{len(lr_prompts)}: {prompt_obj['text'][:80]}...")
-
-        current_seed = args.base_seed + prompt_idx * 100
-        if dist.is_initialized():
-            seed_list = [current_seed] if rank == 0 else [None]
-            dist.broadcast_object_list(seed_list, src=0)
-            current_seed = seed_list[0]
-
-        latent = lr_model.generate(
-            prompt_obj['text'],
-            size=lr_size,
-            max_area=MAX_AREA_CONFIGS[args.lr_size],
-            frame_num=args.frame_num,
-            shift=lr_shift,
-            sample_solver=args.sample_solver,
-            sampling_steps=args.lr_steps,
-            guide_scale=lr_guide_scale,
-            seed=current_seed,
-            offload_model=args.offload_model)
-
-        # Every rank keeps the latent so distributed SR executes the same loop.
-        if isinstance(latent, (list, tuple)):
-            latent = latent[0]
-        lr_latents.append((prompt_obj['text'], latent.cpu()))
-        del latent
-
-    del lr_model
-    torch.cuda.empty_cache()
-    gc.collect()
-    if dist.is_initialized():
-        dist.barrier()
-
-    logging.info(f"Phase 1: Generated {len(lr_latents)} LR latents.")
-
-    # ================================================================
-    # Phase 2: SR upscaling
-    # ================================================================
     sr_size = SIZE_CONFIGS[args.sr_size]
     W_target, H_target = sr_size
     H_lr = H_target // 32
     W_lr = W_target // 32
-
-    logging.info("Phase 2: Loading SR model (WanTI2V_Upsample_Shortcut)...")
-    sr_model = wan.WanTI2V_Upsample_Shortcut(
-        config=cfg,
-        checkpoint_dir=args.ckpt_dir,
-        device_id=device,
-        rank=rank,
-        t5_fsdp=args.t5_fsdp,
-        dit_fsdp=args.dit_fsdp,
-        use_sp=(args.ulysses_size > 1),
-        t5_cpu=args.t5_cpu,
-        convert_model_dtype=args.convert_model_dtype,
-        wan_ckpt=args.sr_ckpt,
-    )
-
     sr_guide_scale = args.sr_guide_scale if args.sr_guide_scale is not None else cfg.sample_guide_scale
 
-    logging.info("Phase 2: Generating SR latents...")
-    saved_sr_paths = []
-    for idx, (prompt, lr_latent) in enumerate(lr_latents):
-        if rank == 0:
-            logging.info(
-                f"  SR {idx + 1}/{len(lr_latents)}: {prompt[:80]}...")
-
-        current_seed = args.base_seed + idx * 100 + 10000
-        if dist.is_initialized():
-            seed_list = [current_seed] if rank == 0 else [None]
-            dist.broadcast_object_list(seed_list, src=0)
-            current_seed = seed_list[0]
-
-        cond_latent = _interpolate_cond_latent(lr_latent, H_lr, W_lr)
-        cond_latent = cond_latent.to(device=sr_model.device, dtype=torch.float32)
-
-        sr_latent = sr_model.generate(
-            prompt,
-            cond_latent=cond_latent,
-            size=sr_size,
-            max_area=MAX_AREA_CONFIGS[args.sr_size],
-            frame_num=args.frame_num,
-            shift=args.sr_shift,
-            sample_solver=args.sr_solver,
-            sampling_steps=args.sr_steps,
-            guide_scale=sr_guide_scale,
-            seed=current_seed,
-            offload_model=args.offload_model)
-
-        if rank == 0:
-            save_path = os.path.join(args.save_dir, f"{idx}.pt")
-            torch.save({
-                'latent': sr_latent,
-                'prompt': prompt,
-                'seed': current_seed,
-                'size': args.sr_size,
-                'frame_num': args.frame_num,
-            }, save_path)
-            saved_sr_paths.append(save_path)
-            logging.info(f"  Saved: {save_path}")
-
-        del sr_latent, cond_latent
-        torch.cuda.empty_cache()
-
-    torch.cuda.synchronize()
-    if dist.is_initialized():
-        dist.barrier()
-        dist.destroy_process_group()
-
-    del sr_model
-    torch.cuda.empty_cache()
-    gc.collect()
-
-    # ================================================================
-    # Phase 3: Decode SR latents to videos
-    # ================================================================
+    os.makedirs(args.save_dir, exist_ok=True)
     if rank == 0:
         video_dir = args.video_dir
         if video_dir is None:
             save_parent = os.path.dirname(os.path.abspath(args.save_dir))
             video_dir = os.path.join(save_parent, "videos")
         os.makedirs(video_dir, exist_ok=True)
-
         vae_path = args.vae_path
         if vae_path is None:
             vae_path = os.path.join(args.ckpt_dir, cfg.vae_checkpoint)
+    else:
+        video_dir = None
+        vae_path = None
 
-        logging.info("Phase 3: Loading VAE for decode...")
-        vae = Wan2_2_VAE(vae_pth=vae_path, device=args.decode_device)
+    lr_prompts = _load_prompts(args.prompt_file)
+    reload_models = (
+        args.model_load_mode == "reload"
+        or (args.model_load_mode == "auto" and world_size > 1)
+    )
 
-        logging.info("Phase 3: Decoding SR latents to videos...")
-        for idx, sr_path in enumerate(saved_sr_paths, 1):
-            output_filename = os.path.basename(sr_path).replace('.pt', '.mp4')
-            output_path = os.path.join(video_dir, output_filename)
-            logging.info(
-                f"  Decode {idx}/{len(saved_sr_paths)}: {os.path.basename(output_path)}")
-            decode_latent_gpu_chunked(
-                sr_path,
-                output_path,
-                vae,
-                num_patches=args.num_patches,
-                device=args.decode_device,
-                patch_dim=args.patch_dim,
-                overlap=args.overlap,
-            )
+    logging.info(
+        f"Resolution preset: {args.resolution} "
+        f"(LR={args.lr_size}, SR={args.sr_size}, "
+        f"SR steps={args.sr_steps}, SR shift={args.sr_shift})")
+    logging.info(f"LR checkpoint: {args.lr_ckpt or 'base weights from ckpt_dir'}")
+    logging.info(f"SR checkpoint: {args.sr_ckpt}")
+    logging.info(f"Loaded {len(lr_prompts)} prompts from {args.prompt_file}")
+    logging.info(
+        "Pipeline mode: one prompt at a time "
+        f"({'reload models per prompt' if reload_models else 'resident models with offload'})")
 
-        del vae
-        torch.cuda.empty_cache()
-        gc.collect()
+    if not reload_models and args.offload_model is False:
+        logging.warning(
+            "resident mode with --offload_model False keeps LR/SR models on GPU during decode; "
+            "use --offload_model True if GPU memory is tight.")
+
+    lr_model = None
+    sr_model = None
+    if not reload_models:
+        logging.info("Loading resident LR model (WanTI2V)...")
+        lr_model = _build_lr_model(args, lr_cfg, device, rank)
+        logging.info("Loading resident SR model (WanTI2V_Upsample_Shortcut)...")
+        sr_model = _build_sr_model(args, cfg, device, rank)
+
+    try:
+        for prompt_idx, prompt_obj in enumerate(lr_prompts, 1):
+            prompt = prompt_obj['text']
+            output_idx = prompt_idx - 1
+            if rank == 0:
+                logging.info("=" * 72)
+                logging.info(
+                    f"Prompt {prompt_idx}/{len(lr_prompts)}: {prompt[:100]}...")
+
+            if reload_models:
+                logging.info("Loading LR model (WanTI2V)...")
+                lr_model = _build_lr_model(args, lr_cfg, device, rank)
+
+            lr_seed = args.base_seed + prompt_idx * 100
+            if dist.is_initialized():
+                seed_list = [lr_seed] if rank == 0 else [None]
+                dist.broadcast_object_list(seed_list, src=0)
+                lr_seed = seed_list[0]
+
+            logging.info(f"Phase 1/3: generating LR latent for prompt {prompt_idx}")
+            lr_latent = lr_model.generate(
+                prompt,
+                size=lr_size,
+                max_area=MAX_AREA_CONFIGS[args.lr_size],
+                frame_num=args.frame_num,
+                shift=lr_shift,
+                sample_solver=args.sample_solver,
+                sampling_steps=args.lr_steps,
+                guide_scale=lr_guide_scale,
+                seed=lr_seed,
+                offload_model=args.offload_model)
+
+            if isinstance(lr_latent, (list, tuple)):
+                lr_latent = lr_latent[0]
+            lr_latent = lr_latent.cpu()
+
+            if reload_models:
+                del lr_model
+                lr_model = None
+                _clear_cuda()
+                if dist.is_initialized():
+                    dist.barrier()
+
+            if reload_models:
+                logging.info("Loading SR model (WanTI2V_Upsample_Shortcut)...")
+                sr_model = _build_sr_model(args, cfg, device, rank)
+
+            sr_seed = args.base_seed + output_idx * 100 + 10000
+            if dist.is_initialized():
+                seed_list = [sr_seed] if rank == 0 else [None]
+                dist.broadcast_object_list(seed_list, src=0)
+                sr_seed = seed_list[0]
+
+            logging.info(f"Phase 2/3: generating SR latent for prompt {prompt_idx}")
+            cond_latent = _interpolate_cond_latent(lr_latent, H_lr, W_lr)
+            cond_latent = cond_latent.to(device=sr_model.device, dtype=torch.float32)
+
+            sr_latent = sr_model.generate(
+                prompt,
+                cond_latent=cond_latent,
+                size=sr_size,
+                max_area=MAX_AREA_CONFIGS[args.sr_size],
+                frame_num=args.frame_num,
+                shift=args.sr_shift,
+                sample_solver=args.sr_solver,
+                sampling_steps=args.sr_steps,
+                guide_scale=sr_guide_scale,
+                seed=sr_seed,
+                offload_model=args.offload_model)
+
+            if rank == 0:
+                save_path = os.path.join(args.save_dir, f"{output_idx}.pt")
+                torch.save({
+                    'latent': sr_latent,
+                    'prompt': prompt,
+                    'prompt_id': prompt_obj.get('id', str(output_idx)),
+                    'lr_seed': lr_seed,
+                    'seed': sr_seed,
+                    'size': args.sr_size,
+                    'frame_num': args.frame_num,
+                }, save_path)
+                logging.info(f"Saved SR latent: {save_path}")
+            else:
+                save_path = None
+
+            del lr_latent, sr_latent, cond_latent
+            _clear_cuda()
+
+            if reload_models:
+                del sr_model
+                sr_model = None
+                _clear_cuda()
+
+            if dist.is_initialized():
+                dist.barrier()
+
+            if rank == 0:
+                output_filename = os.path.basename(save_path).replace('.pt', '.mp4')
+                output_path = os.path.join(video_dir, output_filename)
+                logging.info(f"Phase 3/3: decoding video to {output_path}")
+                _decode_one(save_path, output_path, vae_path, args)
+
+            if dist.is_initialized():
+                dist.barrier()
+    finally:
+        if lr_model is not None:
+            del lr_model
+        if sr_model is not None:
+            del sr_model
+        _clear_cuda()
+
+    if dist.is_initialized():
+        dist.barrier()
+        dist.destroy_process_group()
 
     logging.info("Finished.")
 
