@@ -4,21 +4,24 @@ End-to-end pipeline: generates low-resolution latents (stage 1), immediately
 upscales them to 2K/4K (stage 2), and decodes the SR latents to videos.
 
 Usage:
-    python generate.py \                                                                                                                                             
-      --ckpt_dir ./Wan2.2-TI2V-5B \                                                                                                                                
-      --sr_ckpt <sr_checkpoint> \                                                                                                                                  
-      --prompt_file prompts.txt \                                                                                                                                  
-      --save_dir outputs/sr \                                                                                                                                      
-      --video_dir outputs/videos \                                                                                                                                 
-      --resolution 2k
-
-    torchrun --nproc_per_node=8 generate.py \
-        --ckpt_dir ./Wan2.2-TI2V-5B \
-        --sr_ckpt <sr_checkpoint> \
-        --prompt_file prompts.txt \
-        --save_dir outputs/sr \
-        --video_dir outputs/videos \
+    python generate.py --ckpt_dir /mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B \
+        --lr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p_new/checkpoint_model_001800/model.pt \
+        --sr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_shortcut_new2/checkpoint_model_001300/model.pt \
+        --save_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/2k_pt \
+        --video_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/2k_mp4 \
         --resolution 2k
+    
+    python generate.py --ckpt_dir /mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B \
+        --lr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p_new/checkpoint_model_001800/model.pt \
+        --sr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/4k_shortcut_new2/checkpoint_model_001150/model.pt \
+        --save_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/4k_pt \
+        --video_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/4k_mp4 \
+        --resolution 4k
+
+    torchrun --nproc_per_node=8 generate.py --ckpt_dir ./Wan2.2-TI2V-5B \
+        --lr_ckpt <lr_checkpoint> --sr_ckpt <sr_checkpoint> \
+        --prompt_file prompts.txt --save_dir outputs/sr \
+        --video_dir outputs/videos --resolution 2k
 """
 import argparse
 import gc
@@ -93,7 +96,7 @@ def _parse_args():
                         help="LR flow matching shift (None = use config default)")
     parser.add_argument("--lr_guide_scale", type=float, default=None)
     parser.add_argument("--lr_ckpt", type=str, default=None,
-                        help="Optional fine-tuned LR checkpoint (.pt)")
+                        help="Optional fine-tuned LR checkpoint (.pt). Omit to use ckpt_dir base weights")
     # --- stage II ---
     parser.add_argument("--sr_ckpt", type=str, required=True,
                         help="Path to Stage II   checkpoint (.pt)")
@@ -212,6 +215,8 @@ def generate(args):
         f"Resolution preset: {args.resolution} "
         f"(LR={args.lr_size}, SR={args.sr_size}, "
         f"SR steps={args.sr_steps}, SR shift={args.sr_shift})")
+    logging.info(f"LR checkpoint: {args.lr_ckpt or 'base weights from ckpt_dir'}")
+    logging.info(f"SR checkpoint: {args.sr_ckpt}")
 
     # ================================================================
     # Phase 1: LR latent generation

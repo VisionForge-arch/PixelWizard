@@ -44,6 +44,7 @@ Run the full pipeline (LR generation + SR upscaling + decode):
 # 2K output
 torchrun --nproc_per_node=8 generate.py \
     --ckpt_dir ./Wan2.2-TI2V-5B \
+    --lr_ckpt <lr_checkpoint> \
     --sr_ckpt <sr_2k_checkpoint> \
     --prompt_file prompts.txt \
     --save_dir outputs/sr_2k \
@@ -54,6 +55,7 @@ torchrun --nproc_per_node=8 generate.py \
 # 4K output
 torchrun --nproc_per_node=8 generate.py \
     --ckpt_dir ./Wan2.2-TI2V-5B \
+    --lr_ckpt <lr_checkpoint> \
     --sr_ckpt <sr_4k_checkpoint> \
     --prompt_file prompts.txt \
     --save_dir outputs/sr_4k \
@@ -65,6 +67,8 @@ torchrun --nproc_per_node=8 generate.py \
 `--resolution 2k` uses fixed LR `448x256`, SR `2560x1440`, 4 SR steps, and shift `5.5`. `--resolution 4k` uses fixed LR `448x256`, SR `3840x2144`, 5 SR steps, and shift `5.8`.
 
 By default, `generate.py` uses `./Wan2.2-TI2V-5B/Wan2.2_VAE.pth` for decode. Override it with `--vae_path` if your VAE checkpoint lives elsewhere.
+
+`--lr_ckpt` is optional. If omitted, LR generation uses the base Wan2.2 weights from `--ckpt_dir`; pass it when you have a fine-tuned LR checkpoint.
 
 The `--num_patches`, `--patch_dim`, and `--overlap` options control spatial chunking during decode to avoid OOM on high-resolution latents. The overlap region uses cosine-ramp blending to avoid seam artifacts.
 
