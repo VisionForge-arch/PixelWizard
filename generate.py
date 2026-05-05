@@ -53,11 +53,13 @@ RESOLUTION_CONFIGS = {
         "sr_size": "2560*1440",
         "sr_steps": 4,
         "sr_shift": 5.5,
+        "decode_num_patches": 3,
     },
     "4k": {
         "sr_size": "3840*2144",
         "sr_steps": 4,
         "sr_shift": 5.8,
+        "decode_num_patches": 4,
     },
 }
 
@@ -112,8 +114,8 @@ def _parse_args():
     # --- decode ---
     parser.add_argument("--vae_path", type=str, default=None,
                         help="Path to Wan2.2 VAE checkpoint (.pth). Defaults to ckpt_dir/config VAE")
-    parser.add_argument("--num_patches", type=int, default=3,
-                        help="Number of spatial patches for chunked decoding")
+    parser.add_argument("--num_patches", type=int, default=None,
+                        help="Number of spatial patches for chunked decoding (default: 2k=3, 4k=4)")
     parser.add_argument("--patch_dim", type=str, default="w",
                         choices=['h', 'w'],
                         help="Dimension to split during decode")
@@ -129,6 +131,8 @@ def _parse_args():
     args.sr_size = preset["sr_size"]
     args.sr_steps = preset["sr_steps"]
     args.sr_shift = preset["sr_shift"]
+    if args.num_patches is None:
+        args.num_patches = preset["decode_num_patches"]
     return args
 
 
@@ -328,6 +332,7 @@ def generate(args):
         f"Resolution preset: {args.resolution} "
         f"(LR={args.lr_size}, SR={args.sr_size}, "
         f"SR steps={args.sr_steps}, SR shift={args.sr_shift})")
+    logging.info(f"Decode patches: {args.num_patches} along {args.patch_dim}")
     logging.info(f"LR checkpoint: {args.lr_ckpt or 'base weights from ckpt_dir'}")
     logging.info(f"SR checkpoint: {args.sr_ckpt}")
     logging.info(f"Loaded {len(lr_prompts)} prompts from {args.prompt_file}")
