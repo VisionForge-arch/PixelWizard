@@ -20,8 +20,7 @@ Usage:
 
     torchrun --nproc_per_node=8 generate.py --ckpt_dir ./Wan2.2-TI2V-5B \
         --lr_ckpt <lr_checkpoint> --hr_ckpt <hr_checkpoint> \
-        --prompt_file prompts.txt --save_dir outputs/hr \
-        --video_dir outputs/videos --resolution 2k
+        --prompt_file prompts.txt --video_dir outputs/videos --resolution 2k
 """
 import argparse
 import gc
@@ -76,10 +75,10 @@ def _parse_args():
                         help="Number of frames (should be 4n+1)")
     parser.add_argument("--prompt_file", type=str, default="prompts/demos.txt",
                         help="Prompt file: .txt (one per line) or .jsonl ({id, text})")
-    parser.add_argument("--save_dir", type=str, required=True,
-                        help="Directory to save output high resolution output .pt files")
+    parser.add_argument("--save_dir", type=str, default=None,
+                        help="Optional directory to save output high resolution .pt latent files")
     parser.add_argument("--video_dir", type=str, default=None,
-                        help="Directory to save decoded .mp4 videos (default: sibling videos/ directory)")
+                        help="Directory to save decoded .mp4 videos (default: sibling videos/ directory when --save_dir is set, otherwise outputs/videos)")
     parser.add_argument("--resolution", type=str, default="2k",
                         choices=list(RESOLUTION_CONFIGS.keys()),
                         help="Output resolution preset. 2k = 2560x1440, 4k = 3840x2144")
@@ -185,6 +184,14 @@ def _interpolate_cond_latent(latent, H_lr, W_lr):
     return x
 
 
+def _latent_to_cpu(latent):
+    if isinstance(latent, torch.Tensor):
+        return latent.cpu()
+    if isinstance(latent, (list, tuple)):
+        return [x.cpu() if isinstance(x, torch.Tensor) else x for x in latent]
+    return latent
+
+
 def _clear_cuda():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -241,11 +248,11 @@ def _build_hr_model(args, cfg, device, rank):
     return model
 
 
-def _decode_one(hr_path, output_path, vae_path, args):
+def _decode_one(latent_input, output_path, vae_path, args):
     vae = Wan2_2_VAE(vae_pth=vae_path, device=args.decode_device)
     try:
         decode_latent_gpu_chunked(
-            hr_path,
+            latent_input,
             output_path,
             vae,
             num_patches=args.num_patches,
@@ -308,12 +315,16 @@ def generate(args):
     W_lr = W_target // 32
     hr_guide_scale = args.hr_guide_scale if args.hr_guide_scale is not None else cfg.sample_guide_scale
 
-    os.makedirs(args.save_dir, exist_ok=True)
+    if args.save_dir is not None:
+        os.makedirs(args.save_dir, exist_ok=True)
     if rank == 0:
         video_dir = args.video_dir
         if video_dir is None:
-            save_parent = os.path.dirname(os.path.abspath(args.save_dir))
-            video_dir = os.path.join(save_parent, "videos")
+            if args.save_dir is not None:
+                save_parent = os.path.dirname(os.path.abspath(args.save_dir))
+                video_dir = os.path.join(save_parent, "videos")
+            else:
+                video_dir = os.path.join("outputs", "videos")
         os.makedirs(video_dir, exist_ok=True)
         vae_path = args.vae_path
         if vae_path is None:
@@ -335,6 +346,7 @@ def generate(args):
     logging.info(f"Decode patches: {args.num_patches} along {args.patch_dim}")
     logging.info(f"LR checkpoint: {args.lr_ckpt or 'base weights from ckpt_dir'}")
     logging.info(f"HR checkpoint: {args.hr_ckpt}")
+    logging.info(f"HR latent saving: {args.save_dir or 'disabled'}")
     logging.info(f"Loaded {len(lr_prompts)} prompts from {args.prompt_file}")
     logging.info(
         "Pipeline mode: one prompt at a time "
@@ -422,18 +434,23 @@ def generate(args):
                 offload_model=args.offload_model)
 
             if rank == 0:
-                save_path = os.path.join(args.save_dir, f"{output_idx}.pt")
-                torch.save({
-                    'latent': hr_latent,
+                latent_data = {
+                    'latent': _latent_to_cpu(hr_latent),
                     'prompt': prompt,
                     'prompt_id': prompt_obj.get('id', str(output_idx)),
                     'lr_seed': lr_seed,
                     'seed': hr_seed,
                     'size': args.hr_size,
                     'frame_num': args.frame_num,
-                }, save_path)
-                logging.info(f"Saved HR latent: {save_path}")
+                }
+                if args.save_dir is not None:
+                    save_path = os.path.join(args.save_dir, f"{output_idx}.pt")
+                    torch.save(latent_data, save_path)
+                    logging.info(f"Saved HR latent: {save_path}")
+                else:
+                    save_path = None
             else:
+                latent_data = None
                 save_path = None
 
             del lr_latent, hr_latent, cond_latent
@@ -448,10 +465,15 @@ def generate(args):
                 dist.barrier()
 
             if rank == 0:
-                output_filename = os.path.basename(save_path).replace('.pt', '.mp4')
+                if save_path is not None:
+                    output_filename = os.path.basename(save_path).replace('.pt', '.mp4')
+                    decode_input = save_path
+                else:
+                    output_filename = f"{output_idx}.mp4"
+                    decode_input = latent_data
                 output_path = os.path.join(video_dir, output_filename)
                 logging.info(f"Phase 3/3: decoding video to {output_path}")
-                _decode_one(save_path, output_path, vae_path, args)
+                _decode_one(decode_input, output_path, vae_path, args)
 
             if dist.is_initialized():
                 dist.barrier()

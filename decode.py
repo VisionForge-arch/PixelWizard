@@ -64,7 +64,7 @@ def build_spatial_blend_mask(
 
 
 def decode_latent_gpu_chunked(
-    latent_path,
+    latent_input,
     output_path,
     vae,
     num_patches=2,
@@ -72,10 +72,10 @@ def decode_latent_gpu_chunked(
     patch_dim='h',
     overlap=3,
 ):
-    """Decode a latent .pt file to video, splitting spatially into patches with overlap blending.
+    """Decode a latent to video, splitting spatially into patches with overlap blending.
 
     Args:
-        latent_path: Path to .pt latent file
+        latent_input: Path to .pt latent file, or an in-memory latent data dict
         output_path: Path to save .mp4 video
         vae: Wan2_2_VAE instance
         num_patches: Number of spatial patches to split into
@@ -83,8 +83,15 @@ def decode_latent_gpu_chunked(
         patch_dim: 'h' for height split, 'w' for width split
         overlap: Number of latent-space overlap pixels between patches
     """
-    print(f"Loading latent: {latent_path}")
-    data = torch.load(latent_path, map_location='cpu')
+    if isinstance(latent_input, (str, os.PathLike)):
+        print(f"Loading latent: {latent_input}")
+        data = torch.load(latent_input, map_location='cpu')
+    elif isinstance(latent_input, dict):
+        print("Loading latent: in-memory")
+        data = latent_input
+    else:
+        raise TypeError("latent_input must be a path or latent data dict")
+
     latent = data['latent']
     prompt = data.get('prompt', 'unknown')
     print(f"Prompt: {prompt}")
