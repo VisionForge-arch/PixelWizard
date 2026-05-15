@@ -272,7 +272,7 @@ class WanTI2V_HR:
             dt_idx = torch.clamp(dt_idx - (dt_idx % 2), min=2)
         else:
             # --- build GLOBAL dt candidate list from anchors (training support set) ---
-            anchors = torch.arange(t_min, t_max + 1, t_stride, device=device, dtype=torch.float32)  # e.g. [600,700,800]
+            anchors = torch.arange(t_min, t_max + 1, t_stride, device=device, dtype=torch.float32)  
             powers = torch.arange(0, k + 1, device=device, dtype=torch.float32)                      # [0..k]
             div = (2.0 ** powers)[None, :]                                                           # [1,K]
 
