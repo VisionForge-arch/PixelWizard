@@ -40,7 +40,7 @@ import torch.nn.functional as F
 
 import wan
 from decode import decode_latent_gpu_chunked
-from wan.configs import MAX_AREA_CONFIGS, SIZE_CONFIGS, WAN_CONFIGS
+from wan.configs import SIZE_CONFIGS, WAN_CONFIGS
 from wan.distributed.util import init_distributed_group
 from wan.modules.vae2_2 import Wan2_2_VAE
 from wan.utils.utils import str2bool
@@ -66,7 +66,7 @@ RESOLUTION_CONFIGS = {
 
 def _parse_args():
     parser = argparse.ArgumentParser(
-        description="Unified LR → SR video generation pipeline")
+        description="PixelWizard Ultra-High Resolution Video Generation Pipeline")
     # --- shared ---
     parser.add_argument("--task", type=str, default="ti2v-5B",
                         choices=list(WAN_CONFIGS.keys()))
@@ -77,7 +77,7 @@ def _parse_args():
     parser.add_argument("--prompt_file", type=str, default="prompts/demos.txt",
                         help="Prompt file: .txt (one per line) or .jsonl ({id, text})")
     parser.add_argument("--save_dir", type=str, required=True,
-                        help="Directory to save output SR .pt files")
+                        help="Directory to save output high resolution output .pt files")
     parser.add_argument("--video_dir", type=str, default=None,
                         help="Directory to save decoded .mp4 videos (default: sibling videos/ directory)")
     parser.add_argument("--resolution", type=str, default="2k",
@@ -103,14 +103,14 @@ def _parse_args():
     parser.add_argument("--lr_ckpt", type=str, default=None,
                         help="Optional fine-tuned LR checkpoint (.pt). Omit to use ckpt_dir base weights")
     # --- stage II ---
-    parser.add_argument("--sr_ckpt", type=str, required=True,
+    parser.add_argument("--hr_ckpt", type=str, required=True,
                         help="Path to Stage II   checkpoint (.pt)")
-    parser.add_argument("--sr_guide_scale", type=float, default=None)
-    parser.add_argument("--sr_solver", type=str, default='unipc',
+    parser.add_argument("--hr_guide_scale", type=float, default=None)
+    parser.add_argument("--hr_solver", type=str, default='unipc',
                         choices=['unipc', 'dpm++'])
     parser.add_argument("--sample_solver", type=str, default='unipc',
                         choices=['unipc', 'dpm++'],
-                        help="LR sampling solver")
+                        help="sampling solver")
     # --- decode ---
     parser.add_argument("--vae_path", type=str, default=None,
                         help="Path to Wan2.2 VAE checkpoint (.pth). Defaults to ckpt_dir/config VAE")
@@ -224,7 +224,7 @@ def _build_lr_model(args, lr_cfg, device, rank):
     return model
 
 
-def _build_sr_model(args, cfg, device, rank):
+def _build_hr_model(args, cfg, device, rank):
     model = wan.WanTI2V_Upsample_Shortcut(
         config=cfg,
         checkpoint_dir=args.ckpt_dir,
@@ -241,11 +241,11 @@ def _build_sr_model(args, cfg, device, rank):
     return model
 
 
-def _decode_one(sr_path, output_path, vae_path, args):
+def _decode_one(hr_path, output_path, vae_path, args):
     vae = Wan2_2_VAE(vae_pth=vae_path, device=args.decode_device)
     try:
         decode_latent_gpu_chunked(
-            sr_path,
+            hr_path,
             output_path,
             vae,
             num_patches=args.num_patches,
@@ -302,11 +302,11 @@ def generate(args):
     lr_size = SIZE_CONFIGS[args.lr_size]
     lr_shift = args.lr_shift if args.lr_shift is not None else lr_cfg.sample_shift
     lr_guide_scale = args.lr_guide_scale if args.lr_guide_scale is not None else lr_cfg.sample_guide_scale
-    sr_size = SIZE_CONFIGS[args.sr_size]
-    W_target, H_target = sr_size
+    hr_size = SIZE_CONFIGS[args.hr_size]
+    W_target, H_target = hr_size
     H_lr = H_target // 32
     W_lr = W_target // 32
-    sr_guide_scale = args.sr_guide_scale if args.sr_guide_scale is not None else cfg.sample_guide_scale
+    hr_guide_scale = args.hr_guide_scale if args.hr_guide_scale is not None else cfg.sample_guide_scale
 
     os.makedirs(args.save_dir, exist_ok=True)
     if rank == 0:
@@ -330,11 +330,11 @@ def generate(args):
 
     logging.info(
         f"Resolution preset: {args.resolution} "
-        f"(LR={args.lr_size}, SR={args.sr_size}, "
-        f"SR steps={args.sr_steps}, SR shift={args.sr_shift})")
+        f"(LR={args.lr_size}, HR={args.hr_size}, "
+        f"HR steps={args.sr_steps}, HR shift={args.hr_shift})")
     logging.info(f"Decode patches: {args.num_patches} along {args.patch_dim}")
     logging.info(f"LR checkpoint: {args.lr_ckpt or 'base weights from ckpt_dir'}")
-    logging.info(f"SR checkpoint: {args.sr_ckpt}")
+    logging.info(f"HR checkpoint: {args.hr_ckpt}")
     logging.info(f"Loaded {len(lr_prompts)} prompts from {args.prompt_file}")
     logging.info(
         "Pipeline mode: one prompt at a time "
@@ -342,7 +342,7 @@ def generate(args):
 
     if not reload_models and args.offload_model is False:
         logging.warning(
-            "resident mode with --offload_model False keeps LR/SR models on GPU during decode; "
+            "resident mode with --offload_model False keeps LR/HR models on GPU during decode; "
             "use --offload_model True if GPU memory is tight.")
 
     lr_model = None
@@ -350,8 +350,8 @@ def generate(args):
     if not reload_models:
         logging.info("Loading resident LR model (WanTI2V)...")
         lr_model = _build_lr_model(args, lr_cfg, device, rank)
-        logging.info("Loading resident SR model (WanTI2V_Upsample_Shortcut)...")
-        sr_model = _build_sr_model(args, cfg, device, rank)
+        logging.info("Loading resident HR model (WanTI2V_Upsample_Shortcut)...")
+        sr_model = _build_hr_model(args, cfg, device, rank)
 
     try:
         for prompt_idx, prompt_obj in enumerate(lr_prompts, 1):
@@ -376,7 +376,6 @@ def generate(args):
             lr_latent = lr_model.generate(
                 prompt,
                 size=lr_size,
-                max_area=MAX_AREA_CONFIGS[args.lr_size],
                 frame_num=args.frame_num,
                 shift=lr_shift,
                 sample_solver=args.sample_solver,
@@ -414,7 +413,6 @@ def generate(args):
                 prompt,
                 cond_latent=cond_latent,
                 size=sr_size,
-                max_area=MAX_AREA_CONFIGS[args.sr_size],
                 frame_num=args.frame_num,
                 shift=args.sr_shift,
                 sample_solver=args.sr_solver,
