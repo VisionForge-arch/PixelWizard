@@ -135,6 +135,8 @@ torchrun --nproc_per_node=8 generate.py \
     --dit_fsdp --t5_fsdp --ulysses_size 8
 ```
 
+The default commands use FSDP/Ulysses for multi-GPU memory sharding. The pipeline still processes prompts one by one rather than distributing different prompts across GPUs.
+
 By default, `generate.py` does **not** save HR latent `.pt` files. To save HR latents for later decoding or debugging, pass `--save_dir`:
 
 ```bash

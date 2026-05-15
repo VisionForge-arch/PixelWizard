@@ -14,13 +14,14 @@ Usage:
     python generate.py --ckpt_dir /mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B \
         --lr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Weight/PixelWizard/lr/model.pt \
         --hr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Weight/PixelWizard/4k/model.pt \
-        --save_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/4k_pt \
         --video_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/4k_mp4 \
         --resolution 4k
 
     torchrun --nproc_per_node=8 generate.py --ckpt_dir ./Wan2.2-TI2V-5B \
-        --lr_ckpt <lr_checkpoint> --hr_ckpt <hr_checkpoint> \
-        --prompt_file prompts.txt --video_dir outputs/videos --resolution 2k
+        --lr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Weight/PixelWizard/lr/model.pt \
+        --hr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Weight/PixelWizard/4k/model.pt \
+        --video_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/4k_mp4 \
+        --resolution 4k
 """
 import argparse
 import gc

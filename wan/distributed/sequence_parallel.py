@@ -143,8 +143,9 @@ def sp_dit_forward(
         freqs=self.freqs,
         context=context,
         context_lens=context_lens,
-        lr_latents=lr_latents,
         )
+    if lr_latents is not None:
+        kwargs["lr_latents"] = lr_latents
 
     for block in self.blocks:
         x = block(x, **kwargs)
