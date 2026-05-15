@@ -59,10 +59,18 @@ cd PixelWizard
 ### 2. Set Up the Environment
 
 ```bash
-# PyTorch >= 2.4.0 is recommended.
+# 1. Create and activate a clean environment.
+conda create -n pixelwizard python=3.10
+conda activate pixelwizard
+
+# 2. Install PyTorch first. Choose the command matching your CUDA version.
+# Example for CUDA 12.1:
+pip install torch==2.4.0 torchvision==0.19.0 --index-url https://download.pytorch.org/whl/cu121
+
+# 3. Install the remaining Python dependencies.
 pip install -r requirements.txt
 
-# If flash-attn fails during installation:
+# 4. Install flash-attn after PyTorch is available.
 pip install flash-attn --no-build-isolation
 ```
 

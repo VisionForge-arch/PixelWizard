@@ -5,15 +5,15 @@ upscales them to 2K/4K (stage 2), and decodes the HR latents to videos.
 
 Usage:
     python generate.py --ckpt_dir /mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B \
-        --lr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p_new/checkpoint_model_001800/model.pt \
-        --hr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_shortcut_new2/checkpoint_model_001300/model.pt \
+        --lr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Weight/PixelWizard/lr/model.pt \
+        --hr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Weight/PixelWizard/2k/model.pt \
         --save_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/2k_pt \
         --video_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/2k_mp4 \
         --resolution 2k
     
     python generate.py --ckpt_dir /mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B \
-        --lr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p_new/checkpoint_model_001800/model.pt \
-        --hr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/4k_shortcut_new2/checkpoint_model_001150/model.pt \
+        --lr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Weight/PixelWizard/lr/model.pt \
+        --hr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Weight/PixelWizard/4k/model.pt \
         --save_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/4k_pt \
         --video_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/4k_mp4 \
         --resolution 4k
