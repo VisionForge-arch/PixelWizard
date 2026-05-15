@@ -397,51 +397,51 @@ def generate(args):
 
             if reload_models:
                 logging.info("Loading SR model (WanTI2V_Upsample_Shortcut)...")
-                sr_model = _build_sr_model(args, cfg, device, rank)
+                hr_model = _build_hr_model(args, cfg, device, rank)
 
-            sr_seed = args.base_seed + output_idx * 100 + 10000
+            hr_seed = args.base_seed + output_idx * 100 + 10000
             if dist.is_initialized():
-                seed_list = [sr_seed] if rank == 0 else [None]
+                seed_list = [hr_seed] if rank == 0 else [None]
                 dist.broadcast_object_list(seed_list, src=0)
-                sr_seed = seed_list[0]
+                hr_seed = seed_list[0]
 
-            logging.info(f"Phase 2/3: generating SR latent for prompt {prompt_idx}")
+            logging.info(f"Phase 2/3: generating HR latent for prompt {prompt_idx}")
             cond_latent = _interpolate_cond_latent(lr_latent, H_lr, W_lr)
-            cond_latent = cond_latent.to(device=sr_model.device, dtype=torch.float32)
+            cond_latent = cond_latent.to(device=hr_model.device, dtype=torch.float32)
 
-            sr_latent = sr_model.generate(
+            hr_latent = hr_model.generate(
                 prompt,
                 cond_latent=cond_latent,
-                size=sr_size,
+                size=hr_size,
                 frame_num=args.frame_num,
-                shift=args.sr_shift,
-                sample_solver=args.sr_solver,
-                sampling_steps=args.sr_steps,
-                guide_scale=sr_guide_scale,
-                seed=sr_seed,
+                shift=args.hr_shift,
+                sample_solver=args.hr_solver,
+                sampling_steps=args.hr_steps,
+                guide_scale=hr_guide_scale,
+                seed=hr_seed,
                 offload_model=args.offload_model)
 
             if rank == 0:
                 save_path = os.path.join(args.save_dir, f"{output_idx}.pt")
                 torch.save({
-                    'latent': sr_latent,
+                    'latent': hr_latent,
                     'prompt': prompt,
                     'prompt_id': prompt_obj.get('id', str(output_idx)),
                     'lr_seed': lr_seed,
-                    'seed': sr_seed,
-                    'size': args.sr_size,
+                    'seed': hr_seed,
+                    'size': args.hr_size,
                     'frame_num': args.frame_num,
                 }, save_path)
-                logging.info(f"Saved SR latent: {save_path}")
+                logging.info(f"Saved HR latent: {save_path}")
             else:
                 save_path = None
 
-            del lr_latent, sr_latent, cond_latent
+            del lr_latent, hr_latent, cond_latent
             _clear_cuda()
 
             if reload_models:
-                del sr_model
-                sr_model = None
+                del hr_model
+                hr_model = None
                 _clear_cuda()
 
             if dist.is_initialized():
@@ -458,8 +458,8 @@ def generate(args):
     finally:
         if lr_model is not None:
             del lr_model
-        if sr_model is not None:
-            del sr_model
+        if hr_model is not None:
+            del hr_model
         _clear_cuda()
 
     if dist.is_initialized():
