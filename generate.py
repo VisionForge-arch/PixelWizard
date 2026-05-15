@@ -1,7 +1,7 @@
 # Copyright 2024-2025 The Alibaba Wan Team Authors. All rights reserved.
 """
 End-to-end pipeline: generates low-resolution latents (stage 1), immediately
-upscales them to 2K/4K (stage 2), and decodes the SR latents to videos.
+upscales them to 2K/4K (stage 2), and decodes the HR latents to videos.
 
 Usage:
     python generate.py --ckpt_dir /mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B \
@@ -168,7 +168,7 @@ def _load_prompts(prompt_file):
     return prompts
 
 def _interpolate_cond_latent(latent, H_lr, W_lr):
-    """Interpolate a LR latent to the target SR conditioning size.
+    """Interpolate a LR latent to the target HR conditioning size.
 
     Args:
         latent: shape (C, T, h, w) or (B, C, T, h, w)
@@ -235,7 +235,7 @@ def _build_hr_model(args, cfg, device, rank):
         use_sp=(args.ulysses_size > 1),
         t5_cpu=args.t5_cpu,
         convert_model_dtype=args.convert_model_dtype,
-        wan_ckpt=args.sr_ckpt,
+        wan_ckpt=args.hr_ckpt,
     )
     _offload_unused_t2v_vae(model)
     return model
@@ -331,7 +331,7 @@ def generate(args):
     logging.info(
         f"Resolution preset: {args.resolution} "
         f"(LR={args.lr_size}, HR={args.hr_size}, "
-        f"HR steps={args.sr_steps}, HR shift={args.hr_shift})")
+        f"HR steps={args.hr_steps}, HR shift={args.hr_shift})")
     logging.info(f"Decode patches: {args.num_patches} along {args.patch_dim}")
     logging.info(f"LR checkpoint: {args.lr_ckpt or 'base weights from ckpt_dir'}")
     logging.info(f"HR checkpoint: {args.hr_ckpt}")
@@ -346,12 +346,12 @@ def generate(args):
             "use --offload_model True if GPU memory is tight.")
 
     lr_model = None
-    sr_model = None
+    hr_model = None
     if not reload_models:
         logging.info("Loading resident LR model (WanTI2V)...")
         lr_model = _build_lr_model(args, lr_cfg, device, rank)
         logging.info("Loading resident HR model (WanTI2V_Upsample_Shortcut)...")
-        sr_model = _build_hr_model(args, cfg, device, rank)
+        hr_model = _build_hr_model(args, cfg, device, rank)
 
     try:
         for prompt_idx, prompt_obj in enumerate(lr_prompts, 1):
@@ -396,7 +396,7 @@ def generate(args):
                     dist.barrier()
 
             if reload_models:
-                logging.info("Loading SR model (WanTI2V_Upsample_Shortcut)...")
+                logging.info("Loading HR model (WanTI2V_Upsample_Shortcut)...")
                 hr_model = _build_hr_model(args, cfg, device, rank)
 
             hr_seed = args.base_seed + output_idx * 100 + 10000
