@@ -6,21 +6,21 @@ upscales them to 2K/4K (stage 2), and decodes the SR latents to videos.
 Usage:
     python generate.py --ckpt_dir /mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B \
         --lr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p_new/checkpoint_model_001800/model.pt \
-        --sr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_shortcut_new2/checkpoint_model_001300/model.pt \
+        --hr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/2k_shortcut_new2/checkpoint_model_001300/model.pt \
         --save_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/2k_pt \
         --video_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/2k_mp4 \
         --resolution 2k
     
     python generate.py --ckpt_dir /mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B \
         --lr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/wan_240p_new/checkpoint_model_001800/model.pt \
-        --sr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/4k_shortcut_new2/checkpoint_model_001150/model.pt \
+        --hr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Output/Ultra_Train_Weight/4k_shortcut_new2/checkpoint_model_001150/model.pt \
         --save_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/4k_pt \
         --video_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/4k_mp4 \
         --resolution 4k
 
     torchrun --nproc_per_node=8 generate.py --ckpt_dir ./Wan2.2-TI2V-5B \
-        --lr_ckpt <lr_checkpoint> --sr_ckpt <sr_checkpoint> \
-        --prompt_file prompts.txt --save_dir outputs/sr \
+        --lr_ckpt <lr_checkpoint> --hr_ckpt <hr_checkpoint> \
+        --prompt_file prompts.txt --save_dir outputs/hr \
         --video_dir outputs/videos --resolution 2k
 """
 import argparse
@@ -50,15 +50,15 @@ LR_SIZE = "448*256"
 
 RESOLUTION_CONFIGS = {
     "2k": {
-        "sr_size": "2560*1440",
-        "sr_steps": 4,
-        "sr_shift": 5.5,
+        "hr_size": "2560*1440",
+        "hr_steps": 4,
+        "hr_shift": 5.5,
         "decode_num_patches": 3,
     },
     "4k": {
-        "sr_size": "3840*2144",
-        "sr_steps": 4,
-        "sr_shift": 5.8,
+        "hr_size": "3840*2144",
+        "hr_steps": 4,
+        "hr_shift": 5.8,
         "decode_num_patches": 4,
     },
 }
@@ -128,9 +128,9 @@ def _parse_args():
     args.base_seed = args.base_seed if args.base_seed >= 0 else random.randint(0, sys.maxsize)
     preset = RESOLUTION_CONFIGS[args.resolution]
     args.lr_size = LR_SIZE
-    args.sr_size = preset["sr_size"]
-    args.sr_steps = preset["sr_steps"]
-    args.sr_shift = preset["sr_shift"]
+    args.hr_size = preset["hr_size"]
+    args.hr_steps = preset["hr_steps"]
+    args.hr_shift = preset["hr_shift"]
     if args.num_patches is None:
         args.num_patches = preset["decode_num_patches"]
     return args
