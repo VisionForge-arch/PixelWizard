@@ -17,7 +17,7 @@ from tqdm import tqdm
 from .distributed.fsdp import shard_model
 from .distributed.sequence_parallel import sp_attn_forward, sp_dit_forward
 from .distributed.util import get_world_size
-from .modules.model_upsample_shortcut2 import WanModel_Upsample_Shortcut2
+from .modules.hr_model import WanModel_HR
 from .modules.t5 import T5EncoderModel
 from .modules.vae2_2 import Wan2_2_VAE
 from .utils.fm_solvers import (
@@ -29,7 +29,7 @@ from .utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
 from .utils.utils import masks_like
 
 
-class WanTI2V_Upsample_Shortcut:
+class WanTI2V_HR:
 
     def __init__(
         self,
@@ -100,8 +100,8 @@ class WanTI2V_Upsample_Shortcut:
             device=self.device)
 
         logging.info(f"Creating WanModel from {checkpoint_dir}")
-        from .modules.model_upsample_shortcut2 import register_spatial_control
-        self.model = WanModel_Upsample_Shortcut2.from_pretrained(checkpoint_dir)
+        from .modules.hr_model import register_spatial_control
+        self.model = WanModel_HR.from_pretrained(checkpoint_dir)
 
         self.model.enable_dt_conditioning()
         #==============load the model from the checkpoint (在 FSDP 之前加载)=============
@@ -112,7 +112,7 @@ class WanTI2V_Upsample_Shortcut:
                 state_dict = torch.load(wan_ckpt, map_location="cpu")
             else:
                 print(f"Loading Wan model from {wan_ckpt} for SP mode")
-                state_dict = None  # 先占位
+                state_dict = None  
                 if not dist.is_initialized() or dist.get_rank() == 0:
                     state_dict = torch.load(wan_ckpt, map_location="cpu")
                     print(f"[rank0] loaded Wan model from {wan_ckpt}")
@@ -436,13 +436,11 @@ class WanTI2V_Upsample_Shortcut:
             context_null = [t.to(self.device) for t in context_null]
 
         
-        # 先处理 cond_latent 的维度（如果有的话）
         if cond_latent is not None:
             # if cond_latent.dim() == 5:  # [B, C, T, H, W]
-            #     cond_latent = cond_latent.squeeze(0)  # 变成 [C, T, H, W]
+            #     cond_latent = cond_latent.squeeze(0)  # to [C, T, H, W]
             print(f'cond_latent_shape: {cond_latent.shape}')
         
-        # 暂时先生成纯噪声（后面会根据 scheduler 的第一个 sigma 重新初始化）
         noise = [torch.randn(
             target_shape[0],
             target_shape[1],
@@ -501,7 +499,6 @@ class WanTI2V_Upsample_Shortcut:
             #cond_latent = cond_latent.permute(0, 2, 1, 3, 4).contiguous()   # [B, C, T, h, w]
 
             arg_c = {'context': context, 'seq_len': seq_len, 'lr_latents':cond_latent}
-            #arg_c = {'context': context, 'seq_len': seq_len}
             arg_null = {'context': context_null, 'seq_len': seq_len, 'lr_latents':cond_latent}
 
             if offload_model or self.init_on_cpu:
@@ -532,7 +529,7 @@ class WanTI2V_Upsample_Shortcut:
                 noise_pred_uncond = self.model(latent_model_input, t=timestep, dt=dt_embed, **arg_null)[0]
 
                 noise_pred = noise_pred_uncond + guide_scale * (noise_pred_cond - noise_pred_uncond)
-                #noise_pred = noise_pred_cond
+
                 
                 temp_x0 = sample_scheduler.step(
                     noise_pred.unsqueeze(0),
@@ -542,7 +539,6 @@ class WanTI2V_Upsample_Shortcut:
                     generator=seed_g)[0]
                 latents = [temp_x0.squeeze(0)]
                 
-                # 每 10 步打印一次统计信息
                 if i % 10 == 0 or i == len(timesteps) - 1:
                     print(f'  Step {i}/{len(timesteps)}, t={t:.1f}, '
                           f'latent: mean={latents[0].mean():.4f}, std={latents[0].std():.4f}')
