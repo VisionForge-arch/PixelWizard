@@ -1,24 +1,66 @@
 # PixelWizard
 
-A two-stage video super-resolution pipeline built on [Wan2.2-TI2V-5B](https://github.com/Wan-Video/Wan2.2). Generates low-resolution video latents in stage 1, then upscales to 2K/4K in stage 2 using shortcut distillation (only 4-5 sampling steps).
+**Towards Efficient High-Fidelity Video Generation at Ultra-Large Spatial Resolutions**
 
-## Pipeline
+Official repository for **PixelWizard**, a framework for efficient high-resolution text-to-video generation at 2K and 4K spatial resolutions. PixelWizard decouples global structure modeling from high-resolution detail synthesis: it first builds a compact spatial-temporal anchor, then uses the anchor to guide high-resolution latent generation with a shortcut-trained Wan DiT backbone.
 
-```
-prompts.txt → generate.py → sr_latents/*.pt + videos/*.mp4
+> Paper, project page, checkpoints, and examples will be released after publication.
+
+## Highlights
+
+- **Ultra-large spatial resolution video generation**: native 2K and 4K video synthesis in latent space.
+- **Spatial-Temporal Anchor Modeling**: generates global motion and layout at a compact 448x256 latent regime.
+- **Anchor-Guided High-Resolution Synthesis**: injects the anchor into the HR DiT backbone through a lightweight spatial control adapter.
+- **Noise-Span Aligned Shortcut Training**: models shortcut step size `dt` for stable few-step high-resolution inference.
+- **Efficient inference**: the HR stage uses only 4 sampling steps by default for both 2K and 4K presets.
+
+## Method Overview
+
+PixelWizard addresses the optimization and efficiency bottlenecks of high-resolution video generation with a two-stage pipeline:
+
+1. **Stage I: Spatial-Temporal Anchor Modeling**
+   A Wan2.2-TI2V-5B model generates a compact low-resolution latent video at 448x256. This stage focuses on global structure, object layout, and motion consistency.
+
+2. **Stage II: Anchor-Guided High-Resolution Synthesis**
+   The LR anchor latent is interpolated to the HR latent grid and passed to a spatial adapter. The adapter uses 3D convolutions plus timestep and step-size conditioning to produce control features, which are injected into the HR DiT blocks.
+
+3. **Shortcut HR Sampling**
+   The HR model is conditioned on both diffusion timestep `t` and shortcut step size `dt`, enabling large denoising steps and few-step inference without a heavy teacher-student distillation pipeline.
+
+4. **Chunked VAE Decode**
+   HR latents are decoded to video with spatial chunking and cosine-ramp overlap blending to reduce memory usage and avoid patch boundary artifacts.
+
+## Repository Structure
+
+```text
+generate.py                 # End-to-end prompt -> anchor -> HR latent -> video pipeline
+decode.py                   # Chunked Wan VAE latent decoder
+dataset_upsample.py         # Unified latent/video dataset utilities
+wan/
+  textimage2video.py        # LR Wan TI2V pipeline
+  textimage2video_HR.py     # HR anchor-guided shortcut pipeline
+  modules/hr_model.py       # HR DiT, spatial adapter, dt conditioning, hooks
+  modules/model.py          # Base Wan DiT backbone
+  modules/vae2_2.py         # Wan2.2 VAE
+  modules/t5.py             # T5 text encoder
+  configs/                  # Wan2.2 TI2V configs and resolution mappings
+  distributed/              # FSDP and sequence parallel utilities
 ```
 
 ## Installation
 
 ```bash
-# Ensure torch >= 2.4.0
+git clone <this-repository-url>
+cd PixelWizard
+
+# PyTorch >= 2.4.0 is recommended.
 pip install -r requirements.txt
 
-# If flash_attn fails, install other packages first then:
+# If flash-attn fails during the main install, install other packages first, then:
 pip install flash-attn --no-build-isolation
 ```
 
-## Model Download
+## Checkpoints
 
 Download the Wan2.2-TI2V-5B base checkpoint:
 
@@ -27,61 +69,112 @@ pip install "huggingface_hub[cli]"
 huggingface-cli download Wan-AI/Wan2.2-TI2V-5B --local-dir ./Wan2.2-TI2V-5B
 ```
 
-You also need a fine-tuned SR checkpoint (not included in this repo).
+PixelWizard also requires the HR shortcut checkpoint for the target resolution. The PixelWizard checkpoints are not included in this repository and will be released separately.
 
-## Usage
+Expected checkpoint inputs:
 
-Prepare a text file with one prompt per line:
+- `--ckpt_dir`: Wan2.2-TI2V-5B base checkpoint directory.
+- `--lr_ckpt`: optional LR anchor-model checkpoint. If omitted, the LR stage uses base Wan2.2 weights from `--ckpt_dir`.
+- `--hr_ckpt`: required PixelWizard HR shortcut checkpoint.
 
+## Inference
+
+Prepare a prompt file with one prompt per line:
+
+```text
+A Samoyed and a Golden Retriever dog are playfully romping through a futuristic neon city at night.
+A sunny day, a pure white cat moves through a verdant garden with stately trees and vibrant flowers.
 ```
-A cat sitting on a sofa
-Sunset over the ocean
-```
 
-Run the full pipeline (LR generation + SR upscaling + decode):
+Run the full LR anchor -> HR synthesis -> decode pipeline:
 
 ```bash
-# 2K output
 torchrun --nproc_per_node=8 generate.py \
     --ckpt_dir ./Wan2.2-TI2V-5B \
-    --lr_ckpt <lr_checkpoint> \
-    --sr_ckpt <sr_2k_checkpoint> \
+    --lr_ckpt <lr_anchor_checkpoint> \
+    --hr_ckpt <pixelwizard_hr_checkpoint> \
     --prompt_file prompts.txt \
-    --save_dir outputs/sr_2k \
     --video_dir outputs/videos_2k \
     --resolution 2k \
     --dit_fsdp --t5_fsdp --ulysses_size 8
+```
 
-# 4K output
+For 4K generation, use the 4K HR checkpoint and switch the preset:
+
+```bash
 torchrun --nproc_per_node=8 generate.py \
     --ckpt_dir ./Wan2.2-TI2V-5B \
-    --lr_ckpt <lr_checkpoint> \
-    --sr_ckpt <sr_4k_checkpoint> \
+    --lr_ckpt <lr_anchor_checkpoint> \
+    --hr_ckpt <pixelwizard_hr_4k_checkpoint> \
     --prompt_file prompts.txt \
-    --save_dir outputs/sr_4k \
     --video_dir outputs/videos_4k \
     --resolution 4k \
     --dit_fsdp --t5_fsdp --ulysses_size 8
 ```
 
-`--resolution 2k` uses fixed LR `448x256`, SR `2560x1440`, 4 SR steps, and shift `5.5`. `--resolution 4k` uses fixed LR `448x256`, SR `3840x2144`, 5 SR steps, and shift `5.8`.
+By default, `generate.py` does **not** save HR latent `.pt` files. To keep HR latents for later decoding or debugging, pass `--save_dir`:
 
-By default, `generate.py` uses `./Wan2.2-TI2V-5B/Wan2.2_VAE.pth` for decode. Override it with `--vae_path` if your VAE checkpoint lives elsewhere.
+```bash
+python generate.py \
+    --ckpt_dir ./Wan2.2-TI2V-5B \
+    --hr_ckpt <pixelwizard_hr_checkpoint> \
+    --prompt_file prompts.txt \
+    --video_dir outputs/videos \
+    --save_dir outputs/hr_latents \
+    --resolution 2k
+```
 
-`--lr_ckpt` is optional. If omitted, LR generation uses the base Wan2.2 weights from `--ckpt_dir`; pass it when you have a fine-tuned LR checkpoint.
+## Resolution Presets
 
-`generate.py` processes prompts one by one: LR latent → SR latent → decoded video, then moves to the next prompt. The default `--model_load_mode auto` keeps models resident with CPU offload on single-process runs, and reloads LR/SR per prompt for distributed runs to avoid holding both FSDP model stacks at once. You can force either behavior with `--model_load_mode resident` or `--model_load_mode reload`.
+| Preset | Anchor Resolution | HR Resolution | HR Steps | Shift | Decode Patches |
+|--------|-------------------|---------------|----------|-------|----------------|
+| `2k` | 448x256 | 2560x1440 | 4 | 5.5 | 3 |
+| `4k` | 448x256 | 3840x2144 | 4 | 5.8 | 4 |
 
-The `--num_patches`, `--patch_dim`, and `--overlap` options control spatial chunking during decode to avoid OOM on high-resolution latents. By default, 2K decode uses 3 patches and 4K decode uses 4 patches. The overlap region uses cosine-ramp blending to avoid seam artifacts.
+`generate.py` processes prompts one at a time: LR anchor latent -> HR latent -> decoded video, then moves to the next prompt. The default `--model_load_mode auto` keeps models resident with CPU offload in single-process runs and reloads LR/HR models per prompt in distributed runs to reduce peak memory.
 
-## Resolutions
+Decode options:
 
-| Stage | Resolution | Sampling Steps | Shift |
-|-------|-----------|---------------|-------|
-| LR base | 448x256 (240p) | 50 | 5.0 |
-| SR 2K | 2560x1440 | 4 | 5.5 |
-| SR 4K | 3840x2144 | 5 | 5.8 |
+- `--num_patches`: number of spatial chunks for HR VAE decode.
+- `--patch_dim`: decode split dimension, `w` by default.
+- `--overlap`: latent-space overlap between chunks; overlap is blended with a cosine ramp.
+- `--vae_path`: optional path to the Wan2.2 VAE checkpoint. If omitted, `generate.py` uses the VAE under `--ckpt_dir`.
+
+## Prompt Format
+
+`generate.py` supports either plain text or JSONL prompt files.
+
+Plain text:
+
+```text
+Prompt one
+Prompt two
+```
+
+JSONL:
+
+```jsonl
+{"id": "sample_0001", "text": "Prompt one"}
+{"id": "sample_0002", "text": "Prompt two"}
+```
+
+## Citation
+
+If PixelWizard is useful for your research, please cite our paper. BibTeX will be added after publication.
+
+```bibtex
+@article{pixelwizard2026,
+  title   = {PixelWizard: Towards Efficient High-Fidelity Video Generation at Ultra-Large Spatial Resolutions},
+  author  = {Anonymous Authors},
+  journal = {ACM Transactions on Graphics},
+  year    = {2026}
+}
+```
 
 ## Acknowledgements
 
-Built on [Wan2.2](https://github.com/Wan-Video/Wan2.2) by the Alibaba Wan Team. Licensed under Apache 2.0.
+PixelWizard is built on [Wan2.2](https://github.com/Wan-Video/Wan2.2). We thank the Wan team for releasing their open video generation models and infrastructure.
+
+## License
+
+This project follows the license terms of the released code and the underlying Wan2.2 components. Please also check the license of the base Wan2.2 checkpoint before use.
