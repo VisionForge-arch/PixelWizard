@@ -232,7 +232,7 @@ def _build_lr_model(args, lr_cfg, device, rank):
 
 
 def _build_hr_model(args, cfg, device, rank):
-    model = wan.WanTI2V_Upsample_Shortcut(
+    model = wan.WanTI2V_HR(
         config=cfg,
         checkpoint_dir=args.ckpt_dir,
         device_id=device,
