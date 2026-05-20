@@ -16,7 +16,6 @@
 
 PixelWizard is a high-resolution text-to-video generation framework for efficient 2K/4K video synthesis. It decouples global spatial-temporal structure modeling from high-resolution detail generation, then accelerates the expensive high-resolution stage with shortcut step-size conditioning.
 
-> Paper, project page, checkpoints, and visual examples will be released after publication.
 
 <div align="center">
 <img src="./teaser/teaser.jpeg" width="95%"/>
