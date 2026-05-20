@@ -122,7 +122,7 @@ python generate.py \
     --hr_ckpt ./weight/PixelWizard/<resolution>/model.pt \
     --prompt_file prompts.txt \
     --video_dir outputs/videos \
-    --resolution <resolution>
+    --resolution <2k_or_4k>
 ```
 
 For single-GPU inference, expect approximately **52 GB VRAM** for 2K generation and **100 GB VRAM** for 4K generation.
@@ -136,7 +136,7 @@ torchrun --standalone --nproc_per_node=<n_gpus> generate.py \
     --hr_ckpt ./weight/PixelWizard/<resolution>/model.pt \
     --prompt_file prompts.txt \
     --video_dir outputs/videos \
-    --resolution <resolution> \
+    --resolution <2k_or_4k> \
     --dit_fsdp \
     --t5_fsdp \
     --ulysses_size <n_gpus>
@@ -184,10 +184,9 @@ wan/
 If PixelWizard is useful for your research, please cite our paper. BibTeX will be updated after publication.
 
 ```bibtex
-@article{pixelwizard2026,
+@misc{pixelwizard,
   title   = {PixelWizard: Towards Efficient High-Fidelity Video Generation at Ultra-Large Spatial Resolutions},
-  author  = {Anonymous Authors},
-  journal = {ACM Transactions on Graphics},
+  author  = {Li, Wenxue and Ren, Jingjing and Zhang, Peng and Ye, Tian and Zhou, Daiguo and Luan, Jian and Zhu, Lei},
   year    = {2026}
 }
 ```
@@ -195,7 +194,3 @@ If PixelWizard is useful for your research, please cite our paper. BibTeX will b
 ## Acknowledgements
 
 PixelWizard is built on [Wan2.2](https://github.com/Wan-Video/Wan2.2). We thank the Wan team for releasing their open video generation models and infrastructure.
-
-## License
-
-This project follows the license terms of the released code and the underlying Wan2.2 components. Please also check the license of the base Wan2.2 checkpoint before use.
