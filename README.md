@@ -31,21 +31,7 @@ PixelWizard is a high-resolution text-to-video generation framework for efficien
 
 High-resolution video generation faces a coupled bottleneck of optimization instability and prohibitive computational cost. As spatial resolution increases, the token sequence expands dramatically, making optimization biased toward local textures while weakening global structural coherence. PixelWizard addresses this by hierarchically decoupling global structure modeling from fine-grained high-resolution synthesis. It first establishes a compact spatial-temporal anchor that captures motion and layout, then uses this anchor to guide high-resolution latent generation through an Anchor-Guided Injector. To reduce inference latency, PixelWizard further introduces Noise-Span Aligned Shortcut Training, enabling robust few-step generation at native 2K/4K resolutions without a memory-heavy teacher-student distillation pipeline.
 
-## Method
 
-PixelWizard consists of three main components:
-
-### Spatial-Temporal Anchor Modeling
-
-The first stage generates a compact low-resolution latent video at **448x256**. This anchor concentrates semantic and structural information in a dense latent grid, allowing the model to capture global layout, object structure, and motion patterns with substantially lower cost.
-
-### Anchor-Guided High-Resolution Synthesis
-
-The low-resolution anchor is interpolated to the target high-resolution latent grid and injected into the HR DiT backbone. The Anchor-Guided Injector uses lightweight 3D convolutions to refine the anchor features, then modulates their influence with timestep and shortcut step-size embeddings before adding them into selected DiT blocks.
-
-### Noise-Span Aligned Shortcut Training
-
-The HR model is conditioned on both the diffusion timestep `t` and the integration step size `dt`. This lets the model learn large-step transitions and run the high-resolution stage in only a few sampling steps, which is critical for practical 2K/4K generation.
 
 ## Getting Started
 
