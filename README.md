@@ -83,16 +83,7 @@ Download the PixelWizard checkpoints and place them under `./weight/PixelWizard`
 
 PixelWizard checkpoints will be released separately.
 
-### 4. Prepare Prompts
-
-Create a text file with one prompt per line:
-
-```text
-A Samoyed and a Golden Retriever dog are playfully romping through a futuristic neon city at night.
-A sunny day, a pure white cat moves through a verdant garden with stately trees and vibrant flowers.
-```
-
-### 5. Run Inference
+### 4. Run Inference
 
 Single-GPU generation:
 
