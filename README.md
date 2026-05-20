@@ -135,7 +135,23 @@ torchrun --nproc_per_node=8 generate.py \
     --dit_fsdp --t5_fsdp --ulysses_size 8
 ```
 
+Distributed 4K generation with 2 GPUs:
+
+```bash
+torchrun --standalone --nproc_per_node=2 generate.py \
+    --ckpt_dir /mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B \
+    --lr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Weight/PixelWizard/lr/model.pt \
+    --hr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Weight/PixelWizard/4k/model.pt \
+    --video_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/4k_mp4 \
+    --resolution 4k \
+    --dit_fsdp \
+    --t5_fsdp \
+    --ulysses_size 2
+```
+
 The default commands use FSDP/Ulysses for multi-GPU memory sharding. The pipeline still processes prompts one by one rather than distributing different prompts across GPUs.
+
+For single-GPU inference, expect approximately **52 GB VRAM** for 2K generation and **100 GB VRAM** for 4K generation.
 
 By default, `generate.py` does **not** save HR latent `.pt` files. To save HR latents for later decoding or debugging, pass `--save_dir`:
 

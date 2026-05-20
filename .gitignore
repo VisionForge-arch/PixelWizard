@@ -18,4 +18,9 @@ outputs/
 logs/
 wandb/
 *.log
+
+# Local coding-agent files
+AGENTS.md
+CLAUDE.md
 .claude/
+.agents/
