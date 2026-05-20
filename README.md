@@ -26,10 +26,6 @@ PixelWizard is a high-resolution text-to-video generation framework for efficien
 - **[2026.05]** Initial repository for PixelWizard.
 - Project page, paper link, checkpoints, and demo videos are coming soon.
 
-## Abstract
-
-High-resolution video generation faces a coupled bottleneck of optimization instability and prohibitive computational cost. As spatial resolution increases, the token sequence expands dramatically, making optimization biased toward local textures while weakening global structural coherence. PixelWizard addresses this by hierarchically decoupling global structure modeling from fine-grained high-resolution synthesis. It first establishes a compact spatial-temporal anchor that captures motion and layout, then uses this anchor to guide high-resolution latent generation through an Anchor-Guided Injector. To reduce inference latency, PixelWizard further introduces Noise-Span Aligned Shortcut Training, enabling robust few-step generation at native 2K/4K resolutions without a memory-heavy teacher-student distillation pipeline.
-
 
 
 ## Getting Started
