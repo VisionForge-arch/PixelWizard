@@ -162,23 +162,6 @@ Decode options:
 - `--overlap`: latent-space overlap between chunks, blended with a cosine ramp.
 - `--vae_path`: optional path to the Wan2.2 VAE checkpoint. If omitted, the VAE under `--ckpt_dir` is used.
 
-## Repository Structure
-
-```text
-generate.py                 # End-to-end prompt -> anchor -> HR latent -> video pipeline
-decode.py                   # Chunked Wan VAE latent decoder
-dataset_upsample.py         # Unified latent/video dataset utilities
-wan/
-  textimage2video.py        # LR Wan TI2V pipeline
-  textimage2video_HR.py     # HR anchor-guided shortcut pipeline
-  modules/hr_model.py       # HR DiT, spatial adapter, dt conditioning, hooks
-  modules/model.py          # Base Wan DiT backbone
-  modules/vae2_2.py         # Wan2.2 VAE
-  modules/t5.py             # T5 text encoder
-  configs/                  # Wan2.2 TI2V configs and resolution mappings
-  distributed/              # FSDP and sequence parallel utilities
-```
-
 ## Citation
 
 If PixelWizard is useful for your research, please cite our paper. BibTeX will be updated after publication.
