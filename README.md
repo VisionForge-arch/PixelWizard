@@ -74,20 +74,31 @@ pip install -r requirements.txt
 pip install flash-attn --no-build-isolation
 ```
 
-### 3. Download Base Models
+### 3. Download Weights
+
+Put all model weights under `./weight`:
+
+```text
+weight/
+  Wan2.2-TI2V-5B/
+  PixelWizard/
+    lr/model.pt
+    2k/model.pt
+    4k/model.pt
+```
 
 Download the Wan2.2-TI2V-5B base checkpoint:
 
 ```bash
 pip install "huggingface_hub[cli]"
-huggingface-cli download Wan-AI/Wan2.2-TI2V-5B --local-dir ./Wan2.2-TI2V-5B
+huggingface-cli download Wan-AI/Wan2.2-TI2V-5B --local-dir ./weight/Wan2.2-TI2V-5B
 ```
 
-PixelWizard also requires a high-resolution shortcut checkpoint:
+Download the PixelWizard checkpoints and place them under `./weight/PixelWizard`:
 
-- `--ckpt_dir`: Wan2.2-TI2V-5B base checkpoint directory.
-- `--lr_ckpt`: optional low-resolution anchor checkpoint. If omitted, the LR stage uses base Wan2.2 weights.
-- `--hr_ckpt`: required PixelWizard HR shortcut checkpoint.
+- `--ckpt_dir`: Wan2.2-TI2V-5B base checkpoint directory, for example `./weight/Wan2.2-TI2V-5B`.
+- `--lr_ckpt`: optional low-resolution anchor checkpoint, for example `./weight/PixelWizard/lr/model.pt`. If omitted, the LR stage uses base Wan2.2 weights.
+- `--hr_ckpt`: required PixelWizard HR shortcut checkpoint, for example `./weight/PixelWizard/2k/model.pt` or `./weight/PixelWizard/4k/model.pt`.
 
 PixelWizard checkpoints will be released separately.
 
@@ -106,12 +117,12 @@ Single-GPU generation:
 
 ```bash
 python generate.py \
-    --ckpt_dir ./Wan2.2-TI2V-5B \
-    --lr_ckpt <lr_anchor_checkpoint> \
-    --hr_ckpt <pixelwizard_hr_checkpoint> \
+    --ckpt_dir ./weight/Wan2.2-TI2V-5B \
+    --lr_ckpt ./weight/PixelWizard/lr/model.pt \
+    --hr_ckpt ./weight/PixelWizard/<resolution>/model.pt \
     --prompt_file prompts.txt \
     --video_dir outputs/videos \
-    --resolution <2k_or_4k>
+    --resolution <resolution>
 ```
 
 For single-GPU inference, expect approximately **52 GB VRAM** for 2K generation and **100 GB VRAM** for 4K generation.
@@ -120,18 +131,18 @@ Distributed generation:
 
 ```bash
 torchrun --standalone --nproc_per_node=<n_gpus> generate.py \
-    --ckpt_dir ./Wan2.2-TI2V-5B \
-    --lr_ckpt <lr_anchor_checkpoint> \
-    --hr_ckpt <pixelwizard_hr_checkpoint> \
+    --ckpt_dir ./weight/Wan2.2-TI2V-5B \
+    --lr_ckpt ./weight/PixelWizard/lr/model.pt \
+    --hr_ckpt ./weight/PixelWizard/<resolution>/model.pt \
     --prompt_file prompts.txt \
     --video_dir outputs/videos \
-    --resolution <2k_or_4k> \
+    --resolution <resolution> \
     --dit_fsdp \
     --t5_fsdp \
     --ulysses_size <n_gpus>
 ```
 
-Distributed inference uses FSDP/Ulysses for multi-GPU memory sharding. Set `<n_gpus>` to the number of GPUs in the job, and use the HR checkpoint that matches the selected resolution. The pipeline still processes prompts one by one rather than distributing different prompts across GPUs.
+Set `<resolution>` to `2k` or `4k`. Distributed inference uses FSDP/Ulysses for multi-GPU memory sharding. Set `<n_gpus>` to the number of GPUs in the job. The pipeline still processes prompts one by one rather than distributing different prompts across GPUs.
 
 By default, `generate.py` does **not** save HR latent `.pt` files. To save HR latents for later decoding or debugging, pass `--save_dir outputs/hr_latents`.
 
