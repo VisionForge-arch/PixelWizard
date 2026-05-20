@@ -1,6 +1,5 @@
 import argparse
 import gc
-import json
 import logging
 import os
 import sys
@@ -50,7 +49,7 @@ def _parse_args():
     parser.add_argument("--frame_num", type=int, default=121,
                         help="Number of frames (should be 4n+1)")
     parser.add_argument("--prompt_file", type=str, default="prompts/demos.txt",
-                        help="Prompt file: .txt (one per line) or .jsonl ({id, text})")
+                        help="Prompt file: plain text, one prompt per line")
     parser.add_argument("--save_dir", type=str, default=None,
                         help="Optional directory to save output high resolution .pt latent files")
     parser.add_argument("--video_dir", type=str, default=None,
@@ -112,7 +111,7 @@ def _parse_args():
 
 
 def _load_prompts(prompt_file):
-    """Load prompts from .txt (one per line) or .jsonl ({id, text})."""
+    """Load prompts from a plain text file, one prompt per line."""
     if not os.path.exists(prompt_file):
         raise FileNotFoundError(
             f"Prompt file not found: {prompt_file}. "
@@ -121,23 +120,10 @@ def _load_prompts(prompt_file):
 
     prompts = []
     with open(prompt_file, 'r', encoding='utf-8') as f:
-        first_line = f.readline().strip()
-        f.seek(0)
-
-        if first_line.startswith('{'):
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                obj = json.loads(line)
-                prompt_id = obj.get('id', obj.get('prompt_id', ''))
-                text = obj.get('text', obj.get('prompt', obj.get('caption', '')))
-                prompts.append({'id': str(prompt_id), 'text': text})
-        else:
-            for i, line in enumerate(f):
-                line = line.strip()
-                if line:
-                    prompts.append({'id': str(i), 'text': line})
+        for i, line in enumerate(f):
+            line = line.strip()
+            if line:
+                prompts.append({'id': str(i), 'text': line})
     if not prompts:
         raise ValueError(f"Prompt file is empty: {prompt_file}")
     return prompts

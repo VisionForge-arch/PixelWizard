@@ -100,70 +100,40 @@ A Samoyed and a Golden Retriever dog are playfully romping through a futuristic 
 A sunny day, a pure white cat moves through a verdant garden with stately trees and vibrant flowers.
 ```
 
-JSONL is also supported:
-
-```jsonl
-{"id": "sample_0001", "text": "A cinematic shot of a white cat walking through a garden."}
-{"id": "sample_0002", "text": "Majestic snow-covered rocky mountain peaks tower over a canyon."}
-```
-
 ### 5. Run Inference
 
-2K generation:
-
-```bash
-torchrun --nproc_per_node=8 generate.py \
-    --ckpt_dir ./Wan2.2-TI2V-5B \
-    --lr_ckpt <lr_anchor_checkpoint> \
-    --hr_ckpt <pixelwizard_hr_2k_checkpoint> \
-    --prompt_file prompts.txt \
-    --video_dir outputs/videos_2k \
-    --resolution 2k \
-    --dit_fsdp --t5_fsdp --ulysses_size 8
-```
-
-4K generation:
-
-```bash
-torchrun --nproc_per_node=8 generate.py \
-    --ckpt_dir ./Wan2.2-TI2V-5B \
-    --lr_ckpt <lr_anchor_checkpoint> \
-    --hr_ckpt <pixelwizard_hr_4k_checkpoint> \
-    --prompt_file prompts.txt \
-    --video_dir outputs/videos_4k \
-    --resolution 4k \
-    --dit_fsdp --t5_fsdp --ulysses_size 8
-```
-
-Distributed 4K generation with 2 GPUs:
-
-```bash
-torchrun --standalone --nproc_per_node=2 generate.py \
-    --ckpt_dir /mnt/vision-gen-ks3/ModelZoo/Video_Generation/Wan2.2-TI2V-5B \
-    --lr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Weight/PixelWizard/lr/model.pt \
-    --hr_ckpt /mnt/vision-gen-ks3/IndividualDirs/zp/wenxueli/Weight/PixelWizard/4k/model.pt \
-    --video_dir /mnt/nas01-ak/IndividualDirs/wenxueli/test_github/4k_mp4 \
-    --resolution 4k \
-    --dit_fsdp \
-    --t5_fsdp \
-    --ulysses_size 2
-```
-
-The default commands use FSDP/Ulysses for multi-GPU memory sharding. The pipeline still processes prompts one by one rather than distributing different prompts across GPUs.
-
-For single-GPU inference, expect approximately **52 GB VRAM** for 2K generation and **100 GB VRAM** for 4K generation.
-
-By default, `generate.py` does **not** save HR latent `.pt` files. To save HR latents for later decoding or debugging, pass `--save_dir`:
+Single-GPU generation:
 
 ```bash
 python generate.py \
     --ckpt_dir ./Wan2.2-TI2V-5B \
+    --lr_ckpt <lr_anchor_checkpoint> \
     --hr_ckpt <pixelwizard_hr_checkpoint> \
     --prompt_file prompts.txt \
     --video_dir outputs/videos \
-    --save_dir outputs/hr_latents \
-    --resolution 2k
+    --resolution <2k_or_4k>
 ```
+
+For single-GPU inference, expect approximately **52 GB VRAM** for 2K generation and **100 GB VRAM** for 4K generation.
+
+Distributed generation:
+
+```bash
+torchrun --standalone --nproc_per_node=<n_gpus> generate.py \
+    --ckpt_dir ./Wan2.2-TI2V-5B \
+    --lr_ckpt <lr_anchor_checkpoint> \
+    --hr_ckpt <pixelwizard_hr_checkpoint> \
+    --prompt_file prompts.txt \
+    --video_dir outputs/videos \
+    --resolution <2k_or_4k> \
+    --dit_fsdp \
+    --t5_fsdp \
+    --ulysses_size <n_gpus>
+```
+
+Distributed inference uses FSDP/Ulysses for multi-GPU memory sharding. Set `<n_gpus>` to the number of GPUs in the job, and use the HR checkpoint that matches the selected resolution. The pipeline still processes prompts one by one rather than distributing different prompts across GPUs.
+
+By default, `generate.py` does **not** save HR latent `.pt` files. To save HR latents for later decoding or debugging, pass `--save_dir outputs/hr_latents`.
 
 ## Resolution Presets
 
