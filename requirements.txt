@@ -3,13 +3,11 @@ transformers>=4.49.0
 accelerate>=1.1.1
 einops
 decord
-easydict
 ftfy
 regex
 numpy>=1.23.5,<2
 pillow
 scipy
 imageio[ffmpeg]
-tqdm
 peft
 huggingface_hub[cli]

@@ -12,7 +12,6 @@ from functools import partial
 import torch
 import torch.cuda.amp as amp
 import torch.distributed as dist
-from tqdm import tqdm
 
 from .distributed.fsdp import shard_model
 from .distributed.sequence_parallel import sp_attn_forward, sp_dit_forward
@@ -50,7 +49,7 @@ class WanTI2V_HR:
         Initializes the Wan text-to-video generation model components.
 
         Args:
-            config (EasyDict):
+            config (AttrDict):
                 Object containing model parameters initialized from config.py
             checkpoint_dir (`str`):
                 Path to directory containing model checkpoints
@@ -505,7 +504,7 @@ class WanTI2V_HR:
                 self.model.to(self.device)
                 torch.cuda.empty_cache()
             
-            for i, t in enumerate(tqdm(timesteps)):
+            for i, t in enumerate(timesteps):
                 latent_model_input = latents
                 timestep = torch.stack([t])
                 t_next = timesteps[i + 1] if (i + 1) < len(timesteps) else timestep.new_zeros(())

@@ -1,9 +1,10 @@
 # Copyright 2024-2025 The Alibaba Wan Team Authors. All rights reserved.
 import torch
-from easydict import EasyDict
+
+from .attrdict import AttrDict
 
 #------------------------ Wan shared config ------------------------#
-wan_shared_cfg = EasyDict()
+wan_shared_cfg = AttrDict()
 
 # t5
 wan_shared_cfg.t5_model = 'umt5_xxl'

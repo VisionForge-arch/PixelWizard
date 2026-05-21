@@ -12,7 +12,6 @@ from functools import partial
 import torch
 import torch.cuda.amp as amp
 import torch.distributed as dist
-from tqdm import tqdm
 
 from .distributed.fsdp import shard_model
 from .distributed.sequence_parallel import sp_attn_forward, sp_dit_forward
@@ -260,7 +259,7 @@ class WanTI2V:
                 self.model.to(self.device)
                 torch.cuda.empty_cache()
 
-            for _, t in enumerate(tqdm(timesteps)):
+            for _, t in enumerate(timesteps):
                 latent_model_input = latents
                 timestep = [t]
                 timestep = torch.stack(timestep)

@@ -1,11 +1,11 @@
 # Copyright 2024-2025 The Alibaba Wan Team Authors. All rights reserved.
-from easydict import EasyDict
+from .attrdict import AttrDict
 
 from .shared_config import wan_shared_cfg
 
 #------------------------ Wan TI2V 5B ------------------------#
 
-ti2v_5B = EasyDict(__name__='Config: Wan TI2V 5B')
+ti2v_5B = AttrDict(__name__='Config: Wan TI2V 5B')
 ti2v_5B.update(wan_shared_cfg)
 
 # t5

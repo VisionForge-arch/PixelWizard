@@ -375,7 +375,6 @@ def cycle(dl):
 
 if __name__ == "__main__":
     import argparse
-    from tqdm import tqdm
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_base_path", type=str, default=None)
@@ -414,7 +413,7 @@ if __name__ == "__main__":
     print(len(dataset))
     dataloader = torch.utils.data.DataLoader(dataset, shuffle=True, collate_fn=lambda x: x[0], num_workers=1)
     
-    for data in tqdm(dataloader):
+    for data in dataloader:
         print(data.keys())
         print(data["prompt"])
         print(data["file"].shape)
