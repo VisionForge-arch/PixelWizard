@@ -4,11 +4,11 @@
 
 # PixelWizard: Towards Efficient High-Fidelity Video Generation at Ultra-Large Spatial Resolutions
 
-<a href="#"><img src="https://img.shields.io/static/v1?label=Paper&message=Coming%20Soon&color=red"></a>
+<a href="http://arxiv.org/abs/2605.25801"><img src="https://img.shields.io/static/v1?label=Paper&message=arXiv&color=red"></a>
 &ensp;
-<a href="#"><img src="https://img.shields.io/static/v1?label=Project%20Page&message=Coming%20Soon&color=green"></a>
+<a href="https://wxliii.github.io/pixelwizard/"><img src="https://img.shields.io/static/v1?label=Project%20Page&message=Page&color=green"></a>
 &ensp;
-<a href="#"><img src="https://img.shields.io/static/v1?label=Checkpoints&message=Coming%20Soon&color=yellow"></a>
+<a href="https://huggingface.co/wxli318/PixelWizard"><img src="https://img.shields.io/static/v1?label=Checkpoints&message=HuggingFace&color=yellow"></a>
 &ensp;
 <a href="#"><img src="https://img.shields.io/static/v1?label=Code&message=Github&color=blue"></a>
 
