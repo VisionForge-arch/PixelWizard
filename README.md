@@ -33,7 +33,7 @@ PixelWizard is a high-resolution text-to-video generation framework for efficien
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/VisionForge-arch/PixelWizard
 cd PixelWizard
 ```
 
@@ -83,7 +83,7 @@ huggingface-cli download wxli318/PixelWizard --local-dir ./weight/PixelWizard
 
 - `--ckpt_dir`: Wan2.2-TI2V-5B base checkpoint directory, for example `./weight/Wan2.2-TI2V-5B`.
 - `--lr_ckpt`: optional low-resolution anchor checkpoint, for example `./weight/PixelWizard/lr/model.pt`. If omitted, the LR stage uses base Wan2.2 weights.
-- `--hr_ckpt`: required PixelWizard HR shortcut checkpoint, for example `./weight/PixelWizard/2k/model.pt` or `./weight/PixelWizard/4k/model.pt`.
+- `--hr_ckpt`: required PixelWizard HR shortcut checkpoint, for example `./weight/PixelWizard/4k/model.pt`.
 
 TODO:
 
