@@ -85,9 +85,6 @@ huggingface-cli download wxli318/PixelWizard --local-dir ./weight/PixelWizard
 - `--lr_ckpt`: optional low-resolution anchor checkpoint, for example `./weight/PixelWizard/lr/model.pt`. If omitted, the LR stage uses base Wan2.2 weights.
 - `--hr_ckpt`: required PixelWizard HR shortcut checkpoint, for example `./weight/PixelWizard/4k/model.pt`.
 
-TODO:
-
-- Upload the 2K PixelWizard HR shortcut checkpoint to [wxli318/PixelWizard](https://huggingface.co/wxli318/PixelWizard).
 
 ### 4. Run Inference
 
